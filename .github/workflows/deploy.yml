@@ -1,0 +1,21 @@
+name: Deploy Obrigenie Web
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish Blazor WASM
+        run: dotnet publish ./Obrigenie.csproj -c Release -o ./publish
+
+      - name: Deploy static files
+        run: |
+          sudo mkdir -p /var/www/serapi/wwwroot
+          sudo cp -r ./publish/wwwroot/* /var/www/serapi/wwwroot/
+          sudo systemctl restart serapi.service
+          echo "Obrigenie Web deployed successfully!"

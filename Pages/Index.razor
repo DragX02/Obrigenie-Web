@@ -1,0 +1,306 @@
+@page "/"
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject ApiService Api
+@inject CalendarService CalendarSvc
+
+<div class="calendar-container">
+    <!-- Header -->
+    <div class="calendar-header">
+        <button class="nav-btn" @onclick="MovePrevious">&lt;</button>
+        <h2 class="week-title" @onclick="ToggleViewMode">@weekTitle</h2>
+        <button class="nav-btn" @onclick="MoveNext">&gt;</button>
+    </div>
+
+    <!-- Server Status -->
+    <div class="server-status">
+        <span class="status-dot @(serverOnline ? "online" : "offline")"></span>
+        <span>@serverStatus</span>
+    </div>
+
+    @if (viewMode == CalendarViewMode.SingleDay && currentDay != null)
+    {
+        <!-- Single Day View with Time Grid -->
+        <div class="single-day-header">
+            <span class="day-name">@currentDay.DayOfWeek</span>
+            <span class="day-number">@currentDay.DayOfMonth</span>
+        </div>
+
+        <div class="time-grid">
+            @for (int h = 6; h <= 22; h++)
+            {
+                var hour = h;
+                var course = currentDay.Courses.FirstOrDefault(c =>
+                    c.StartTime.Hours <= hour && c.EndTime.Hours > hour);
+                var note = currentDay.Notes.FirstOrDefault(n => n.Hour == hour);
+
+                <div class="time-row" @onclick="() => OnTimeSlotClicked(hour)">
+                    <div class="time-label">@($"{hour:D2}:00")</div>
+                    <div class="time-content">
+                        @if (course != null)
+                        {
+                            <div class="course-block" style="background-color: @course.Color;">
+                                <span class="course-name">@course.Name</span>
+                                <span class="course-time">@($"{course.StartTime:hh\\:mm} - {course.EndTime:hh\\:mm}")</span>
+                            </div>
+                        }
+                        @if (note != null)
+                        {
+                            <div class="note-block" @onclick="() => OnTimeSlotClicked(hour)" @onclick:stopPropagation="true">
+                                @note.Content
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <!-- Week/Month Grid View -->
+        <div class="grid-header">
+            @foreach (var day in days)
+            {
+                <div class="grid-header-cell">@day.DayOfWeek[..3]</div>
+            }
+        </div>
+        <div class="days-grid" style="grid-template-columns: repeat(@gridSpan, 1fr);">
+            @foreach (var day in days)
+            {
+                <div class="day-cell @(day.IsHoliday ? "holiday" : "") @(day.IsSchoolStart ? "school-start" : "") @(day.Date == DateTime.Today ? "today" : "")"
+                     @onclick="() => SelectDay(day.Date)">
+                    <span class="day-num">@day.DayOfMonth</span>
+                    @if (!string.IsNullOrEmpty(day.ShortHolidayName))
+                    {
+                        <span class="holiday-name">@day.ShortHolidayName</span>
+                    }
+                    @foreach (var course in day.Courses.Take(3))
+                    {
+                        <div class="course-mini" style="background-color: @course.Color;">@course.Name</div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- Note Modal -->
+@if (showNoteModal)
+{
+    <div class="modal-overlay" @onclick="CloseNoteModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <h3>Note pour @($"{editingHour:D2}:00")</h3>
+            <textarea @bind="noteContent" placeholder="Tapez votre note ici..." rows="4"></textarea>
+            <div class="modal-buttons">
+                <button class="btn-save" @onclick="SaveNote">Enregistrer</button>
+                @if (editingNote != null)
+                {
+                    <button class="btn-delete" @onclick="DeleteNote">Supprimer</button>
+                }
+                <button class="btn-cancel" @onclick="CloseNoteModal">Annuler</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Logout Button -->
+<div class="logout-section">
+    <button class="btn-logout" @onclick="Logout">Deconnexion</button>
+</div>
+
+@code {
+    private CalendarViewMode viewMode = CalendarViewMode.Week;
+    private CalendarViewMode previousViewMode = CalendarViewMode.Week;
+    private DateTime currentDate = DateTime.Today;
+    private string weekTitle = "Chargement...";
+    private List<Day> days = new();
+    private Day? currentDay;
+    private List<Holiday> cachedHolidays = new();
+    private bool serverOnline = false;
+    private string serverStatus = "Verification...";
+    private int gridSpan => viewMode == CalendarViewMode.SingleDay ? 1 :
+        (viewMode == CalendarViewMode.Month || viewMode == CalendarViewMode.WeekAndWeekend) ? 7 : 5;
+
+    // Note modal
+    private bool showNoteModal = false;
+    private int editingHour = 0;
+    private string noteContent = "";
+    private Note? editingNote = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var isLoggedIn = await Auth.IsLoggedInAsync();
+        if (!isLoggedIn)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        serverOnline = await Api.CheckHealthAsync();
+        serverStatus = serverOnline ? "Serveur connecte" : "Serveur hors ligne";
+
+        try
+        {
+            var calendarData = await CalendarSvc.GetCalendarData();
+            cachedHolidays = calendarData.Holidays;
+        }
+        catch { }
+
+        await UpdateCalendarView();
+    }
+
+    private async Task UpdateCalendarView()
+    {
+        if (viewMode == CalendarViewMode.SingleDay) await UpdateSingleDayView();
+        else if (viewMode == CalendarViewMode.Month) UpdateMonthView();
+        else UpdateWeekView();
+    }
+
+    private async Task UpdateSingleDayView()
+    {
+        weekTitle = currentDate.ToString("dddd dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"));
+        currentDay = await CreateDayWithDataAsync(currentDate);
+        days = new List<Day> { currentDay };
+    }
+
+    private void UpdateWeekView()
+    {
+        int delta = System.DayOfWeek.Monday - currentDate.DayOfWeek;
+        if (delta > 0) delta -= 7;
+        DateTime monday = currentDate.AddDays(delta);
+        DateTime sunday = monday.AddDays(6);
+
+        weekTitle = $"Semaine du {monday:dd/MM} au {sunday:dd/MM}";
+
+        int daysToShow = viewMode == CalendarViewMode.Week ? 5 : 7;
+        days = new List<Day>();
+        for (int i = 0; i < daysToShow; i++)
+            days.Add(CreateDayModel(monday.AddDays(i)));
+    }
+
+    private void UpdateMonthView()
+    {
+        weekTitle = currentDate.ToString("MMMM yyyy", new System.Globalization.CultureInfo("fr-FR")).ToUpper();
+        DateTime firstDayOfMonth = new DateTime(currentDate.Year, currentDate.Month, 1);
+        int offset = ((int)firstDayOfMonth.DayOfWeek - (int)System.DayOfWeek.Monday + 7) % 7;
+        DateTime startDate = firstDayOfMonth.AddDays(-offset);
+
+        days = new List<Day>();
+        for (int i = 0; i < 42; i++)
+            days.Add(CreateDayModel(startDate.AddDays(i)));
+    }
+
+    private Day CreateDayModel(DateTime date)
+    {
+        var holiday = cachedHolidays.FirstOrDefault(h => date >= h.StartDate && date <= h.EndDate);
+        bool isRentree = holiday != null && (holiday.Name.Contains("Rentree") || holiday.Name.Contains("Rentre"));
+
+        return new Day
+        {
+            Date = date,
+            DayOfWeek = date.ToString("dddd", new System.Globalization.CultureInfo("fr-FR")),
+            DayOfMonth = date.Day.ToString(),
+            IsHoliday = holiday != null && !isRentree,
+            IsSchoolStart = isRentree,
+            HolidayName = holiday?.Name ?? string.Empty,
+        };
+    }
+
+    private async Task<Day> CreateDayWithDataAsync(DateTime date)
+    {
+        var day = CreateDayModel(date);
+        day.Courses = await Api.GetCoursesForDateAsync(date);
+        day.Notes = await Api.GetNotesForDateAsync(date);
+        return day;
+    }
+
+    private async Task MovePrevious()
+    {
+        if (viewMode == CalendarViewMode.SingleDay) currentDate = currentDate.AddDays(-1);
+        else if (viewMode == CalendarViewMode.Month) currentDate = currentDate.AddMonths(-1);
+        else currentDate = currentDate.AddDays(-7);
+        await UpdateCalendarView();
+    }
+
+    private async Task MoveNext()
+    {
+        if (viewMode == CalendarViewMode.SingleDay) currentDate = currentDate.AddDays(1);
+        else if (viewMode == CalendarViewMode.Month) currentDate = currentDate.AddMonths(1);
+        else currentDate = currentDate.AddDays(7);
+        await UpdateCalendarView();
+    }
+
+    private async Task ToggleViewMode()
+    {
+        if (viewMode == CalendarViewMode.SingleDay)
+            viewMode = previousViewMode;
+        else
+        {
+            viewMode = viewMode switch
+            {
+                CalendarViewMode.Week => CalendarViewMode.WeekAndWeekend,
+                CalendarViewMode.WeekAndWeekend => CalendarViewMode.Month,
+                CalendarViewMode.Month => CalendarViewMode.Week,
+                _ => CalendarViewMode.Week
+            };
+        }
+        await UpdateCalendarView();
+    }
+
+    private async Task SelectDay(DateTime date)
+    {
+        if (viewMode != CalendarViewMode.SingleDay)
+            previousViewMode = viewMode;
+        viewMode = CalendarViewMode.SingleDay;
+        currentDate = date;
+        await UpdateCalendarView();
+    }
+
+    private void OnTimeSlotClicked(int hour)
+    {
+        editingHour = hour;
+        editingNote = currentDay?.Notes.FirstOrDefault(n => n.Hour == hour);
+        noteContent = editingNote?.Content ?? "";
+        showNoteModal = true;
+    }
+
+    private async Task SaveNote()
+    {
+        if (currentDay == null) return;
+
+        var note = editingNote ?? new Note
+        {
+            Date = currentDay.Date,
+            Hour = editingHour
+        };
+        note.Content = noteContent;
+
+        await Api.SaveNoteAsync(note);
+        showNoteModal = false;
+
+        // Refresh day data
+        currentDay = await CreateDayWithDataAsync(currentDate);
+        days = new List<Day> { currentDay };
+    }
+
+    private async Task DeleteNote()
+    {
+        if (editingNote == null) return;
+        await Api.DeleteNoteAsync(editingNote.Id);
+        showNoteModal = false;
+
+        currentDay = await CreateDayWithDataAsync(currentDate);
+        days = new List<Day> { currentDay };
+    }
+
+    private void CloseNoteModal()
+    {
+        showNoteModal = false;
+    }
+
+    private async Task Logout()
+    {
+        await Auth.RemoveTokenAsync();
+        Nav.NavigateTo("/login");
+    }
+}

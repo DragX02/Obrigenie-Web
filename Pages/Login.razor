@@ -1,0 +1,140 @@
+@page "/login"
+@inject ApiService Api
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<div class="login-container">
+    <div class="login-card">
+        <h1 class="login-title">Obrigenie</h1>
+        <p class="login-subtitle">Agenda Professionnel</p>
+
+        <!-- OAuth Buttons -->
+        <div class="oauth-buttons">
+            <a href="api/auth/google" class="btn-oauth btn-google">
+                Se connecter avec Google
+            </a>
+            <a href="api/auth/microsoft" class="btn-oauth btn-microsoft">
+                Se connecter avec Outlook
+            </a>
+        </div>
+
+        <div class="separator">
+            <span>ou</span>
+        </div>
+
+        <!-- Toggle Login/Register -->
+        <div class="tab-buttons">
+            <button class="@(isRegister ? "" : "active")" @onclick="() => isRegister = false">Connexion</button>
+            <button class="@(isRegister ? "active" : "")" @onclick="() => isRegister = true">Inscription</button>
+        </div>
+
+        @if (!isRegister)
+        {
+            <!-- Login Form -->
+            <div class="form-group">
+                <input type="email" @bind="loginEmail" placeholder="Email" class="form-input" />
+                <input type="password" @bind="loginPassword" placeholder="Mot de passe" class="form-input" />
+                <button class="btn-submit" @onclick="HandleLogin" disabled="@isLoading">
+                    @(isLoading ? "Connexion..." : "Se connecter")
+                </button>
+            </div>
+        }
+        else
+        {
+            <!-- Register Form -->
+            <div class="form-group">
+                <input type="text" @bind="registerNom" placeholder="Nom" class="form-input" />
+                <input type="text" @bind="registerPrenom" placeholder="Prenom" class="form-input" />
+                <input type="email" @bind="registerEmail" placeholder="Email" class="form-input" />
+                <input type="password" @bind="registerPassword" placeholder="Mot de passe (6 car. min, 1 maj, 1 chiffre)" class="form-input" />
+                <input type="password" @bind="registerConfirmPassword" placeholder="Confirmer le mot de passe" class="form-input" />
+                <button class="btn-submit" @onclick="HandleRegister" disabled="@isLoading">
+                    @(isLoading ? "Inscription..." : "S'inscrire")
+                </button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <p class="error-message">@errorMessage</p>
+        }
+    </div>
+</div>
+
+@code {
+    private bool isRegister = false;
+    private bool isLoading = false;
+    private string errorMessage = "";
+
+    private string loginEmail = "";
+    private string loginPassword = "";
+
+    private string registerNom = "";
+    private string registerPrenom = "";
+    private string registerEmail = "";
+    private string registerPassword = "";
+    private string registerConfirmPassword = "";
+
+    private async Task HandleLogin()
+    {
+        errorMessage = "";
+        isLoading = true;
+
+        var result = await Api.LoginAsync(new LoginDto { Email = loginEmail, Password = loginPassword });
+        if (result != null)
+        {
+            await Auth.SaveTokenAsync(result.Token);
+            await Auth.SaveEmailAsync(result.Email);
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            errorMessage = "Email ou mot de passe incorrect.";
+        }
+
+        isLoading = false;
+    }
+
+    private async Task HandleRegister()
+    {
+        errorMessage = "";
+
+        if (registerPassword != registerConfirmPassword)
+        {
+            errorMessage = "Les mots de passe ne correspondent pas.";
+            return;
+        }
+
+        if (registerPassword.Length < 6 ||
+            !registerPassword.Any(char.IsUpper) ||
+            !registerPassword.Any(char.IsDigit))
+        {
+            errorMessage = "Le mot de passe doit contenir au moins 6 caracteres, 1 majuscule et 1 chiffre.";
+            return;
+        }
+
+        isLoading = true;
+
+        var result = await Api.RegisterAsync(new RegisterDto
+        {
+            Email = registerEmail,
+            Password = registerPassword,
+            ConfirmPassword = registerConfirmPassword,
+            Nom = registerNom,
+            Prenom = registerPrenom
+        });
+
+        if (result != null)
+        {
+            await Auth.SaveTokenAsync(result.Token);
+            await Auth.SaveEmailAsync(result.Email);
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            errorMessage = "Erreur lors de l'inscription.";
+        }
+
+        isLoading = false;
+    }
+}

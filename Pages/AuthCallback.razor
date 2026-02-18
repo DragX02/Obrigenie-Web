@@ -1,0 +1,37 @@
+@page "/auth-callback"
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<div class="login-container">
+    <p>Connexion en cours...</p>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = new Uri(Nav.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+        var token = query["token"];
+        var email = query["email"];
+        var error = query["error"];
+
+        if (!string.IsNullOrEmpty(error))
+        {
+            Nav.NavigateTo($"/login?error={error}");
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(token))
+        {
+            await Auth.SaveTokenAsync(token);
+            if (!string.IsNullOrEmpty(email))
+                await Auth.SaveEmailAsync(email);
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            Nav.NavigateTo("/login");
+        }
+    }
+}
