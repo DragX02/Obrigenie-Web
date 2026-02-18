@@ -10,7 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Au lieu d'installer, on vérifie juste que dotnet est là
       - name: Check .NET version
         run: dotnet --version
 
@@ -25,3 +24,4 @@ jobs:
           sudo chown -R www-data:www-data /var/www/obrigenie-web
           sudo systemctl restart nginx
           echo "Obrigenie Web deployed successfully!"
+# upda
