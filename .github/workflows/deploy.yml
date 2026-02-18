@@ -10,12 +10,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
       - name: Publish Blazor WASM
         run: dotnet publish ./Obrigenie.csproj -c Release -o ./publish
 
-      - name: Deploy static files
+      - name: Deploy to Web Folder
         run: |
-          sudo mkdir -p /var/www/serapi/wwwroot
-          sudo cp -r ./publish/wwwroot/* /var/www/serapi/wwwroot/
-          sudo systemctl restart serapi.service
-          echo "Obrigenie Web deployed successfully!"
+          # 1. Créer le dossier de destination (Autorisé par visudo)
+          sudo mkdir -p /var/www/obrigenie-web
+          
+          # 2. Nettoyer l'ancien contenu (Autorisé par visudo)
+          sudo rm -rf /var/www/obrigenie-web/*
+          
+          # 3. Copier les nouveaux fichiers (Autorisé par visudo)
+          sudo cp -r ./publish/wwwroot/* /var/www/obrigenie-web/
+          
+          # 4. Donner les droits à Nginx (Autorisé par visudo)
+          sudo chown -R www-data:www-data /var/www/obrigenie-web
+          
+          # 5. Redémarrer Nginx pour appliquer (Autorisé par visudo)
+          sudo systemctl restart nginx
+          
+          echo "Déploiement Obrigenie Web réussi sur 192.168.1.7 !"
