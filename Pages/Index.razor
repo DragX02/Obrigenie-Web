@@ -5,10 +5,22 @@
 @inject CalendarService CalendarSvc
 
 <div class="calendar-container">
-    <!-- Header -->
+    <!-- Boutons de vue -->
+    <div class="view-mode-bar">
+        <button class="@(viewMode == CalendarViewMode.SingleDay ? "view-btn active" : "view-btn")"
+                @onclick='() => SetViewMode(CalendarViewMode.SingleDay)'>Jour</button>
+        <button class="@(viewMode == CalendarViewMode.Week ? "view-btn active" : "view-btn")"
+                @onclick='() => SetViewMode(CalendarViewMode.Week)'>Semaine</button>
+        <button class="@(viewMode == CalendarViewMode.WeekAndWeekend ? "view-btn active" : "view-btn")"
+                @onclick='() => SetViewMode(CalendarViewMode.WeekAndWeekend)'>Sem. +</button>
+        <button class="@(viewMode == CalendarViewMode.Month ? "view-btn active" : "view-btn")"
+                @onclick='() => SetViewMode(CalendarViewMode.Month)'>Mois</button>
+    </div>
+
+    <!-- Header navigation -->
     <div class="calendar-header">
         <button class="nav-btn" @onclick="MovePrevious">&lt;</button>
-        <h2 class="week-title" @onclick="ToggleViewMode">@weekTitle</h2>
+        <h2 class="week-title">@weekTitle</h2>
         <button class="nav-btn" @onclick="MoveNext">&gt;</button>
     </div>
 
@@ -214,20 +226,24 @@
         await UpdateCalendarView();
     }
 
+    private async Task SetViewMode(CalendarViewMode mode)
+    {
+        if (viewMode != CalendarViewMode.SingleDay)
+            previousViewMode = viewMode;
+        viewMode = mode;
+        await UpdateCalendarView();
+    }
+
     private async Task ToggleViewMode()
     {
-        if (viewMode == CalendarViewMode.SingleDay)
-            viewMode = previousViewMode;
-        else
+        viewMode = viewMode switch
         {
-            viewMode = viewMode switch
-            {
-                CalendarViewMode.Week => CalendarViewMode.WeekAndWeekend,
-                CalendarViewMode.WeekAndWeekend => CalendarViewMode.Month,
-                CalendarViewMode.Month => CalendarViewMode.Week,
-                _ => CalendarViewMode.Week
-            };
-        }
+            CalendarViewMode.SingleDay => previousViewMode,
+            CalendarViewMode.Week => CalendarViewMode.WeekAndWeekend,
+            CalendarViewMode.WeekAndWeekend => CalendarViewMode.Month,
+            CalendarViewMode.Month => CalendarViewMode.Week,
+            _ => CalendarViewMode.Week
+        };
         await UpdateCalendarView();
     }
 
