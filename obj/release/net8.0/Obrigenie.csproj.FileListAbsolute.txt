@@ -1046,9 +1046,6 @@ G:\csharpcallender\Obrigenie\obj\release\net8.0\compressed\sc69uidq4x-tjcz0u77k5
 G:\csharpcallender\Obrigenie\obj\release\net8.0\compressed\3ckoxpqh0l-tptq2av103.gz
 G:\csharpcallender\Obrigenie\obj\release\net8.0\compressed\0u5z7ftl6k-lfu7j35m59.gz
 G:\csharpcallender\Obrigenie\obj\release\net8.0\compressed\f305jzgglj-oyz0vx2fzb.gz
-G:\csharpcallender\Obrigenie\obj\release\net8.0\compressed\sximyzyto4-zsohe5voee.gz
-G:\csharpcallender\Obrigenie\obj\release\net8.0\compressed\xtagjm5cvc-myn7hxx1r9.gz
-G:\csharpcallender\Obrigenie\obj\release\net8.0\compressed\j9h466dswd-qq45blu4kr.gz
 G:\csharpcallender\Obrigenie\obj\release\net8.0\staticwebassets.build.json
 G:\csharpcallender\Obrigenie\obj\release\net8.0\staticwebassets.build.json.cache
 G:\csharpcallender\Obrigenie\obj\release\net8.0\staticwebassets.development.json
@@ -1058,3 +1055,6 @@ G:\csharpcallender\Obrigenie\obj\release\net8.0\Obrigenie.dll
 G:\csharpcallender\Obrigenie\obj\release\net8.0\refint\Obrigenie.dll
 G:\csharpcallender\Obrigenie\obj\release\net8.0\Obrigenie.pdb
 G:\csharpcallender\Obrigenie\obj\release\net8.0\ref\Obrigenie.dll
+G:\csharpcallender\Obrigenie\obj\release\net8.0\compressed\sximyzyto4-23c2p6a57h.gz
+G:\csharpcallender\Obrigenie\obj\release\net8.0\compressed\xtagjm5cvc-fafju66ch9.gz
+G:\csharpcallender\Obrigenie\obj\release\net8.0\compressed\j9h466dswd-tvam05bum0.gz
