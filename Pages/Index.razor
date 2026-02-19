@@ -24,6 +24,13 @@
         <button class="nav-btn" @onclick="MoveNext">&gt;</button>
     </div>
 
+    @if (!string.IsNullOrEmpty(periodLabel))
+    {
+        <div class="period-label @(periodLabel.StartsWith("Congé") ? "period-label--holiday" : "")">
+            📚 @periodLabel
+        </div>
+    }
+
     @if (viewMode == CalendarViewMode.SingleDay && currentDay != null)
     {
         <!-- Single Day View with Time Grid -->
@@ -117,6 +124,7 @@
     private List<Day> days = new();
     private Day? currentDay;
     private List<Holiday> cachedHolidays = new();
+    private string? periodLabel;
     private int gridSpan => viewMode == CalendarViewMode.SingleDay ? 1 :
         (viewMode == CalendarViewMode.Month || viewMode == CalendarViewMode.WeekAndWeekend) ? 7 : 5;
 
@@ -150,6 +158,8 @@
         if (viewMode == CalendarViewMode.SingleDay) await UpdateSingleDayView();
         else if (viewMode == CalendarViewMode.Month) UpdateMonthView();
         else UpdateWeekView();
+
+        periodLabel = SchoolPeriodHelper.GetLabel(currentDate, cachedHolidays);
     }
 
     private async Task UpdateSingleDayView()

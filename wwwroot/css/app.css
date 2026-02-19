@@ -291,6 +291,26 @@ h1:focus { outline: none; }
 .view-btn:hover { background: var(--row-hover); color: var(--text); }
 .view-btn.active { background: var(--primary); color: white; }
 
+/* Period label */
+.period-label {
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 20px;
+    margin-bottom: 0.75rem;
+    background: var(--primary);
+    color: white;
+    display: inline-block;
+    width: 100%;
+    box-sizing: border-box;
+    letter-spacing: 0.3px;
+}
+.period-label--holiday {
+    background: #FF9800;
+    color: #1a1a1a;
+}
+
 /* Single Day */
 .single-day-header { text-align: center; margin-bottom: 1rem; }
 .day-name { display: block; text-transform: capitalize; color: var(--text-muted); }

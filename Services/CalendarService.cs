@@ -134,6 +134,49 @@ namespace Obrigenie.Services
         }
     }
 
+    public static class SchoolPeriodHelper
+    {
+        private static string GetShortName(string holidayName)
+        {
+            if (holidayName.Contains("Toussaint") || holidayName.Contains("automne")) return "Toussaint";
+            if (holidayName.Contains("Noel") || holidayName.Contains("Noël") || holidayName.Contains("hiver")) return "Noël";
+            if (holidayName.Contains("Carnaval") || holidayName.Contains("detente") || holidayName.Contains("détente")) return "Carnaval";
+            if (holidayName.Contains("Paques") || holidayName.Contains("Pâques") || holidayName.Contains("printemps")) return "Pâques";
+            if (holidayName.Contains("ete") || holidayName.Contains("été") || holidayName.Contains("Ete") || holidayName.Contains("Été")) return "Été";
+            if (holidayName.Contains("Rentree") || holidayName.Contains("Rentrée")) return "Rentrée";
+            return holidayName;
+        }
+
+        public static string? GetLabel(DateTime date, List<Holiday> holidays)
+        {
+            if (holidays == null || holidays.Count == 0) return null;
+
+            // Vacances uniquement (pas les Rentrée qui sont des marqueurs ponctuels)
+            var vacations = holidays
+                .Where(h => !h.Name.Contains("Rentree") && !h.Name.Contains("Rentrée"))
+                .OrderBy(h => h.StartDate)
+                .ToList();
+
+            // Congé en cours ?
+            var current = vacations.FirstOrDefault(h => date.Date >= h.StartDate.Date && date.Date <= h.EndDate.Date);
+            if (current != null)
+                return $"Congé de {GetShortName(current.Name)}";
+
+            // Congé précédent et suivant
+            var prev = vacations.Where(h => h.EndDate.Date < date.Date).OrderByDescending(h => h.EndDate).FirstOrDefault();
+            var next = vacations.Where(h => h.StartDate.Date > date.Date).OrderBy(h => h.StartDate).FirstOrDefault();
+
+            if (prev != null && next != null)
+                return $"{GetShortName(prev.Name)} → {GetShortName(next.Name)}";
+            if (next != null)
+                return $"Rentrée → {GetShortName(next.Name)}";
+            if (prev != null)
+                return $"Après {GetShortName(prev.Name)}";
+
+            return null;
+        }
+    }
+
     public class ApiCalendrierDto
     {
         public string? nomEvenement { get; set; }
