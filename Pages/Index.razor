@@ -70,11 +70,66 @@
             }
         </div>
     }
+    else if (viewMode == CalendarViewMode.SchoolPeriod)
+    {
+        <!-- Trimestre : semaines en colonnes, jours en lignes -->
+        @if (trimLoading)
+        {
+            <div class="trim-loading">Chargement du trimestre...</div>
+        }
+        else
+        {
+            <div class="trimestre-scroll">
+                <div class="trimestre-table">
+                    <!-- Colonne fixe : noms des jours -->
+                    <div class="trim-col trim-col-fixed">
+                        <div class="trim-cell trim-cell-header trim-corner"></div>
+                        <div class="trim-cell trim-cell-day">Lun</div>
+                        <div class="trim-cell trim-cell-day">Mar</div>
+                        <div class="trim-cell trim-cell-day">Mer</div>
+                        <div class="trim-cell trim-cell-day">Jeu</div>
+                        <div class="trim-cell trim-cell-day">Ven</div>
+                    </div>
+                    <!-- Colonnes semaines -->
+                    @foreach (var week in trimWeeks)
+                    {
+                        <div class="trim-col @(week.IsFullHoliday ? "trim-col-holiday" : "")">
+                            <div class="trim-cell trim-cell-header">
+                                <span class="trim-week-num">S@week.WeekNum</span>
+                                <span class="trim-week-date">@week.DateLabel</span>
+                            </div>
+                            @if (week.IsFullHoliday)
+                            {
+                                <div class="trim-cell-holiday-span">@week.HolidayShortName</div>
+                            }
+                            else
+                            {
+                                @foreach (var day in week.Days)
+                                {
+                                    <div class="trim-cell @(day.IsHoliday ? "trim-cell-hol" : "") @(day.IsToday ? "trim-cell-today" : "") @(!day.IsInPeriod ? "trim-cell-out" : "")"
+                                         @onclick="() => SelectDay(day.Date)">
+                                        @if (day.IsHoliday)
+                                        {
+                                            <span class="trim-conge">C</span>
+                                        }
+                                        @foreach (var c in day.Courses)
+                                        {
+                                            <div class="trim-course" style="background-color: @c.Color;" title="@c.Name">@c.Name</div>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
     else
     {
         <!-- Week/Month Grid View -->
-        <div class="grid-header">
-            @foreach (var day in days)
+        <div class="grid-header" style="grid-template-columns: repeat(@gridSpan, 1fr); display: grid;">
+            @foreach (var day in days.Take(gridSpan))
             {
                 <div class="grid-header-cell">@day.DayOfWeek[..3]</div>
             }
@@ -82,7 +137,7 @@
         <div class="days-grid" style="grid-template-columns: repeat(@gridSpan, 1fr);">
             @foreach (var day in days)
             {
-                <div class="day-cell @(day.IsHoliday ? "holiday" : "") @(day.IsSchoolStart ? "school-start" : "") @(day.Date == DateTime.Today ? "today" : "") @(viewMode == CalendarViewMode.SchoolPeriod && (day.Date < schoolPeriodStart || day.Date > schoolPeriodEnd) ? "out-of-period" : "")"
+                <div class="day-cell @(day.IsHoliday ? "holiday" : "") @(day.IsSchoolStart ? "school-start" : "") @(day.Date == DateTime.Today ? "today" : "")"
                      @onclick="() => SelectDay(day.Date)">
                     <span class="day-num">@day.DayOfMonth</span>
                     @if (!string.IsNullOrEmpty(day.ShortHolidayName))
@@ -129,8 +184,10 @@
     private string? periodLabel;
     private DateTime schoolPeriodStart;
     private DateTime schoolPeriodEnd;
-    private int gridSpan => viewMode == CalendarViewMode.SingleDay ? 1 :
-        (viewMode == CalendarViewMode.Month || viewMode == CalendarViewMode.WeekAndWeekend || viewMode == CalendarViewMode.SchoolPeriod) ? 7 : 5;
+    private bool trimLoading = false;
+    private List<TrimWeek> trimWeeks = new();
+    private int gridSpan => viewMode == CalendarViewMode.Week ? 5 :
+        viewMode == CalendarViewMode.SingleDay ? 1 : 7;
 
     // Note modal
     private bool showNoteModal = false;
@@ -138,14 +195,32 @@
     private string noteContent = "";
     private Note? editingNote = null;
 
+    // ── Classes pour la vue Trimestre ──────────────────────────────────
+    private class TrimWeek
+    {
+        public DateTime WeekStart { get; set; }
+        public int WeekNum { get; set; }
+        public string DateLabel { get; set; } = "";
+        public List<TrimDay> Days { get; set; } = new();
+        public bool IsFullHoliday => Days.Count == 5 && Days.All(d => d.IsHoliday);
+        public string HolidayShortName => Days.FirstOrDefault(d => d.IsHoliday)?.HolidayShortName ?? "Congé";
+    }
+
+    private class TrimDay
+    {
+        public DateTime Date { get; set; }
+        public List<Course> Courses { get; set; } = new();
+        public bool IsHoliday { get; set; }
+        public string HolidayShortName { get; set; } = "";
+        public bool IsInPeriod { get; set; }
+        public bool IsToday => Date.Date == DateTime.Today;
+    }
+
+    // ── Initialisation ─────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
         var isLoggedIn = await Auth.IsLoggedInAsync();
-        if (!isLoggedIn)
-        {
-            Nav.NavigateTo("/login");
-            return;
-        }
+        if (!isLoggedIn) { Nav.NavigateTo("/login"); return; }
 
         try
         {
@@ -161,37 +236,15 @@
     {
         if (viewMode == CalendarViewMode.SingleDay) await UpdateSingleDayView();
         else if (viewMode == CalendarViewMode.Month) UpdateMonthView();
-        else if (viewMode == CalendarViewMode.SchoolPeriod) UpdateSchoolPeriodView();
+        else if (viewMode == CalendarViewMode.SchoolPeriod) await UpdateSchoolPeriodView();
         else UpdateWeekView();
 
-        // En mode Trimestre le titre suffit, pas besoin du bandeau
         periodLabel = viewMode == CalendarViewMode.SchoolPeriod
             ? null
             : SchoolPeriodHelper.GetLabel(currentDate, cachedHolidays);
     }
 
-    private void UpdateSchoolPeriodView()
-    {
-        var (start, end, title) = SchoolPeriodHelper.GetPeriodBounds(currentDate, cachedHolidays);
-        schoolPeriodStart = start;
-        schoolPeriodEnd   = end;
-        weekTitle = title;
-
-        // Aligne le début sur un lundi
-        int offset = ((int)start.DayOfWeek - (int)System.DayOfWeek.Monday + 7) % 7;
-        DateTime gridStart = start.AddDays(-offset);
-
-        days = new List<Day>();
-        for (DateTime d = gridStart; d.Date <= end.Date; d = d.AddDays(1))
-            days.Add(CreateDayModel(d));
-
-        // Complète la dernière semaine
-        int remainder = days.Count % 7;
-        if (remainder != 0)
-            for (int i = 0; i < 7 - remainder; i++)
-                days.Add(CreateDayModel(end.AddDays(i + 1)));
-    }
-
+    // ── Vues ──────────────────────────────────────────────────────────
     private async Task UpdateSingleDayView()
     {
         weekTitle = currentDate.ToString("dddd dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"));
@@ -205,9 +258,7 @@
         if (delta > 0) delta -= 7;
         DateTime monday = currentDate.AddDays(delta);
         DateTime sunday = monday.AddDays(6);
-
         weekTitle = $"Semaine du {monday:dd/MM} au {sunday:dd/MM}";
-
         int daysToShow = viewMode == CalendarViewMode.Week ? 5 : 7;
         days = new List<Day>();
         for (int i = 0; i < daysToShow; i++)
@@ -217,26 +268,96 @@
     private void UpdateMonthView()
     {
         weekTitle = currentDate.ToString("MMMM yyyy", new System.Globalization.CultureInfo("fr-FR")).ToUpper();
-        DateTime firstDayOfMonth = new DateTime(currentDate.Year, currentDate.Month, 1);
-        int offset = ((int)firstDayOfMonth.DayOfWeek - (int)System.DayOfWeek.Monday + 7) % 7;
-        DateTime startDate = firstDayOfMonth.AddDays(-offset);
-
+        DateTime first = new DateTime(currentDate.Year, currentDate.Month, 1);
+        int offset = ((int)first.DayOfWeek - (int)System.DayOfWeek.Monday + 7) % 7;
+        DateTime start = first.AddDays(-offset);
         days = new List<Day>();
         for (int i = 0; i < 42; i++)
-            days.Add(CreateDayModel(startDate.AddDays(i)));
+            days.Add(CreateDayModel(start.AddDays(i)));
     }
 
+    private async Task UpdateSchoolPeriodView()
+    {
+        trimLoading = true;
+        StateHasChanged();
+
+        var (start, end, title) = SchoolPeriodHelper.GetPeriodBounds(currentDate, cachedHolidays);
+        schoolPeriodStart = start;
+        schoolPeriodEnd   = end;
+        weekTitle = title;
+
+        // Lundi précédant le début
+        int off = ((int)start.DayOfWeek - (int)System.DayOfWeek.Monday + 7) % 7;
+        DateTime gridStart = start.AddDays(-off);
+
+        // Collecter tous les jours ouvrés (lun-ven) pour les requêtes API
+        var weekdays = new List<DateTime>();
+        for (DateTime d = gridStart; d.Date <= end.Date; d = d.AddDays(1))
+            if (d.DayOfWeek != System.DayOfWeek.Saturday && d.DayOfWeek != System.DayOfWeek.Sunday)
+                weekdays.Add(d);
+
+        // Charger les cours en parallèle
+        var tasks = weekdays.Select(d => Api.GetCoursesForDateAsync(d)).ToArray();
+        var results = await Task.WhenAll(tasks);
+        var coursesByDate = weekdays.Zip(results).ToDictionary(p => p.First.Date, p => p.Second);
+
+        var frCulture = new System.Globalization.CultureInfo("fr-FR");
+        trimWeeks = new List<TrimWeek>();
+
+        for (DateTime ws = gridStart; ws.Date <= end.Date; ws = ws.AddDays(7))
+        {
+            var week = new TrimWeek
+            {
+                WeekStart = ws,
+                WeekNum   = frCulture.Calendar.GetWeekOfYear(ws,
+                    System.Globalization.CalendarWeekRule.FirstFourDayWeek,
+                    System.DayOfWeek.Monday),
+                DateLabel = ws.ToString("dd/MM")
+            };
+
+            for (int d = 0; d < 5; d++) // Lun → Ven
+            {
+                DateTime date = ws.AddDays(d);
+                var hol = cachedHolidays.FirstOrDefault(h =>
+                    date.Date >= h.StartDate.Date && date.Date <= h.EndDate.Date &&
+                    !h.Name.Contains("Rentree") && !h.Name.Contains("Rentrée"));
+
+                week.Days.Add(new TrimDay
+                {
+                    Date           = date,
+                    Courses        = coursesByDate.GetValueOrDefault(date.Date, new()),
+                    IsHoliday      = hol != null,
+                    HolidayShortName = hol != null ? GetShortHolName(hol.Name) : "",
+                    IsInPeriod     = date.Date >= start.Date && date.Date <= end.Date
+                });
+            }
+            trimWeeks.Add(week);
+        }
+
+        trimLoading = false;
+    }
+
+    private static string GetShortHolName(string name)
+    {
+        if (name.Contains("Toussaint") || name.Contains("automne")) return "Toussaint";
+        if (name.Contains("Noel") || name.Contains("Noël") || name.Contains("hiver")) return "Noël";
+        if (name.Contains("Carnaval") || name.Contains("detente"))   return "Carnaval";
+        if (name.Contains("Paques")   || name.Contains("Pâques"))    return "Pâques";
+        if (name.Contains("ete")      || name.Contains("été"))        return "Été";
+        return "Congé";
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────
     private Day CreateDayModel(DateTime date)
     {
         var holiday = cachedHolidays.FirstOrDefault(h => date >= h.StartDate && date <= h.EndDate);
         bool isRentree = holiday != null && (holiday.Name.Contains("Rentree") || holiday.Name.Contains("Rentre"));
-
         return new Day
         {
-            Date = date,
-            DayOfWeek = date.ToString("dddd", new System.Globalization.CultureInfo("fr-FR")),
-            DayOfMonth = date.Day.ToString(),
-            IsHoliday = holiday != null && !isRentree,
+            Date        = date,
+            DayOfWeek   = date.ToString("dddd", new System.Globalization.CultureInfo("fr-FR")),
+            DayOfMonth  = date.Day.ToString(),
+            IsHoliday   = holiday != null && !isRentree,
             IsSchoolStart = isRentree,
             HolidayName = holiday?.Name ?? string.Empty,
         };
@@ -246,33 +367,25 @@
     {
         var day = CreateDayModel(date);
         day.Courses = await Api.GetCoursesForDateAsync(date);
-        day.Notes = await Api.GetNotesForDateAsync(date);
+        day.Notes   = await Api.GetNotesForDateAsync(date);
         return day;
     }
 
+    // ── Navigation ────────────────────────────────────────────────────
     private async Task MovePrevious()
     {
-        if (viewMode == CalendarViewMode.SingleDay) currentDate = currentDate.AddDays(-1);
-        else if (viewMode == CalendarViewMode.Month) currentDate = currentDate.AddMonths(-1);
-        else if (viewMode == CalendarViewMode.SchoolPeriod)
-        {
-            // On atterrit 1 jour avant le début de la période courante → dans le congé précédent
-            // GetPeriodBounds saute automatiquement les congés
-            currentDate = schoolPeriodStart.AddDays(-1);
-        }
+        if      (viewMode == CalendarViewMode.SingleDay)    currentDate = currentDate.AddDays(-1);
+        else if (viewMode == CalendarViewMode.Month)        currentDate = currentDate.AddMonths(-1);
+        else if (viewMode == CalendarViewMode.SchoolPeriod) currentDate = schoolPeriodStart.AddDays(-1);
         else currentDate = currentDate.AddDays(-7);
         await UpdateCalendarView();
     }
 
     private async Task MoveNext()
     {
-        if (viewMode == CalendarViewMode.SingleDay) currentDate = currentDate.AddDays(1);
-        else if (viewMode == CalendarViewMode.Month) currentDate = currentDate.AddMonths(1);
-        else if (viewMode == CalendarViewMode.SchoolPeriod)
-        {
-            // On atterrit 1 jour après la fin de la période courante → dans le congé suivant
-            currentDate = schoolPeriodEnd.AddDays(1);
-        }
+        if      (viewMode == CalendarViewMode.SingleDay)    currentDate = currentDate.AddDays(1);
+        else if (viewMode == CalendarViewMode.Month)        currentDate = currentDate.AddMonths(1);
+        else if (viewMode == CalendarViewMode.SchoolPeriod) currentDate = schoolPeriodEnd.AddDays(1);
         else currentDate = currentDate.AddDays(7);
         await UpdateCalendarView();
     }
@@ -285,19 +398,6 @@
         await UpdateCalendarView();
     }
 
-    private async Task ToggleViewMode()
-    {
-        viewMode = viewMode switch
-        {
-            CalendarViewMode.SingleDay => previousViewMode,
-            CalendarViewMode.Week => CalendarViewMode.WeekAndWeekend,
-            CalendarViewMode.WeekAndWeekend => CalendarViewMode.Month,
-            CalendarViewMode.Month => CalendarViewMode.Week,
-            _ => CalendarViewMode.Week
-        };
-        await UpdateCalendarView();
-    }
-
     private async Task SelectDay(DateTime date)
     {
         if (viewMode != CalendarViewMode.SingleDay)
@@ -307,6 +407,20 @@
         await UpdateCalendarView();
     }
 
+    private async Task ToggleViewMode()
+    {
+        viewMode = viewMode switch
+        {
+            CalendarViewMode.SingleDay     => previousViewMode,
+            CalendarViewMode.Week          => CalendarViewMode.WeekAndWeekend,
+            CalendarViewMode.WeekAndWeekend=> CalendarViewMode.Month,
+            CalendarViewMode.Month         => CalendarViewMode.Week,
+            _ => CalendarViewMode.Week
+        };
+        await UpdateCalendarView();
+    }
+
+    // ── Notes ─────────────────────────────────────────────────────────
     private void OnTimeSlotClicked(int hour)
     {
         editingHour = hour;
@@ -318,18 +432,10 @@
     private async Task SaveNote()
     {
         if (currentDay == null) return;
-
-        var note = editingNote ?? new Note
-        {
-            Date = currentDay.Date,
-            Hour = editingHour
-        };
+        var note = editingNote ?? new Note { Date = currentDay.Date, Hour = editingHour };
         note.Content = noteContent;
-
         await Api.SaveNoteAsync(note);
         showNoteModal = false;
-
-        // Refresh day data
         currentDay = await CreateDayWithDataAsync(currentDate);
         days = new List<Day> { currentDay };
     }
@@ -339,14 +445,9 @@
         if (editingNote == null) return;
         await Api.DeleteNoteAsync(editingNote.Id);
         showNoteModal = false;
-
         currentDay = await CreateDayWithDataAsync(currentDate);
         days = new List<Day> { currentDay };
     }
 
-    private void CloseNoteModal()
-    {
-        showNoteModal = false;
-    }
-
+    private void CloseNoteModal() => showNoteModal = false;
 }
