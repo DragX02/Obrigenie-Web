@@ -1,5 +1,6 @@
 @page "/access-code"
 @inject ApiService Api
+@inject AuthService Auth
 @inject ILocalStorageService LocalStorage
 @inject NavigationManager Nav
 
@@ -33,6 +34,14 @@
     private string code = string.Empty;
     private string? errorMsg = null;
     private bool isValidating = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Le code d'accès est uniquement accessible après connexion
+        var isLoggedIn = await Auth.IsLoggedInAsync();
+        if (!isLoggedIn)
+            Nav.NavigateTo("/login");
+    }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
