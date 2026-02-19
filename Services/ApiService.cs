@@ -105,16 +105,30 @@ namespace Obrigenie.Services
         }
 
         // Admin – créer une licence
-        public async Task<LicenseDto?> CreateLicenseAsync(string? label, DateTime? expiresAt, string? code = null)
+        public async Task<(LicenseDto? License, string? Error)> CreateLicenseAsync(string? label, DateTime? expiresAt, string? code = null)
         {
             try
             {
                 var response = await _httpClient.PostAsJsonAsync("api/admin/licenses", new { code, label, expiresAt });
                 if (response.IsSuccessStatusCode)
-                    return await response.Content.ReadFromJsonAsync<LicenseDto>();
-                return null;
+                    return (await response.Content.ReadFromJsonAsync<LicenseDto>(), null);
+
+                // Lire le message d'erreur réel du serveur
+                try
+                {
+                    var err = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                    var msg = err.GetProperty("message").GetString();
+                    return (null, msg ?? $"Erreur {(int)response.StatusCode}");
+                }
+                catch
+                {
+                    return (null, $"Erreur {(int)response.StatusCode}");
+                }
             }
-            catch { return null; }
+            catch (Exception ex)
+            {
+                return (null, ex.Message);
+            }
         }
 
         // Admin – révoquer

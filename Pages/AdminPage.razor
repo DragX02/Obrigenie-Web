@@ -117,7 +117,7 @@ else
         isCreating = true;
         createMsg = null;
 
-        var result = await Api.CreateLicenseAsync(newLabel, newExpiry, newCode);
+        var (result, error) = await Api.CreateLicenseAsync(newLabel, newExpiry, newCode);
         if (result != null)
         {
             createSuccess = true;
@@ -130,7 +130,7 @@ else
         else
         {
             createSuccess = false;
-            createMsg = "Erreur lors de la création (code déjà existant ?)";
+            createMsg = error ?? "Erreur lors de la création";
         }
         isCreating = false;
     }
