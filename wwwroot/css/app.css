@@ -394,7 +394,7 @@ h1:focus { outline: none; }
     display: flex;
     flex-direction: column;
     border-right: 1px solid var(--border);
-    min-width: 72px;
+    min-width: 86px;
 }
 .trim-col:last-child { border-right: none; }
 
@@ -463,8 +463,8 @@ h1:focus { outline: none; }
 .trim-cell-day:hover { background: var(--bg-card); }
 
 /* Numéro et date dans l'en-tête */
-.trim-week-num { font-size: 0.68rem; font-weight: 700; display: block; }
-.trim-week-date { font-size: 0.6rem; display: block; opacity: 0.85; }
+.trim-week-num { font-size: 0.7rem; font-weight: 700; display: block; }
+.trim-week-date { font-size: 0.55rem; display: block; opacity: 0.85; white-space: nowrap; }
 
 /* Cellule de congé qui prend toute la hauteur */
 .trim-cell-holiday-span {

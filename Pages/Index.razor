@@ -312,23 +312,27 @@
                 WeekNum   = frCulture.Calendar.GetWeekOfYear(ws,
                     System.Globalization.CalendarWeekRule.FirstFourDayWeek,
                     System.DayOfWeek.Monday),
-                DateLabel = ws.ToString("dd/MM")
+                DateLabel = $"{ws:dd/MM} - {ws.AddDays(6):dd/MM}"
             };
 
             for (int d = 0; d < 5; d++) // Lun → Ven
             {
                 DateTime date = ws.AddDays(d);
-                var hol = cachedHolidays.FirstOrDefault(h =>
+                // Priorité à la Rentrée sur les congés qui chevauchent le même jour
+                bool isRentreeDay = cachedHolidays.Any(h =>
+                    date.Date >= h.StartDate.Date && date.Date <= h.EndDate.Date &&
+                    (h.Name.Contains("Rentree") || h.Name.Contains("Rentrée")));
+                var hol = isRentreeDay ? null : cachedHolidays.FirstOrDefault(h =>
                     date.Date >= h.StartDate.Date && date.Date <= h.EndDate.Date &&
                     !h.Name.Contains("Rentree") && !h.Name.Contains("Rentrée"));
 
                 week.Days.Add(new TrimDay
                 {
-                    Date           = date,
-                    Courses        = coursesByDate.GetValueOrDefault(date.Date, new()),
-                    IsHoliday      = hol != null,
+                    Date             = date,
+                    Courses          = coursesByDate.GetValueOrDefault(date.Date, new()),
+                    IsHoliday        = hol != null,
                     HolidayShortName = hol != null ? GetShortHolName(hol.Name) : "",
-                    IsInPeriod     = date.Date >= start.Date && date.Date <= end.Date
+                    IsInPeriod       = date.Date >= start.Date && date.Date <= end.Date
                 });
             }
             trimWeeks.Add(week);
@@ -350,8 +354,14 @@
     // ── Helpers ───────────────────────────────────────────────────────
     private Day CreateDayModel(DateTime date)
     {
-        var holiday = cachedHolidays.FirstOrDefault(h => date >= h.StartDate && date <= h.EndDate);
-        bool isRentree = holiday != null && (holiday.Name.Contains("Rentree") || holiday.Name.Contains("Rentre"));
+        // Une entrée "Rentree" a priorité sur un congé qui chevaucherait le même jour
+        var rentree = cachedHolidays.FirstOrDefault(h =>
+            date >= h.StartDate && date <= h.EndDate &&
+            (h.Name.Contains("Rentree") || h.Name.Contains("Rentre")));
+        var holiday = rentree ?? cachedHolidays.FirstOrDefault(h =>
+            date >= h.StartDate && date <= h.EndDate &&
+            !h.Name.Contains("Rentree") && !h.Name.Contains("Rentre"));
+        bool isRentree = rentree != null;
         return new Day
         {
             Date        = date,
