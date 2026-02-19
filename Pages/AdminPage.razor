@@ -1,0 +1,155 @@
+@page "/admin"
+@inject ApiService Api
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+@if (!isAdmin)
+{
+    <div style="padding:2rem;text-align:center;color:var(--text-muted)">Accès refusé.</div>
+}
+else
+{
+    <div class="admin-page">
+        <h2 class="admin-title">Gestion des licences</h2>
+
+        <!-- Créer une nouvelle licence -->
+        <div class="admin-create-card">
+            <h3 class="admin-section-title">Nouvelle licence</h3>
+            <div class="admin-create-form">
+                <input class="admin-input" type="text" placeholder="Libellé (ex: PROF-DUPONT)"
+                       @bind="newLabel" />
+                <input class="admin-input" type="text" placeholder="Code personnalisé (optionnel)"
+                       @bind="newCode" />
+                <input class="admin-input" type="date" title="Date d'expiration (optionnel)"
+                       @bind="newExpiry" />
+                <button class="btn-admin-create" @onclick="CreateLicense" disabled="@isCreating">
+                    @(isCreating ? "Création..." : "+ Créer")
+                </button>
+            </div>
+            @if (createMsg != null)
+            {
+                <div class="admin-create-msg @(createSuccess ? "msg-ok" : "msg-err")">@createMsg</div>
+            }
+        </div>
+
+        <!-- Liste des licences -->
+        <div class="admin-licenses-list">
+            @if (isLoading)
+            {
+                <div class="admin-loading">Chargement...</div>
+            }
+            else if (licenses.Count == 0)
+            {
+                <div class="admin-empty">Aucune licence. Créez-en une ci-dessus.</div>
+            }
+            else
+            {
+                @foreach (var lic in licenses)
+                {
+                    <div class="admin-license-row @(lic.IsActive ? "" : "row-revoked")">
+                        <div class="lic-info">
+                            <span class="lic-code">@lic.Code</span>
+                            @if (!string.IsNullOrEmpty(lic.Label))
+                            {
+                                <span class="lic-label">@lic.Label</span>
+                            }
+                            <span class="lic-status status-@(lic.Status.ToLower().Replace("é","e").Replace("è","e"))">@lic.Status</span>
+                        </div>
+                        <div class="lic-meta">
+                            @if (lic.AssignedEmail != null)
+                            {
+                                <span class="lic-assigned">👤 @lic.AssignedEmail</span>
+                            }
+                            @if (lic.ExpiresAt.HasValue)
+                            {
+                                <span class="lic-expiry">⏰ @lic.ExpiresAt.Value.ToString("dd/MM/yyyy")</span>
+                            }
+                            <span class="lic-date">🗓 @lic.CreatedAt.ToString("dd/MM/yyyy")</span>
+                        </div>
+                        <div class="lic-actions">
+                            @if (lic.IsActive)
+                            {
+                                <button class="btn-lic-revoke" @onclick="() => Revoke(lic.Id)">Révoquer</button>
+                            }
+                            else
+                            {
+                                <button class="btn-lic-reactivate" @onclick="() => Reactivate(lic.Id)">Réactiver</button>
+                            }
+                            <button class="btn-lic-delete" @onclick="() => Delete(lic.Id)">🗑</button>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private bool isAdmin = false;
+    private bool isLoading = true;
+    private bool isCreating = false;
+    private List<LicenseDto> licenses = new();
+
+    private string? newLabel;
+    private string? newCode;
+    private DateTime? newExpiry;
+    private string? createMsg;
+    private bool createSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var role = await Auth.GetRoleAsync();
+        isAdmin = role == "ADMIN";
+        if (!isAdmin) return;
+
+        await LoadLicenses();
+    }
+
+    private async Task LoadLicenses()
+    {
+        isLoading = true;
+        licenses = await Api.GetLicensesAsync();
+        isLoading = false;
+    }
+
+    private async Task CreateLicense()
+    {
+        isCreating = true;
+        createMsg = null;
+
+        var result = await Api.CreateLicenseAsync(newLabel, newExpiry, newCode);
+        if (result != null)
+        {
+            createSuccess = true;
+            createMsg = $"Licence créée : {result.Code}";
+            newLabel = null;
+            newCode = null;
+            newExpiry = null;
+            await LoadLicenses();
+        }
+        else
+        {
+            createSuccess = false;
+            createMsg = "Erreur lors de la création (code déjà existant ?)";
+        }
+        isCreating = false;
+    }
+
+    private async Task Revoke(int id)
+    {
+        await Api.RevokeLicenseAsync(id);
+        await LoadLicenses();
+    }
+
+    private async Task Reactivate(int id)
+    {
+        await Api.ReactivateLicenseAsync(id);
+        await LoadLicenses();
+    }
+
+    private async Task Delete(int id)
+    {
+        await Api.DeleteLicenseAsync(id);
+        await LoadLicenses();
+    }
+}

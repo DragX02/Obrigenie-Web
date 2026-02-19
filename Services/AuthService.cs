@@ -44,5 +44,26 @@ namespace Obrigenie.Services
             var token = await GetTokenAsync();
             return !string.IsNullOrEmpty(token);
         }
+
+        // Décode le JWT côté client pour lire le rôle (ClaimTypes.Role → "role" dans le payload)
+        public async Task<string?> GetRoleAsync()
+        {
+            var token = await GetTokenAsync();
+            if (string.IsNullOrEmpty(token)) return null;
+            try
+            {
+                var parts = token.Split('.');
+                if (parts.Length != 3) return null;
+                var payload = parts[1];
+                payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+                var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                // ASP.NET Core JwtSecurityTokenHandler mappe ClaimTypes.Role → "role"
+                if (doc.RootElement.TryGetProperty("role", out var role))
+                    return role.GetString();
+            }
+            catch { }
+            return null;
+        }
     }
 }

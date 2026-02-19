@@ -28,6 +28,12 @@
                 <a href="/" class="flyout-item" @onclick="CloseFlyout">
                     <span class="flyout-icon">📅</span> Calendrier
                 </a>
+                @if (isAdmin)
+                {
+                    <a href="/admin" class="flyout-item" @onclick="CloseFlyout">
+                        <span class="flyout-icon">🔑</span> Licences
+                    </a>
+                }
             </div>
             
 
@@ -64,6 +70,7 @@
     private bool isDark = true;
     private bool isLoggedIn = false;
     private bool hasAccess = false;
+    private bool isAdmin = false;
     private bool serverOnline = false;
     private string serverStatus = "Vérification...";
 
@@ -73,10 +80,15 @@
 
         if (isLoggedIn)
         {
-            hasAccess = await LocalStorage.GetItemAsync<bool>("accessGranted");
+            // Validation serveur de la licence (révocation en temps réel)
+            var licenseCode = await LocalStorage.GetItemAsync<string>("licenseCode");
+
+            if (!string.IsNullOrEmpty(licenseCode))
+                hasAccess = await Api.CheckLicenseAsync(licenseCode);
 
             if (!hasAccess)
             {
+                await LocalStorage.RemoveItemAsync("licenseCode");
                 if (!Nav.Uri.Contains("/access-code"))
                     Nav.NavigateTo("/access-code");
                 return;
@@ -84,6 +96,9 @@
 
             var savedTheme = await LocalStorage.GetItemAsync<string>("theme");
             isDark = savedTheme != "light";
+
+            var role = await Auth.GetRoleAsync();
+            isAdmin = role == "ADMIN";
 
             serverOnline = await Api.CheckHealthAsync();
             serverStatus = serverOnline ? "Serveur connecté" : "Hors ligne";

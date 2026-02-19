@@ -1,5 +1,6 @@
 using Obrigenie.Models;
 using System.Net.Http.Json;
+using System.Text.Json.Serialization;
 
 namespace Obrigenie.Services
 {
@@ -69,12 +70,81 @@ namespace Obrigenie.Services
             await _httpClient.DeleteAsync($"api/notes/{id}");
         }
 
-        // Access code
+        // Licence – validation initiale (utilisateur connecté entre son code)
         public async Task<bool> ValidateAccessCodeAsync(string code)
         {
             try
             {
                 var response = await _httpClient.PostAsJsonAsync("api/access/validate", new { code });
+                return response.IsSuccessStatusCode;
+            }
+            catch { return false; }
+        }
+
+        // Licence – vérification à chaque chargement (révocation en temps réel)
+        public async Task<bool> CheckLicenseAsync(string code)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"api/access/check?code={Uri.EscapeDataString(code)}");
+                if (!response.IsSuccessStatusCode) return false;
+                var result = await response.Content.ReadFromJsonAsync<LicenseCheckResult>();
+                return result?.Valid == true;
+            }
+            catch { return false; }
+        }
+
+        // Admin – liste des licences
+        public async Task<List<LicenseDto>> GetLicensesAsync()
+        {
+            try
+            {
+                return await _httpClient.GetFromJsonAsync<List<LicenseDto>>("api/admin/licenses") ?? new();
+            }
+            catch { return new(); }
+        }
+
+        // Admin – créer une licence
+        public async Task<LicenseDto?> CreateLicenseAsync(string? label, DateTime? expiresAt, string? code = null)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/admin/licenses", new { code, label, expiresAt });
+                if (response.IsSuccessStatusCode)
+                    return await response.Content.ReadFromJsonAsync<LicenseDto>();
+                return null;
+            }
+            catch { return null; }
+        }
+
+        // Admin – révoquer
+        public async Task<bool> RevokeLicenseAsync(int id)
+        {
+            try
+            {
+                var response = await _httpClient.PutAsync($"api/admin/licenses/{id}/revoke", null);
+                return response.IsSuccessStatusCode;
+            }
+            catch { return false; }
+        }
+
+        // Admin – réactiver
+        public async Task<bool> ReactivateLicenseAsync(int id)
+        {
+            try
+            {
+                var response = await _httpClient.PutAsync($"api/admin/licenses/{id}/reactivate", null);
+                return response.IsSuccessStatusCode;
+            }
+            catch { return false; }
+        }
+
+        // Admin – supprimer
+        public async Task<bool> DeleteLicenseAsync(int id)
+        {
+            try
+            {
+                var response = await _httpClient.DeleteAsync($"api/admin/licenses/{id}");
                 return response.IsSuccessStatusCode;
             }
             catch { return false; }
@@ -90,5 +160,24 @@ namespace Obrigenie.Services
             }
             catch { return false; }
         }
+    }
+
+    public class LicenseCheckResult
+    {
+        [JsonPropertyName("valid")]
+        public bool Valid { get; set; }
+    }
+
+    public class LicenseDto
+    {
+        [JsonPropertyName("id")]       public int Id { get; set; }
+        [JsonPropertyName("code")]     public string Code { get; set; } = string.Empty;
+        [JsonPropertyName("label")]    public string? Label { get; set; }
+        [JsonPropertyName("isActive")] public bool IsActive { get; set; }
+        [JsonPropertyName("status")]   public string Status { get; set; } = string.Empty;
+        [JsonPropertyName("assignedEmail")] public string? AssignedEmail { get; set; }
+        [JsonPropertyName("createdAt")]     public DateTime CreatedAt { get; set; }
+        [JsonPropertyName("expiresAt")]     public DateTime? ExpiresAt { get; set; }
+        [JsonPropertyName("assignedAt")]    public DateTime? AssignedAt { get; set; }
     }
 }

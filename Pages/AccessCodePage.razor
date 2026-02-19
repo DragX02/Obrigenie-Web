@@ -26,6 +26,10 @@
             <button class="btn-access-validate" @onclick="Validate" disabled="@isValidating">
                 @(isValidating ? "Vérification..." : "Valider")
             </button>
+
+            <button class="btn-access-logout" @onclick="Logout">
+                Déconnexion
+            </button>
         </div>
     </div>
 </div>
@@ -49,6 +53,12 @@
             await Validate();
     }
 
+    private async Task Logout()
+    {
+        await Auth.RemoveTokenAsync();
+        Nav.NavigateTo("/login");
+    }
+
     private async Task Validate()
     {
         if (string.IsNullOrWhiteSpace(code))
@@ -65,7 +75,7 @@
 
         if (isValid)
         {
-            await LocalStorage.SetItemAsync("accessGranted", true);
+            await LocalStorage.SetItemAsync("licenseCode", code.Trim());
             Nav.NavigateTo("/", forceLoad: false);
         }
         else
