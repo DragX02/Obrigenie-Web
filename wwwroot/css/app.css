@@ -349,6 +349,7 @@ h1:focus { outline: none; }
 .dark .day-cell.holiday { background: #2d1010; }
 .day-cell.school-start { background: #E8F5E9; }
 .dark .day-cell.school-start { background: #0d2d10; }
+.day-cell.out-of-period { opacity: 0.25; pointer-events: none; }
 
 .day-num { font-weight: bold; font-size: 1.1rem; color: var(--text); }
 .holiday-name { display: block; font-size: 0.7rem; color: #d32f2f; }

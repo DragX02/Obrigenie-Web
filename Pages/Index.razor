@@ -15,6 +15,8 @@
                 @onclick='() => SetViewMode(CalendarViewMode.WeekAndWeekend)'>Sem. +</button>
         <button class="@(viewMode == CalendarViewMode.Month ? "view-btn active" : "view-btn")"
                 @onclick='() => SetViewMode(CalendarViewMode.Month)'>Mois</button>
+        <button class="@(viewMode == CalendarViewMode.SchoolPeriod ? "view-btn active" : "view-btn")"
+                @onclick='() => SetViewMode(CalendarViewMode.SchoolPeriod)'>Trimestre</button>
     </div>
 
     <!-- Header navigation -->
@@ -80,7 +82,7 @@
         <div class="days-grid" style="grid-template-columns: repeat(@gridSpan, 1fr);">
             @foreach (var day in days)
             {
-                <div class="day-cell @(day.IsHoliday ? "holiday" : "") @(day.IsSchoolStart ? "school-start" : "") @(day.Date == DateTime.Today ? "today" : "")"
+                <div class="day-cell @(day.IsHoliday ? "holiday" : "") @(day.IsSchoolStart ? "school-start" : "") @(day.Date == DateTime.Today ? "today" : "") @(viewMode == CalendarViewMode.SchoolPeriod && (day.Date < schoolPeriodStart || day.Date > schoolPeriodEnd) ? "out-of-period" : "")"
                      @onclick="() => SelectDay(day.Date)">
                     <span class="day-num">@day.DayOfMonth</span>
                     @if (!string.IsNullOrEmpty(day.ShortHolidayName))
@@ -125,8 +127,10 @@
     private Day? currentDay;
     private List<Holiday> cachedHolidays = new();
     private string? periodLabel;
+    private DateTime schoolPeriodStart;
+    private DateTime schoolPeriodEnd;
     private int gridSpan => viewMode == CalendarViewMode.SingleDay ? 1 :
-        (viewMode == CalendarViewMode.Month || viewMode == CalendarViewMode.WeekAndWeekend) ? 7 : 5;
+        (viewMode == CalendarViewMode.Month || viewMode == CalendarViewMode.WeekAndWeekend || viewMode == CalendarViewMode.SchoolPeriod) ? 7 : 5;
 
     // Note modal
     private bool showNoteModal = false;
@@ -157,9 +161,35 @@
     {
         if (viewMode == CalendarViewMode.SingleDay) await UpdateSingleDayView();
         else if (viewMode == CalendarViewMode.Month) UpdateMonthView();
+        else if (viewMode == CalendarViewMode.SchoolPeriod) UpdateSchoolPeriodView();
         else UpdateWeekView();
 
-        periodLabel = SchoolPeriodHelper.GetLabel(currentDate, cachedHolidays);
+        // En mode Trimestre le titre suffit, pas besoin du bandeau
+        periodLabel = viewMode == CalendarViewMode.SchoolPeriod
+            ? null
+            : SchoolPeriodHelper.GetLabel(currentDate, cachedHolidays);
+    }
+
+    private void UpdateSchoolPeriodView()
+    {
+        var (start, end, title) = SchoolPeriodHelper.GetPeriodBounds(currentDate, cachedHolidays);
+        schoolPeriodStart = start;
+        schoolPeriodEnd   = end;
+        weekTitle = title;
+
+        // Aligne le début sur un lundi
+        int offset = ((int)start.DayOfWeek - (int)System.DayOfWeek.Monday + 7) % 7;
+        DateTime gridStart = start.AddDays(-offset);
+
+        days = new List<Day>();
+        for (DateTime d = gridStart; d.Date <= end.Date; d = d.AddDays(1))
+            days.Add(CreateDayModel(d));
+
+        // Complète la dernière semaine
+        int remainder = days.Count % 7;
+        if (remainder != 0)
+            for (int i = 0; i < 7 - remainder; i++)
+                days.Add(CreateDayModel(end.AddDays(i + 1)));
     }
 
     private async Task UpdateSingleDayView()
@@ -224,6 +254,12 @@
     {
         if (viewMode == CalendarViewMode.SingleDay) currentDate = currentDate.AddDays(-1);
         else if (viewMode == CalendarViewMode.Month) currentDate = currentDate.AddMonths(-1);
+        else if (viewMode == CalendarViewMode.SchoolPeriod)
+        {
+            // On atterrit 1 jour avant le début de la période courante → dans le congé précédent
+            // GetPeriodBounds saute automatiquement les congés
+            currentDate = schoolPeriodStart.AddDays(-1);
+        }
         else currentDate = currentDate.AddDays(-7);
         await UpdateCalendarView();
     }
@@ -232,6 +268,11 @@
     {
         if (viewMode == CalendarViewMode.SingleDay) currentDate = currentDate.AddDays(1);
         else if (viewMode == CalendarViewMode.Month) currentDate = currentDate.AddMonths(1);
+        else if (viewMode == CalendarViewMode.SchoolPeriod)
+        {
+            // On atterrit 1 jour après la fin de la période courante → dans le congé suivant
+            currentDate = schoolPeriodEnd.AddDays(1);
+        }
         else currentDate = currentDate.AddDays(7);
         await UpdateCalendarView();
     }

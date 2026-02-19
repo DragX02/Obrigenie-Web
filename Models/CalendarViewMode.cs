@@ -5,6 +5,7 @@ namespace Obrigenie.Models
         Week,
         WeekAndWeekend,
         Month,
-        SingleDay
+        SingleDay,
+        SchoolPeriod
     }
 }

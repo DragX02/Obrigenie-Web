@@ -147,6 +147,32 @@ namespace Obrigenie.Services
             return holidayName;
         }
 
+        // Retourne (début, fin) de la période scolaire contenant la date
+        public static (DateTime start, DateTime end, string title) GetPeriodBounds(DateTime date, List<Holiday> holidays)
+        {
+            var vacations = holidays
+                .Where(h => !h.Name.Contains("Rentree") && !h.Name.Contains("Rentrée"))
+                .OrderBy(h => h.StartDate)
+                .ToList();
+
+            // Si la date est dans un congé, on va à la période suivante
+            var inHoliday = vacations.FirstOrDefault(h => date.Date >= h.StartDate.Date && date.Date <= h.EndDate.Date);
+            if (inHoliday != null)
+                date = inHoliday.EndDate.AddDays(1);
+
+            var prev = vacations.Where(h => h.EndDate.Date < date.Date).OrderByDescending(h => h.EndDate).FirstOrDefault();
+            var next = vacations.Where(h => h.StartDate.Date > date.Date).OrderBy(h => h.StartDate).FirstOrDefault();
+
+            DateTime start = prev != null ? prev.EndDate.AddDays(1) : date.AddDays(-60);
+            DateTime end   = next != null ? next.StartDate.AddDays(-1) : date.AddDays(60);
+
+            string prevName = prev != null ? GetShortName(prev.Name) : "Rentrée";
+            string nextName = next != null ? GetShortName(next.Name) : "Fin d'année";
+            string title = $"{prevName} → {nextName}";
+
+            return (start, end, title);
+        }
+
         public static string? GetLabel(DateTime date, List<Holiday> holidays)
         {
             if (holidays == null || holidays.Count == 0) return null;
