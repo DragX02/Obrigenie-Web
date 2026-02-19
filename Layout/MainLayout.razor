@@ -85,26 +85,34 @@
 
         if (isLoggedIn)
         {
-            // Validation serveur de la licence (révocation en temps réel)
-            var licenseCode = await LocalStorage.GetItemAsync<string>("licenseCode");
+            // L'ADMIN bypasse la vérification de licence
+            var role = await Auth.GetRoleAsync();
+            isAdmin = role == "ADMIN";
 
-            if (!string.IsNullOrEmpty(licenseCode))
-                hasAccess = await Api.CheckLicenseAsync(licenseCode);
-
-            if (!hasAccess)
+            if (isAdmin)
             {
-                await LocalStorage.RemoveItemAsync("licenseCode");
-                isInitializing = false;
-                if (!Nav.Uri.Contains("/access-code"))
-                    Nav.NavigateTo("/access-code");
-                return;
+                hasAccess = true;
+            }
+            else
+            {
+                // Validation serveur de la licence (révocation en temps réel)
+                var licenseCode = await LocalStorage.GetItemAsync<string>("licenseCode");
+
+                if (!string.IsNullOrEmpty(licenseCode))
+                    hasAccess = await Api.CheckLicenseAsync(licenseCode);
+
+                if (!hasAccess)
+                {
+                    await LocalStorage.RemoveItemAsync("licenseCode");
+                    isInitializing = false;
+                    if (!Nav.Uri.Contains("/access-code"))
+                        Nav.NavigateTo("/access-code");
+                    return;
+                }
             }
 
             var savedTheme = await LocalStorage.GetItemAsync<string>("theme");
             isDark = savedTheme != "light";
-
-            var role = await Auth.GetRoleAsync();
-            isAdmin = role == "ADMIN";
 
             serverOnline = await Api.CheckHealthAsync();
             serverStatus = serverOnline ? "Serveur connecté" : "Hors ligne";
