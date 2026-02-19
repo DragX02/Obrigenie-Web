@@ -6,7 +6,7 @@
 
 <div class="@(isDark ? "dark" : "light")" id="app-root">
 
-    @if (isLoggedIn)
+    @if (isLoggedIn && hasAccess)
     {
         @if (flyoutOpen)
         {
@@ -29,6 +29,8 @@
                     <span class="flyout-icon">📅</span> Calendrier
                 </a>
             </div>
+            
+
 
             <div class="flyout-footer">
                 <button class="btn-theme-toggle" @onclick="ToggleTheme">
@@ -61,6 +63,7 @@
     private bool flyoutOpen = false;
     private bool isDark = true;
     private bool isLoggedIn = false;
+    private bool hasAccess = false;
     private bool serverOnline = false;
     private string serverStatus = "Vérification...";
 
@@ -70,6 +73,15 @@
 
         if (isLoggedIn)
         {
+            hasAccess = await LocalStorage.GetItemAsync<bool>("accessGranted");
+
+            if (!hasAccess)
+            {
+                if (!Nav.Uri.Contains("/access-code"))
+                    Nav.NavigateTo("/access-code");
+                return;
+            }
+
             var savedTheme = await LocalStorage.GetItemAsync<string>("theme");
             isDark = savedTheme != "light";
 

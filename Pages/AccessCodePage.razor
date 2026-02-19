@@ -1,0 +1,68 @@
+@page "/access-code"
+@inject ApiService Api
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager Nav
+
+<div class="access-container">
+    <div class="access-card">
+        <div class="access-icon">🔑</div>
+        <h1 class="access-title">Obrigenie</h1>
+        <p class="access-subtitle">Insérer code d'invitation ou clé</p>
+
+        <div class="access-form">
+            <input class="access-input @(errorMsg != null ? "access-input-error" : "")"
+                   type="text"
+                   placeholder="Code d'accès"
+                   @bind="code"
+                   @bind:event="oninput"
+                   @onkeydown="OnKeyDown" />
+
+            @if (errorMsg != null)
+            {
+                <div class="access-error">@errorMsg</div>
+            }
+
+            <button class="btn-access-validate" @onclick="Validate" disabled="@isValidating">
+                @(isValidating ? "Vérification..." : "Valider")
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string code = string.Empty;
+    private string? errorMsg = null;
+    private bool isValidating = false;
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await Validate();
+    }
+
+    private async Task Validate()
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            errorMsg = "Veuillez entrer un code.";
+            return;
+        }
+
+        isValidating = true;
+        errorMsg = null;
+        StateHasChanged();
+
+        var isValid = await Api.ValidateAccessCodeAsync(code.Trim());
+
+        if (isValid)
+        {
+            await LocalStorage.SetItemAsync("accessGranted", true);
+            Nav.NavigateTo("/", forceLoad: false);
+        }
+        else
+        {
+            errorMsg = "Code invalide. Veuillez réessayer.";
+            isValidating = false;
+        }
+    }
+}

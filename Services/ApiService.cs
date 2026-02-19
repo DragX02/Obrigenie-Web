@@ -69,6 +69,17 @@ namespace Obrigenie.Services
             await _httpClient.DeleteAsync($"api/notes/{id}");
         }
 
+        // Access code
+        public async Task<bool> ValidateAccessCodeAsync(string code)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/access/validate", new { code });
+                return response.IsSuccessStatusCode;
+            }
+            catch { return false; }
+        }
+
         // Health
         public async Task<bool> CheckHealthAsync()
         {
