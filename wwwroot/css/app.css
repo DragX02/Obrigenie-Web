@@ -54,17 +54,21 @@ h1:focus { outline: none; }
 .flyout {
     position: fixed;
     top: 0;
-    left: -280px;
+    left: 0;
     width: 280px;
     height: 100vh;
     background: #1e1e1e;
     z-index: 1000;
-    transition: left 0.28s ease;
+    /* transform au lieu de left = GPU layer propre, fiable sur Android */
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    will-change: transform;
     display: flex;
     flex-direction: column;
     box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+    overscroll-behavior: contain;
 }
-.flyout-open { left: 0; }
+.flyout-open { transform: translateX(0); }
 
 .flyout-header {
     padding: 24px 20px 16px;
@@ -183,10 +187,18 @@ h1:focus { outline: none; }
     color: white;
     font-size: 1.5rem;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 8px 12px;
     border-radius: 4px;
     line-height: 1;
     transition: background 0.2s;
+    /* Android : évite le délai de 300ms au toucher et le zoom double-tap */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .btn-hamburger:hover { background: rgba(255,255,255,0.15); }
 
