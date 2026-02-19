@@ -12,12 +12,6 @@
         <button class="nav-btn" @onclick="MoveNext">&gt;</button>
     </div>
 
-    <!-- Server Status -->
-    <div class="server-status">
-        <span class="status-dot @(serverOnline ? "online" : "offline")"></span>
-        <span>@serverStatus</span>
-    </div>
-
     @if (viewMode == CalendarViewMode.SingleDay && currentDay != null)
     {
         <!-- Single Day View with Time Grid -->
@@ -103,11 +97,6 @@
     </div>
 }
 
-<!-- Logout Button -->
-<div class="logout-section">
-    <button class="btn-logout" @onclick="Logout">Deconnexion</button>
-</div>
-
 @code {
     private CalendarViewMode viewMode = CalendarViewMode.Week;
     private CalendarViewMode previousViewMode = CalendarViewMode.Week;
@@ -116,8 +105,6 @@
     private List<Day> days = new();
     private Day? currentDay;
     private List<Holiday> cachedHolidays = new();
-    private bool serverOnline = false;
-    private string serverStatus = "Verification...";
     private int gridSpan => viewMode == CalendarViewMode.SingleDay ? 1 :
         (viewMode == CalendarViewMode.Month || viewMode == CalendarViewMode.WeekAndWeekend) ? 7 : 5;
 
@@ -135,9 +122,6 @@
             Nav.NavigateTo("/login");
             return;
         }
-
-        serverOnline = await Api.CheckHealthAsync();
-        serverStatus = serverOnline ? "Serveur connecte" : "Serveur hors ligne";
 
         try
         {
@@ -298,9 +282,4 @@
         showNoteModal = false;
     }
 
-    private async Task Logout()
-    {
-        await Auth.RemoveTokenAsync();
-        Nav.NavigateTo("/login");
-    }
 }

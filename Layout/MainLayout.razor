@@ -1,5 +1,104 @@
 @inherits LayoutComponentBase
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject ApiService Api
+@inject ILocalStorageService LocalStorage
 
-<div class="page">
-    @Body
+<div class="@(isDark ? "dark" : "light")" id="app-root">
+
+    @if (isLoggedIn)
+    {
+        @if (flyoutOpen)
+        {
+            <div class="flyout-overlay" @onclick="CloseFlyout"></div>
+        }
+
+        <!-- Flyout sidebar -->
+        <nav class="flyout @(flyoutOpen ? "flyout-open" : "")">
+            <div class="flyout-header">
+                <div class="flyout-logo-text">Obrigenie</div>
+                <div class="server-badge @(serverOnline ? "badge-online" : "badge-offline")">
+                    <span class="status-dot-flyout"></span>
+                    <span class="badge-text">@serverStatus</span>
+                    <button class="btn-refresh-status" @onclick="RefreshStatus">↻</button>
+                </div>
+            </div>
+
+            <div class="flyout-items">
+                <a href="/" class="flyout-item" @onclick="CloseFlyout">
+                    <span class="flyout-icon">📅</span> Calendrier
+                </a>
+            </div>
+
+            <div class="flyout-footer">
+                <button class="btn-theme-toggle" @onclick="ToggleTheme">
+                    @(isDark ? "☀️  Mode clair" : "🌙  Mode sombre")
+                </button>
+                <button class="btn-logout-flyout" @onclick="Logout">
+                    🚪  Déconnexion
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main area -->
+        <div class="main-wrapper">
+            <div class="top-bar">
+                <button class="btn-hamburger" @onclick="ToggleFlyout">☰</button>
+                <span class="top-bar-title">Obrigenie</span>
+            </div>
+            <main class="content-area">
+                @Body
+            </main>
+        </div>
+    }
+    else
+    {
+        @Body
+    }
 </div>
+
+@code {
+    private bool flyoutOpen = false;
+    private bool isDark = true;
+    private bool isLoggedIn = false;
+    private bool serverOnline = false;
+    private string serverStatus = "Vérification...";
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoggedIn = await Auth.IsLoggedInAsync();
+
+        if (isLoggedIn)
+        {
+            var savedTheme = await LocalStorage.GetItemAsync<string>("theme");
+            isDark = savedTheme != "light";
+
+            serverOnline = await Api.CheckHealthAsync();
+            serverStatus = serverOnline ? "Serveur connecté" : "Hors ligne";
+        }
+    }
+
+    private void ToggleFlyout() => flyoutOpen = !flyoutOpen;
+    private void CloseFlyout() => flyoutOpen = false;
+
+    private async Task ToggleTheme()
+    {
+        isDark = !isDark;
+        await LocalStorage.SetItemAsync("theme", isDark ? "dark" : "light");
+    }
+
+    private async Task RefreshStatus()
+    {
+        serverStatus = "Vérification...";
+        serverOnline = await Api.CheckHealthAsync();
+        serverStatus = serverOnline ? "Serveur connecté" : "Hors ligne";
+    }
+
+    private async Task Logout()
+    {
+        await Auth.RemoveTokenAsync();
+        flyoutOpen = false;
+        isLoggedIn = false;
+        Nav.NavigateTo("/login");
+    }
+}
