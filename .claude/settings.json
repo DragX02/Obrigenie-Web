@@ -5,7 +5,8 @@
     ],
     "additionalDirectories": [
       "G:\\csharp\\serappagenda\\seragenda\\seragenda\\Controllers",
-      "G:\\csharp\\serappagenda\\seragenda\\seragenda\\Services"
+      "G:\\csharp\\serappagenda\\seragenda\\seragenda\\Services",
+      "G:\\csharp\\serappagenda\\seragenda\\seragenda"
     ]
   }
 }
