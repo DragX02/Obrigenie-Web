@@ -22,7 +22,13 @@
     <!-- Header navigation -->
     <div class="calendar-header">
         <button class="nav-btn" @onclick="MovePrevious">&lt;</button>
-        <h2 class="week-title">@weekTitle</h2>
+        <div class="week-title-group">
+            <h2 class="week-title">@weekTitle</h2>
+            @if (viewMode == CalendarViewMode.SchoolPeriod && schoolPeriodStart != DateTime.MinValue)
+            {
+                <span class="period-dates-sub">@schoolPeriodStart.ToString("dd/MM/yyyy") → @schoolPeriodEnd.ToString("dd/MM/yyyy")</span>
+            }
+        </div>
         <button class="nav-btn" @onclick="MoveNext">&gt;</button>
     </div>
 
@@ -106,15 +112,18 @@
                             {
                                 @foreach (var day in week.Days)
                                 {
-                                    <div class="trim-cell @(day.IsHoliday ? "trim-cell-hol" : "") @(day.IsToday ? "trim-cell-today" : "") @(!day.IsInPeriod ? "trim-cell-out" : "")"
+                                    <div class="trim-cell @(day.IsInPeriod && day.IsHoliday ? "trim-cell-hol" : "") @(day.IsToday ? "trim-cell-today" : "") @(!day.IsInPeriod ? "trim-cell-out" : "")"
                                          @onclick="() => SelectDay(day.Date)">
-                                        @if (day.IsHoliday)
+                                        @if (day.IsInPeriod)
                                         {
-                                            <span class="trim-conge">C</span>
-                                        }
-                                        @foreach (var c in day.Courses)
-                                        {
-                                            <div class="trim-course" style="background-color: @c.Color;" title="@c.Name">@c.Name</div>
+                                            @if (day.IsHoliday)
+                                            {
+                                                <span class="trim-conge">C</span>
+                                            }
+                                            @foreach (var c in day.Courses)
+                                            {
+                                                <div class="trim-course" style="background-color: @c.Color;" title="@c.Name">@c.Name</div>
+                                            }
                                         }
                                     </div>
                                 }

@@ -263,7 +263,9 @@ h1:focus { outline: none; }
 }
 .nav-btn:hover { background: var(--primary-hover); }
 
-.week-title { user-select: none; text-transform: capitalize; color: var(--text); font-size: 1.1rem; }
+.week-title-group { display: flex; flex-direction: column; align-items: center; text-align: center; flex: 1; }
+.week-title { user-select: none; text-transform: capitalize; color: var(--text); font-size: 1.1rem; margin: 0; }
+.period-dates-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
 
 /* View mode buttons */
 .view-mode-bar {
@@ -386,7 +388,7 @@ h1:focus { outline: none; }
 
 .trimestre-table {
     display: flex;
-    min-width: max-content;
+    width: 100%;
 }
 
 /* Chaque colonne = une semaine */
@@ -395,6 +397,7 @@ h1:focus { outline: none; }
     flex-direction: column;
     border-right: 1px solid var(--border);
     min-width: 86px;
+    flex: 1;
 }
 .trim-col:last-child { border-right: none; }
 
@@ -539,4 +542,22 @@ h1:focus { outline: none; }
     .calendar-container { padding: 0.5rem; }
     .day-cell { min-height: 60px; padding: 0.25rem; }
     .day-num { font-size: 0.9rem; }
+
+    /* Barre de vue : boutons plus petits sur mobile */
+    .view-mode-bar { padding: 3px; gap: 2px; }
+    .view-btn { padding: 6px 2px; font-size: 0.72rem; }
+
+    /* Navigation */
+    .nav-btn { padding: 0.4rem 0.7rem; font-size: 1rem; }
+    .week-title { font-size: 0.9rem; }
+    .period-dates-sub { font-size: 0.68rem; }
+
+    /* Trimestre : colonnes plus étroites */
+    .trim-col { min-width: 64px; }
+    .trim-col-fixed { min-width: 36px; max-width: 36px; }
+    .trim-cell { min-height: 48px; }
+    .trim-cell-header { min-height: 32px; }
+    .trim-cell-day { font-size: 0.65rem; }
+    .trim-week-num { font-size: 0.62rem; }
+    .trim-week-date { font-size: 0.5rem; }
 }
