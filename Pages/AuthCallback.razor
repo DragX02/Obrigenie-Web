@@ -27,7 +27,7 @@
             await Auth.SaveTokenAsync(token);
             if (!string.IsNullOrEmpty(email))
                 await Auth.SaveEmailAsync(email);
-            Nav.NavigateTo("/");
+            Nav.NavigateTo("/", forceLoad: true);
         }
         else
         {

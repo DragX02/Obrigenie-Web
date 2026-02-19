@@ -85,7 +85,7 @@
         {
             await Auth.SaveTokenAsync(result.Token);
             await Auth.SaveEmailAsync(result.Email);
-            Nav.NavigateTo("/");
+            Nav.NavigateTo("/", forceLoad: true);
         }
         else
         {
@@ -128,7 +128,7 @@
         {
             await Auth.SaveTokenAsync(result.Token);
             await Auth.SaveEmailAsync(result.Email);
-            Nav.NavigateTo("/");
+            Nav.NavigateTo("/", forceLoad: true);
         }
         else
         {
