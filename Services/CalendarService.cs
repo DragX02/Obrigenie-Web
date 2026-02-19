@@ -126,7 +126,7 @@ namespace Obrigenie.Services
             return new List<Holiday>
             {
                 new() { Name = "Conge d'automne (Toussaint)", StartDate = new DateTime(startYear, 10, 20), EndDate = new DateTime(startYear, 11, 3) },
-                new() { Name = "Vacances d'hiver (Noel)", StartDate = new DateTime(startYear, 12, 23), EndDate = new DateTime(endYear, 1, 5) },
+                new() { Name = "Vacances d'hiver (Noel)", StartDate = new DateTime(startYear, 12, 23), EndDate = new DateTime(endYear, 1, 4) },
                 new() { Name = "Conge de detente (Carnaval)", StartDate = new DateTime(endYear, 2, 23), EndDate = new DateTime(endYear, 3, 9) },
                 new() { Name = "Vacances de printemps (Paques)", StartDate = new DateTime(endYear, 4, 6), EndDate = new DateTime(endYear, 4, 19) },
                 new() { Name = "Vacances d'ete", StartDate = new DateTime(endYear, 7, 5), EndDate = new DateTime(endYear, 8, 25) },
@@ -163,7 +163,16 @@ namespace Obrigenie.Services
             var prev = vacations.Where(h => h.EndDate.Date < date.Date).OrderByDescending(h => h.EndDate).FirstOrDefault();
             var next = vacations.Where(h => h.StartDate.Date > date.Date).OrderBy(h => h.StartDate).FirstOrDefault();
 
-            DateTime start = prev != null ? prev.EndDate.AddDays(1) : date.AddDays(-60);
+            // Si l'API fournit une entrée "Rentrée" juste après le congé précédent, on l'utilise comme début exact
+            DateTime defaultStart = prev != null ? prev.EndDate.AddDays(1) : date.AddDays(-60);
+            var rentreeAfterPrev = holidays
+                .Where(h => (h.Name.Contains("Rentree") || h.Name.Contains("Rentrée")) &&
+                            h.StartDate.Date >= defaultStart.Date &&
+                            (next == null || h.StartDate.Date < next.StartDate.Date))
+                .OrderBy(h => h.StartDate)
+                .FirstOrDefault();
+
+            DateTime start = rentreeAfterPrev != null ? rentreeAfterPrev.StartDate : defaultStart;
             DateTime end   = next != null ? next.StartDate.AddDays(-1) : date.AddDays(60);
 
             string prevName = prev != null ? GetShortName(prev.Name) : "Rentrée";

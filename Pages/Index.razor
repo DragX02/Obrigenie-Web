@@ -95,7 +95,7 @@
                     {
                         <div class="trim-col @(week.IsFullHoliday ? "trim-col-holiday" : "")">
                             <div class="trim-cell trim-cell-header">
-                                <span class="trim-week-num">S@week.WeekNum</span>
+                                <span class="trim-week-num">S@(week.WeekNum)</span>
                                 <span class="trim-week-date">@week.DateLabel</span>
                             </div>
                             @if (week.IsFullHoliday)
