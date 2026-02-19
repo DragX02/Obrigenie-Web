@@ -155,10 +155,10 @@ namespace Obrigenie.Services
                 .OrderBy(h => h.StartDate)
                 .ToList();
 
-            // Si la date est dans un congé, on va à la période suivante
+            // Si la date est dans un congé, on remonte à la période précédente (plus naturel)
             var inHoliday = vacations.FirstOrDefault(h => date.Date >= h.StartDate.Date && date.Date <= h.EndDate.Date);
             if (inHoliday != null)
-                date = inHoliday.EndDate.AddDays(1);
+                date = inHoliday.StartDate.AddDays(-1);
 
             var prev = vacations.Where(h => h.EndDate.Date < date.Date).OrderByDescending(h => h.EndDate).FirstOrDefault();
             var next = vacations.Where(h => h.StartDate.Date > date.Date).OrderBy(h => h.StartDate).FirstOrDefault();

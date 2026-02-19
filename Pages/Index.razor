@@ -384,19 +384,49 @@
     // ── Navigation ────────────────────────────────────────────────────
     private async Task MovePrevious()
     {
-        if      (viewMode == CalendarViewMode.SingleDay)    currentDate = currentDate.AddDays(-1);
-        else if (viewMode == CalendarViewMode.Month)        currentDate = currentDate.AddMonths(-1);
-        else if (viewMode == CalendarViewMode.SchoolPeriod) currentDate = schoolPeriodStart.AddDays(-1);
-        else currentDate = currentDate.AddDays(-7);
+        if (viewMode == CalendarViewMode.SingleDay)
+            currentDate = currentDate.AddDays(-1);
+        else if (viewMode == CalendarViewMode.Month)
+            currentDate = currentDate.AddMonths(-1);
+        else if (viewMode == CalendarViewMode.SchoolPeriod)
+        {
+            // Trouver le congé juste AVANT le début de la période courante
+            // puis aller un jour AVANT ce congé → on atterrit dans la période précédente
+            var prevHol = cachedHolidays
+                .Where(h => h.EndDate.Date < schoolPeriodStart.Date &&
+                            !h.Name.Contains("Rentree") && !h.Name.Contains("Rentrée"))
+                .OrderByDescending(h => h.EndDate)
+                .FirstOrDefault();
+            currentDate = prevHol != null
+                ? prevHol.StartDate.AddDays(-1)
+                : schoolPeriodStart.AddDays(-30);
+        }
+        else
+            currentDate = currentDate.AddDays(-7);
         await UpdateCalendarView();
     }
 
     private async Task MoveNext()
     {
-        if      (viewMode == CalendarViewMode.SingleDay)    currentDate = currentDate.AddDays(1);
-        else if (viewMode == CalendarViewMode.Month)        currentDate = currentDate.AddMonths(1);
-        else if (viewMode == CalendarViewMode.SchoolPeriod) currentDate = schoolPeriodEnd.AddDays(1);
-        else currentDate = currentDate.AddDays(7);
+        if (viewMode == CalendarViewMode.SingleDay)
+            currentDate = currentDate.AddDays(1);
+        else if (viewMode == CalendarViewMode.Month)
+            currentDate = currentDate.AddMonths(1);
+        else if (viewMode == CalendarViewMode.SchoolPeriod)
+        {
+            // Trouver le congé juste APRÈS la fin de la période courante
+            // puis aller un jour APRÈS ce congé → on atterrit dans la période suivante
+            var nextHol = cachedHolidays
+                .Where(h => h.StartDate.Date > schoolPeriodEnd.Date &&
+                            !h.Name.Contains("Rentree") && !h.Name.Contains("Rentrée"))
+                .OrderBy(h => h.StartDate)
+                .FirstOrDefault();
+            currentDate = nextHol != null
+                ? nextHol.EndDate.AddDays(1)
+                : schoolPeriodEnd.AddDays(10);
+        }
+        else
+            currentDate = currentDate.AddDays(7);
         await UpdateCalendarView();
     }
 
