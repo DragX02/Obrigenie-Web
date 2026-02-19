@@ -43,6 +43,12 @@ h1:focus { outline: none; }
     transition: background 0.3s, color 0.3s;
 }
 
+/* Écran vide pendant la vérification de la licence (évite le flash de contenu) */
+.app-loading {
+    min-height: 100vh;
+    background: var(--bg-main);
+}
+
 /* ===== FLYOUT ===== */
 .flyout-overlay {
     position: fixed;

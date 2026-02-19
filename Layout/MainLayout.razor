@@ -6,7 +6,11 @@
 
 <div class="@(isDark ? "dark" : "light")" id="app-root">
 
-    @if (isLoggedIn && hasAccess)
+    @if (isInitializing)
+    {
+        <div class="app-loading"></div>
+    }
+    else if (isLoggedIn && hasAccess)
     {
         @if (flyoutOpen)
         {
@@ -66,6 +70,7 @@
 </div>
 
 @code {
+    private bool isInitializing = true;
     private bool flyoutOpen = false;
     private bool isDark = true;
     private bool isLoggedIn = false;
@@ -89,6 +94,7 @@
             if (!hasAccess)
             {
                 await LocalStorage.RemoveItemAsync("licenseCode");
+                isInitializing = false;
                 if (!Nav.Uri.Contains("/access-code"))
                     Nav.NavigateTo("/access-code");
                 return;
@@ -103,6 +109,8 @@
             serverOnline = await Api.CheckHealthAsync();
             serverStatus = serverOnline ? "Serveur connecté" : "Hors ligne";
         }
+
+        isInitializing = false;
     }
 
     private void ToggleFlyout() => flyoutOpen = !flyoutOpen;
