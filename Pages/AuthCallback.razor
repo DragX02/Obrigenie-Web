@@ -1,4 +1,5 @@
 @page "/auth-callback"
+@inject ApiService Api
 @inject AuthService Auth
 @inject NavigationManager Nav
 
@@ -11,9 +12,6 @@
     {
         var uri = new Uri(Nav.Uri);
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-
-        var token = query["token"];
-        var email = query["email"];
         var error = query["error"];
 
         if (!string.IsNullOrEmpty(error))
@@ -22,11 +20,14 @@
             return;
         }
 
-        if (!string.IsNullOrEmpty(token))
+        // Echanger le cookie temporaire HttpOnly contre les données d'auth
+        // (le token ne passe plus jamais dans l'URL)
+        var result = await Api.ExchangeOAuthTokenAsync();
+        if (result != null)
         {
-            await Auth.SaveTokenAsync(token);
-            if (!string.IsNullOrEmpty(email))
-                await Auth.SaveEmailAsync(email);
+            await Auth.SaveTokenAsync(result.Token);
+            if (!string.IsNullOrEmpty(result.Email))
+                await Auth.SaveEmailAsync(result.Email);
             Nav.NavigateTo("/", forceLoad: true);
         }
         else

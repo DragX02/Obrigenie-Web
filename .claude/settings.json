@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Read(//g/csharp/serappagenda/seragenda/seragenda/**)"
+      "Read(//g/csharp/serappagenda/seragenda/seragenda/**)",
+      "Read(//g/csharp/serappagenda/seragenda/**)",
+      "Read(//g/csharp/serappagenda/**)"
     ],
     "additionalDirectories": [
       "G:\\csharp\\serappagenda\\seragenda\\seragenda\\Controllers",

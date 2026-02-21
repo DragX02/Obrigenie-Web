@@ -14,6 +14,19 @@ namespace Obrigenie.Services
         }
 
         // Auth
+        // Echange le cookie temporaire auth_pending (défini après OAuth) contre les données d'auth
+        public async Task<AuthResponse?> ExchangeOAuthTokenAsync()
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync("api/auth/exchange");
+                if (response.IsSuccessStatusCode)
+                    return await response.Content.ReadFromJsonAsync<AuthResponse>();
+                return null;
+            }
+            catch { return null; }
+        }
+
         public async Task<AuthResponse?> LoginAsync(LoginDto loginDto)
         {
             var response = await _httpClient.PostAsJsonAsync("api/auth/login", loginDto);
