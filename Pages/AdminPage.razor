@@ -18,8 +18,12 @@ else
             <div class="admin-create-form">
                 <input class="admin-input" type="text" placeholder="Libellé (ex: PROF-DUPONT)"
                        @bind="newLabel" />
+                            <div class="admin-code-group">
                 <input class="admin-input" type="text" placeholder="Code personnalisé (optionnel)"
-                       @bind="newCode" />
+                    @bind="newCode" />
+                <button class="btn-generate-code" type="button" @onclick="GenerateCodeSuggestion"
+                        title="Générer un code automatiquement">⟳</button>
+            </div>
                 <input class="admin-input" type="date" title="Date d'expiration (optionnel)"
                        @bind="newExpiry" />
                 <button class="btn-admin-create" @onclick="CreateLicense" disabled="@isCreating">
@@ -110,6 +114,15 @@ else
         isLoading = true;
         licenses = await Api.GetLicensesAsync();
         isLoading = false;
+    }
+    private void GenerateCodeSuggestion()
+    {
+        const string lettres = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const string chiffres = "23456789";
+    var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(10);
+    var part1 = new string(bytes.Take(5).Select(b => lettres[b % lettres.Length]).ToArray());
+    var part2 = new string(bytes.Skip(5).Select(b => chiffres[b % chiffres.Length]).ToArray());
+    newCode = $"{part1}-{part2}";
     }
 
     private async Task CreateLicense()

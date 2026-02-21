@@ -785,3 +785,26 @@ h1:focus { outline: none; }
     padding: 4px 8px;
 }
 .btn-lic-delete:hover { border-color: #e74c3c; color: #e74c3c; }
+
+.admin-code-group {
+    flex: 1;
+    min-width: 150px;
+    display: flex;
+}
+.admin-code-group .admin-input {
+    flex: 1;
+    min-width: 0;
+    border-radius: 8px 0 0 8px !important;
+}
+.btn-generate-code {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 0 8px 8px 0;
+    padding: 0 0.75rem;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: filter 0.2s;
+}
+.btn-generate-code:hover { filter: brightness(1.15); }
+
