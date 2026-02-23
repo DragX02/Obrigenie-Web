@@ -581,7 +581,9 @@
     {
         if (currentDay == null || noteEndHour <= noteStartHour) return;
         noteSaveError = null;
-        var note = editingNote ?? new Note { Date = currentDay.Date };
+        // Forcer UTC midnight pour éviter le décalage fuseau horaire lors du JSON encode (+01:00 → veille en UTC)
+        var noteDate = new DateTime(currentDay.Date.Year, currentDay.Date.Month, currentDay.Date.Day, 0, 0, 0, DateTimeKind.Utc);
+        var note = editingNote ?? new Note { Date = noteDate };
         note.Hour = noteStartHour;
         note.EndHour = noteEndHour;
         note.Content = noteContent;
