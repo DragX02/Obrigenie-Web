@@ -101,7 +101,7 @@
                     {
                         <div class="trim-col @(week.IsFullHoliday ? "trim-col-holiday" : "")">
                             <div class="trim-cell trim-cell-header">
-                                <span class="trim-week-num">S@(week.WeekNum)</span>
+                                <span class="trim-week-num">@(week.WeekNum.HasValue ? $"S{week.WeekNum}" : "")</span>
                                 <span class="trim-week-date">@week.DateLabel</span>
                             </div>
                             @if (week.IsFullHoliday)
@@ -204,11 +204,29 @@
     private string noteContent = "";
     private Note? editingNote = null;
 
+    // Numérotation scolaire : S1 = semaine de la rentrée (1er sept),
+    // compte jusqu'à fin juin, juillet et août = null, repart à S1 chaque année.
+    private static int? GetSchoolWeekNumber(DateTime weekMonday)
+    {
+        if (weekMonday.Month == 7 || weekMonday.Month == 8) return null;
+
+        // Année scolaire : septembre de startYear → juin de startYear+1
+        int startYear = weekMonday.Month >= 9 ? weekMonday.Year : weekMonday.Year - 1;
+
+        // Lundi de la semaine contenant le 1er septembre = semaine 1
+        var sept1 = new DateTime(startYear, 9, 1);
+        int daysToMonday = ((int)sept1.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        var rentreeMonday = sept1.AddDays(-daysToMonday);
+
+        int weekNum = (int)((weekMonday.Date - rentreeMonday.Date).TotalDays / 7) + 1;
+        return weekNum >= 1 ? weekNum : null;
+    }
+
     // ── Classes pour la vue Trimestre ──────────────────────────────────
     private class TrimWeek
     {
         public DateTime WeekStart { get; set; }
-        public int WeekNum { get; set; }
+        public int? WeekNum { get; set; }
         public string DateLabel { get; set; } = "";
         public List<TrimDay> Days { get; set; } = new();
         public bool IsFullHoliday => Days.Count == 5 && Days.All(d => d.IsHoliday);
@@ -310,7 +328,6 @@
         var results = await Task.WhenAll(tasks);
         var coursesByDate = weekdays.Zip(results).ToDictionary(p => p.First.Date, p => p.Second);
 
-        var frCulture = new System.Globalization.CultureInfo("fr-FR");
         trimWeeks = new List<TrimWeek>();
 
         for (DateTime ws = gridStart; ws.Date <= end.Date; ws = ws.AddDays(7))
@@ -318,9 +335,7 @@
             var week = new TrimWeek
             {
                 WeekStart = ws,
-                WeekNum   = frCulture.Calendar.GetWeekOfYear(ws,
-                    System.Globalization.CalendarWeekRule.FirstFourDayWeek,
-                    System.DayOfWeek.Monday),
+                WeekNum   = GetSchoolWeekNumber(ws),
                 DateLabel = $"{ws:dd/MM} - {ws.AddDays(6):dd/MM}"
             };
 
