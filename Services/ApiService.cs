@@ -83,9 +83,19 @@ namespace Obrigenie.Services
             catch { return new(); }
         }
 
-        public async Task SaveNoteAsync(Note note)
+        public async Task<(bool Success, string? Error)> SaveNoteAsync(Note note)
         {
-            await _httpClient.PostAsJsonAsync("api/notes", note);
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/notes", note);
+                if (response.IsSuccessStatusCode) return (true, null);
+                var body = await response.Content.ReadAsStringAsync();
+                return (false, $"Erreur {(int)response.StatusCode} : {body}");
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
         }
 
         public async Task DeleteNoteAsync(int id)

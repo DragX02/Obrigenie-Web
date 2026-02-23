@@ -216,6 +216,10 @@
             {
                 <p class="modal-error">L'heure de fin doit être après l'heure de début.</p>
             }
+            @if (noteSaveError != null)
+            {
+                <p class="modal-error">@noteSaveError</p>
+            }
         </div>
     </div>
 }
@@ -242,6 +246,7 @@
     private Note? editingNote = null;
     private int noteStartHour = 8;
     private int noteEndHour = 9;
+    private string? noteSaveError = null;
 
     // Numérotation scolaire : S1 = semaine de la rentrée (semaine contenant le 1er sept),
     // compte jusqu'à fin juin, juillet/août = null sauf si c'est la semaine de rentrée
@@ -568,17 +573,20 @@
         noteContent = editingNote?.Content ?? "";
         noteStartHour = editingNote?.Hour ?? hour;
         noteEndHour = editingNote?.EndHour > 0 ? editingNote.EndHour : hour + 1;
+        noteSaveError = null;
         showNoteModal = true;
     }
 
     private async Task SaveNote()
     {
         if (currentDay == null || noteEndHour <= noteStartHour) return;
+        noteSaveError = null;
         var note = editingNote ?? new Note { Date = currentDay.Date };
         note.Hour = noteStartHour;
         note.EndHour = noteEndHour;
         note.Content = noteContent;
-        await Api.SaveNoteAsync(note);
+        var (success, error) = await Api.SaveNoteAsync(note);
+        if (!success) { noteSaveError = error; return; }
         showNoteModal = false;
         currentDay = await CreateDayWithDataAsync(currentDate);
         days = new List<Day> { currentDay };
