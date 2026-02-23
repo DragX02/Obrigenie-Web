@@ -1,0 +1,22 @@
+@page "/test"
+@inject AuthService Auth
+
+@if (!isAdmin)
+{
+    <div style="padding:2rem;text-align:center;color:var(--text-muted)">Accès refusé.</div>
+}
+else
+{
+    <div style="padding:2rem">
+        <h2>Page de test</h2>
+    </div>
+}
+
+@code {
+    private bool isAdmin = false;
+    protected override async Task OnInitializedAsync()
+    {
+        var role = await Auth.GetRoleAsync();
+        isAdmin = role == "ADMIN";
+    }
+}
