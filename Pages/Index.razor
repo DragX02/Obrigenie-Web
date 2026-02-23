@@ -53,9 +53,14 @@
                 var hour = h;
                 var course = currentDay.Courses.FirstOrDefault(c =>
                     c.StartTime.Hours <= hour && c.EndTime.Hours > hour);
-                var note = currentDay.Notes.FirstOrDefault(n => n.Hour == hour);
+                // Cherche une note qui démarre à cette heure (on l'affiche uniquement sur sa ligne de départ)
+                var noteHere = currentDay.Notes.FirstOrDefault(n => n.Hour == hour);
+                // Cherche si cette heure est couverte par une note qui démarre avant (pour bloquer le clic)
+                var noteCovering = currentDay.Notes.FirstOrDefault(n =>
+                    n.Hour < hour && (n.EndHour > 0 ? n.EndHour : n.Hour + 1) > hour);
 
-                <div class="time-row" @onclick="() => OnTimeSlotClicked(hour)">
+                <div class="time-row @(noteCovering != null ? "time-row-covered" : "")"
+                     @onclick="() => OnTimeSlotClicked(hour)">
                     <div class="time-label">@($"{hour:D2}:00")</div>
                     <div class="time-content">
                         @if (course != null)
@@ -65,10 +70,12 @@
                                 <span class="course-time">@($"{course.StartTime:hh\\:mm} - {course.EndTime:hh\\:mm}")</span>
                             </div>
                         }
-                        @if (note != null)
+                        @if (noteHere != null)
                         {
-                            <div class="note-block" @onclick="() => OnTimeSlotClicked(hour)" @onclick:stopPropagation="true">
-                                @note.Content
+                            var endH = noteHere.EndHour > 0 ? noteHere.EndHour : noteHere.Hour + 1;
+                            <div class="note-block" @onclick:stopPropagation="true" @onclick="() => OnTimeSlotClicked(hour)">
+                                <span class="note-time">@($"{noteHere.Hour:D2}:00 → {endH:D2}:00")</span>
+                                @noteHere.Content
                             </div>
                         }
                     </div>
@@ -168,16 +175,38 @@
 {
     <div class="modal-overlay" @onclick="CloseNoteModal">
         <div class="modal-content" @onclick:stopPropagation="true">
-            <h3>Note pour @($"{editingHour:D2}:00")</h3>
-            <textarea @bind="noteContent" placeholder="Tapez votre note ici..." rows="4"></textarea>
+            <h3>@(editingNote != null ? "Modifier la note" : "Nouvelle note")</h3>
+            <p class="modal-date">@currentDate.ToString("dddd dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</p>
+            <div class="modal-time-range">
+                <label>De</label>
+                <select @bind="noteStartHour">
+                    @for (int h = 6; h <= 22; h++)
+                    {
+                        <option value="@h">@($"{h:D2}:00")</option>
+                    }
+                </select>
+                <label>à</label>
+                <select @bind="noteEndHour">
+                    @for (int h = 7; h <= 23; h++)
+                    {
+                        <option value="@h">@($"{h:D2}:00")</option>
+                    }
+                </select>
+            </div>
+            <textarea @bind="noteContent" placeholder="Tapez votre note ici..." rows="4" maxlength="2000"></textarea>
+            <div class="modal-char-count">@noteContent.Length / 2000</div>
             <div class="modal-buttons">
-                <button class="btn-save" @onclick="SaveNote">Enregistrer</button>
+                <button class="btn-save" @onclick="SaveNote" disabled="@(noteEndHour <= noteStartHour)">Enregistrer</button>
                 @if (editingNote != null)
                 {
                     <button class="btn-delete" @onclick="DeleteNote">Supprimer</button>
                 }
                 <button class="btn-cancel" @onclick="CloseNoteModal">Annuler</button>
             </div>
+            @if (noteEndHour <= noteStartHour)
+            {
+                <p class="modal-error">L'heure de fin doit être après l'heure de début.</p>
+            }
         </div>
     </div>
 }
@@ -200,9 +229,10 @@
 
     // Note modal
     private bool showNoteModal = false;
-    private int editingHour = 0;
     private string noteContent = "";
     private Note? editingNote = null;
+    private int noteStartHour = 8;
+    private int noteEndHour = 9;
 
     // Numérotation scolaire : S1 = semaine de la rentrée (semaine contenant le 1er sept),
     // compte jusqu'à fin juin, juillet/août = null sauf si c'est la semaine de rentrée
@@ -506,16 +536,22 @@
     // ── Notes ─────────────────────────────────────────────────────────
     private void OnTimeSlotClicked(int hour)
     {
-        editingHour = hour;
-        editingNote = currentDay?.Notes.FirstOrDefault(n => n.Hour == hour);
+        // Cherche une note qui couvre cette heure (commence ici ou la couvre)
+        editingNote = currentDay?.Notes.FirstOrDefault(n =>
+            hour >= n.Hour && hour < (n.EndHour > 0 ? n.EndHour : n.Hour + 1));
+
         noteContent = editingNote?.Content ?? "";
+        noteStartHour = editingNote?.Hour ?? hour;
+        noteEndHour = editingNote?.EndHour > 0 ? editingNote.EndHour : hour + 1;
         showNoteModal = true;
     }
 
     private async Task SaveNote()
     {
-        if (currentDay == null) return;
-        var note = editingNote ?? new Note { Date = currentDay.Date, Hour = editingHour };
+        if (currentDay == null || noteEndHour <= noteStartHour) return;
+        var note = editingNote ?? new Note { Date = currentDay.Date };
+        note.Hour = noteStartHour;
+        note.EndHour = noteEndHour;
         note.Content = noteContent;
         await Api.SaveNoteAsync(note);
         showNoteModal = false;
