@@ -127,7 +127,7 @@ namespace Obrigenie.Services
             {
                 new() { Name = "Conge d'automne (Toussaint)", StartDate = new DateTime(startYear, 10, 20), EndDate = new DateTime(startYear, 11, 3) },
                 new() { Name = "Vacances d'hiver (Noel)", StartDate = new DateTime(startYear, 12, 23), EndDate = new DateTime(endYear, 1, 4) },
-                new() { Name = "Conge de detente (Carnaval)", StartDate = new DateTime(endYear, 2, 23), EndDate = new DateTime(endYear, 3, 9) },
+                new() { Name = "Conge de detente (Carnaval)", StartDate = new DateTime(endYear, 2, 16), EndDate = new DateTime(endYear, 3, 1) },
                 new() { Name = "Vacances de printemps (Paques)", StartDate = new DateTime(endYear, 4, 6), EndDate = new DateTime(endYear, 4, 19) },
                 new() { Name = "Vacances d'ete", StartDate = new DateTime(endYear, 7, 5), EndDate = new DateTime(endYear, 8, 25) },
             };

@@ -365,14 +365,14 @@ h1:focus { outline: none; }
 .day-cell { background: var(--day-cell-bg); border-radius: 6px; padding: 0.5rem; min-height: 80px; cursor: pointer; border: 1px solid var(--border); transition: box-shadow 0.2s; }
 .day-cell:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
 .day-cell.today { border-color: var(--primary); border-width: 2px; }
-.day-cell.holiday { background: #FFEBEE; }
-.dark .day-cell.holiday { background: #2d1010; }
+.day-cell.holiday { background: #FFF3E0; }
+.dark .day-cell.holiday { background: #2a1800; }
 .day-cell.school-start { background: #E8F5E9; }
 .dark .day-cell.school-start { background: #0d2d10; }
 .day-cell.out-of-period { opacity: 0.25; pointer-events: none; }
 
 .day-num { font-weight: bold; font-size: 1.1rem; color: var(--text); }
-.holiday-name { display: block; font-size: 0.7rem; color: #d32f2f; }
+.holiday-name { display: block; font-size: 0.7rem; color: #E65100; }
 .course-mini { font-size: 0.65rem; color: white; padding: 1px 4px; border-radius: 3px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Modal */
