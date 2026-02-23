@@ -1,22 +1,176 @@
 @page "/test"
 @inject AuthService Auth
 
+<PageTitle>Test Cascade</PageTitle>
+
 @if (!isAdmin)
 {
     <div style="padding:2rem;text-align:center;color:var(--text-muted)">Accès refusé.</div>
 }
 else
 {
-    <div style="padding:2rem">
-        <h2>Page de test</h2>
+    <div class="container mt-4">
+        <h2>🧪 Test des Sélections en Cascade</h2>
+        <hr />
+
+        <div class="row">
+            <div class="col-md-6">
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">1. Choisir un Cours :</label>
+                    <select class="form-select" value="@selectedCours" @onchange="OnCoursChanged">
+                        <option value="">-- Sélectionner un cours --</option>
+                        @foreach (var cours in listeCours)
+                        {
+                            <option value="@cours.Code">@cours.Nom</option>
+                        }
+                    </select>
+                </div>
+
+                @if (!string.IsNullOrEmpty(selectedCours))
+                {
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">2. Choisir un Niveau :</label>
+                        <select class="form-select" value="@selectedNiveau" @onchange="OnNiveauChanged">
+                            <option value="">-- Sélectionner un niveau --</option>
+                            @foreach (var niveau in listeNiveaux)
+                            {
+                                <option value="@niveau">@niveau</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @if (selectedCours == "LM")
+                {
+                    <div class="mb-3 p-3 bg-light border rounded">
+                        <label class="form-label fw-bold text-primary">⭐ Choisir la langue spécifique :</label>
+                        <select class="form-select border-primary" value="@selectedLangue" @onchange="OnLangueChanged">
+                            <option value="">-- Quelle langue ? --</option>
+                            <option value="Anglais">Anglais</option>
+                            <option value="Néerlandais">Néerlandais</option>
+                            <option value="Allemand">Allemand</option>
+                        </select>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(selectedCours) && !string.IsNullOrEmpty(selectedNiveau))
+                {
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">3. Choisir un Domaine :</label>
+                        <select class="form-select" @bind="selectedDomaine">
+                            <option value="">-- Sélectionner un domaine --</option>
+                            @foreach (var domaine in domainesFiltres)
+                            {
+                                <option value="@domaine">@domaine</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+            </div>
+
+            <div class="col-md-6">
+                <div class="card bg-dark text-light mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Résumé de ta sélection :</h5>
+                        <ul>
+                            <li><strong>Cours :</strong> @(string.IsNullOrEmpty(selectedCours) ? "..." : selectedCours)</li>
+                            <li><strong>Niveau :</strong> @(string.IsNullOrEmpty(selectedNiveau) ? "..." : selectedNiveau)</li>
+
+                            @if (selectedCours == "LM")
+                            {
+                                <li class="text-warning"><strong>Langue :</strong> @(string.IsNullOrEmpty(selectedLangue) ? "..." : selectedLangue)</li>
+                            }
+
+                            <li><strong>Domaine :</strong> @(string.IsNullOrEmpty(selectedDomaine) ? "..." : selectedDomaine)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 }
 
 @code {
     private bool isAdmin = false;
+
     protected override async Task OnInitializedAsync()
     {
         var role = await Auth.GetRoleAsync();
         isAdmin = role == "ADMIN";
+    }
+
+    // === VARIABLES QUI STOCKENT LES CHOIX DE L'UTILISATEUR ===
+    private string selectedCours = "";
+    private string selectedNiveau = "";
+    private string selectedLangue = "";
+    private string selectedDomaine = "";
+
+    // === LISTES DE DONNÉES ===
+    private List<(string Code, string Nom)> listeCours = new()
+    {
+        ("FR",   "Français"),
+        ("MATH", "Mathématiques"),
+        ("SC",   "Sciences"),
+        ("LM",   "Langues modernes")
+    };
+
+    private List<string> listeNiveaux = new() { "P1", "P2", "P3", "P4", "P5", "P6", "S1", "S2", "S3" };
+
+    private List<string> domainesFiltres = new();
+
+    // === ÉVÉNEMENTS ===
+
+    private void OnCoursChanged(ChangeEventArgs e)
+    {
+        selectedCours  = e.Value?.ToString() ?? "";
+        selectedNiveau = "";
+        selectedLangue = "";
+        selectedDomaine = "";
+        domainesFiltres.Clear();
+    }
+
+    private void OnNiveauChanged(ChangeEventArgs e)
+    {
+        selectedNiveau  = e.Value?.ToString() ?? "";
+        selectedDomaine = "";
+        MettreAJourDomaines();
+    }
+
+    private void OnLangueChanged(ChangeEventArgs e)
+    {
+        selectedLangue  = e.Value?.ToString() ?? "";
+        selectedDomaine = "";
+        MettreAJourDomaines();
+    }
+
+    // === LOGIQUE DE FILTRAGE DES DOMAINES ===
+    private void MettreAJourDomaines()
+    {
+        domainesFiltres.Clear();
+
+        if (string.IsNullOrEmpty(selectedCours) || string.IsNullOrEmpty(selectedNiveau))
+            return;
+
+        if (selectedCours == "MATH")
+        {
+            domainesFiltres.Add("DE L'ARITHMÉTIQUE À L'ALGÈBRE");
+            domainesFiltres.Add("DES OBJETS DE L'ESPACE À LA GÉOMÉTRIE");
+        }
+        else if (selectedCours == "SC")
+        {
+            domainesFiltres.Add("Savoir-faire liés aux démarches d'investigation");
+        }
+        else if (selectedCours == "LM")
+        {
+            domainesFiltres.Add($"Niveau CECRL visé en {selectedNiveau}");
+            if (!string.IsNullOrEmpty(selectedLangue))
+                domainesFiltres.Add($"Compréhension à l'audition ({selectedLangue})");
+        }
+        else
+        {
+            domainesFiltres.Add("Domaine général");
+        }
     }
 }
