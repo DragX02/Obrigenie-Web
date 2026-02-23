@@ -204,16 +204,35 @@
     private string noteContent = "";
     private Note? editingNote = null;
 
-    // Numérotation scolaire : S1 = semaine de la rentrée (1er sept),
-    // compte jusqu'à fin juin, juillet et août = null, repart à S1 chaque année.
+    // Numérotation scolaire : S1 = semaine de la rentrée (semaine contenant le 1er sept),
+    // compte jusqu'à fin juin, juillet/août = null sauf si c'est la semaine de rentrée
+    // (ex: rentrée mardi 1er sept → lundi = 31 août → S1 quand même).
+    // Repart à S1 chaque année scolaire.
     private static int? GetSchoolWeekNumber(DateTime weekMonday)
     {
-        if (weekMonday.Month == 7 || weekMonday.Month == 8) return null;
+        int startYear;
 
-        // Année scolaire : septembre de startYear → juin de startYear+1
-        int startYear = weekMonday.Month >= 9 ? weekMonday.Year : weekMonday.Year - 1;
+        if (weekMonday.Month >= 9)
+        {
+            startYear = weekMonday.Year;
+        }
+        else if (weekMonday.Month <= 6)
+        {
+            startYear = weekMonday.Year - 1;
+        }
+        else
+        {
+            // Juillet ou août : null, SAUF si c'est le lundi de la semaine de rentrée
+            // (ex: rentrée le mardi 1er sept → lundi = 31 août)
+            var sept1Check = new DateTime(weekMonday.Year, 9, 1);
+            int d = ((int)sept1Check.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+            if (weekMonday.Date == sept1Check.AddDays(-d).Date)
+                startYear = weekMonday.Year;
+            else
+                return null;
+        }
 
-        // Lundi de la semaine contenant le 1er septembre = semaine 1
+        // Lundi de la semaine contenant le 1er septembre = S1
         var sept1 = new DateTime(startYear, 9, 1);
         int daysToMonday = ((int)sept1.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
         var rentreeMonday = sept1.AddDays(-daysToMonday);
