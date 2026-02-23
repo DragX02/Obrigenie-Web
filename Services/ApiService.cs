@@ -177,6 +177,22 @@ namespace Obrigenie.Services
             catch { return false; }
         }
 
+        // Admin – déclencher le scraper calendrier scolaire
+        public async Task<(bool Success, string Message)> TriggerScraperAsync()
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync("api/update-scolaire");
+                if (response.IsSuccessStatusCode)
+                    return (true, await response.Content.ReadAsStringAsync());
+                return (false, $"Erreur {(int)response.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
+        }
+
         // Health
         public async Task<bool> CheckHealthAsync()
         {

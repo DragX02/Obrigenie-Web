@@ -36,6 +36,21 @@ else
             }
         </div>
 
+        <!-- Calendrier scolaire -->
+        <div class="admin-create-card">
+            <h3 class="admin-section-title">Calendrier scolaire</h3>
+            <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:.75rem">
+                Met à jour les dates de congés depuis enseignement.be.
+            </p>
+            <button class="btn-admin-create" @onclick="RunScraper" disabled="@isScraping">
+                @(isScraping ? "Mise à jour..." : "↻ Mettre à jour")
+            </button>
+            @if (scraperMsg != null)
+            {
+                <div class="admin-create-msg @(scraperSuccess ? "msg-ok" : "msg-err")">@scraperMsg</div>
+            }
+        </div>
+
         <!-- Liste des licences -->
         <div class="admin-licenses-list">
             @if (isLoading)
@@ -99,6 +114,10 @@ else
     private DateTime? newExpiry;
     private string? createMsg;
     private bool createSuccess;
+
+    private bool isScraping = false;
+    private string? scraperMsg;
+    private bool scraperSuccess;
 
     protected override async Task OnInitializedAsync()
     {
@@ -164,5 +183,15 @@ else
     {
         await Api.DeleteLicenseAsync(id);
         await LoadLicenses();
+    }
+
+    private async Task RunScraper()
+    {
+        isScraping = true;
+        scraperMsg = null;
+        var (success, message) = await Api.TriggerScraperAsync();
+        scraperSuccess = success;
+        scraperMsg = success ? "Calendrier mis à jour avec succès." : $"Échec : {message}";
+        isScraping = false;
     }
 }
