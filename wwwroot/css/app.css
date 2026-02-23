@@ -374,6 +374,9 @@ h1:focus { outline: none; }
 .day-num { font-weight: bold; font-size: 1.1rem; color: var(--text); }
 .holiday-name { display: block; font-size: 0.7rem; color: #E65100; }
 .course-mini { font-size: 0.65rem; color: white; padding: 1px 4px; border-radius: 3px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-mini { font-size: 0.65rem; color: #E65100; background: #FFF3E0; padding: 1px 4px; border-radius: 3px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dark .note-mini { background: #2d1f0a; color: #FFB74D; }
+.trim-note-dot { font-size: 0.7rem; line-height: 1; display: block; margin-top: 1px; }
 
 /* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; justify-content: center; align-items: center; z-index: 1000; }

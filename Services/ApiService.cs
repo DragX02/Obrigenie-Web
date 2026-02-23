@@ -53,6 +53,16 @@ namespace Obrigenie.Services
             catch { return new(); }
         }
 
+        public async Task<List<Note>> GetNotesForRangeAsync(DateTime start, DateTime end)
+        {
+            try
+            {
+                return await _httpClient.GetFromJsonAsync<List<Note>>(
+                    $"api/notes/range?start={start:yyyy-MM-dd}&end={end:yyyy-MM-dd}") ?? new();
+            }
+            catch { return new(); }
+        }
+
         public async Task SaveCourseAsync(Course course)
         {
             await _httpClient.PostAsJsonAsync("api/courses", course);

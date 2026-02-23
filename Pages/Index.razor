@@ -131,6 +131,10 @@
                                             {
                                                 <div class="trim-course" style="background-color: @c.Color;" title="@c.Name">@c.Name</div>
                                             }
+                                            @if (day.Notes.Any())
+                                            {
+                                                <div class="trim-note-dot" title="@(day.Notes.Count) note(s)">📝</div>
+                                            }
                                         }
                                     </div>
                                 }
@@ -163,6 +167,11 @@
                     @foreach (var course in day.Courses.Take(3))
                     {
                         <div class="course-mini" style="background-color: @course.Color;">@course.Name</div>
+                    }
+                    @foreach (var note in day.Notes.Take(2))
+                    {
+                        var preview = note.Content.Length > 16 ? note.Content[..16] + "…" : note.Content;
+                        <div class="note-mini">📝 @preview</div>
                     }
                 </div>
             }
@@ -286,6 +295,7 @@
     {
         public DateTime Date { get; set; }
         public List<Course> Courses { get; set; } = new();
+        public List<Note> Notes { get; set; } = new();
         public bool IsHoliday { get; set; }
         public string HolidayShortName { get; set; } = "";
         public bool IsInPeriod { get; set; }
@@ -311,9 +321,9 @@
     private async Task UpdateCalendarView()
     {
         if (viewMode == CalendarViewMode.SingleDay) await UpdateSingleDayView();
-        else if (viewMode == CalendarViewMode.Month) UpdateMonthView();
+        else if (viewMode == CalendarViewMode.Month) await UpdateMonthView();
         else if (viewMode == CalendarViewMode.SchoolPeriod) await UpdateSchoolPeriodView();
-        else UpdateWeekView();
+        else await UpdateWeekView();
 
         periodLabel = viewMode == CalendarViewMode.SchoolPeriod
             ? null
@@ -328,7 +338,7 @@
         days = new List<Day> { currentDay };
     }
 
-    private void UpdateWeekView()
+    private async Task UpdateWeekView()
     {
         int delta = System.DayOfWeek.Monday - currentDate.DayOfWeek;
         if (delta > 0) delta -= 7;
@@ -339,9 +349,13 @@
         days = new List<Day>();
         for (int i = 0; i < daysToShow; i++)
             days.Add(CreateDayModel(monday.AddDays(i)));
+
+        var allNotes = await Api.GetNotesForRangeAsync(monday, monday.AddDays(daysToShow - 1));
+        foreach (var day in days)
+            day.Notes = allNotes.Where(n => n.Date.Date == day.Date.Date).ToList();
     }
 
-    private void UpdateMonthView()
+    private async Task UpdateMonthView()
     {
         weekTitle = currentDate.ToString("MMMM yyyy", new System.Globalization.CultureInfo("fr-FR")).ToUpper();
         DateTime first = new DateTime(currentDate.Year, currentDate.Month, 1);
@@ -350,6 +364,10 @@
         days = new List<Day>();
         for (int i = 0; i < 42; i++)
             days.Add(CreateDayModel(start.AddDays(i)));
+
+        var allNotes = await Api.GetNotesForRangeAsync(start, start.AddDays(41));
+        foreach (var day in days)
+            day.Notes = allNotes.Where(n => n.Date.Date == day.Date.Date).ToList();
     }
 
     private async Task UpdateSchoolPeriodView()
@@ -372,10 +390,16 @@
             if (d.DayOfWeek != System.DayOfWeek.Saturday && d.DayOfWeek != System.DayOfWeek.Sunday)
                 weekdays.Add(d);
 
-        // Charger les cours en parallèle
-        var tasks = weekdays.Select(d => Api.GetCoursesForDateAsync(d)).ToArray();
-        var results = await Task.WhenAll(tasks);
-        var coursesByDate = weekdays.Zip(results).ToDictionary(p => p.First.Date, p => p.Second);
+        // Charger les cours et les notes en parallèle
+        var courseTasks = weekdays.Select(d => Api.GetCoursesForDateAsync(d)).ToArray();
+        var notesTask   = Api.GetNotesForRangeAsync(gridStart, end);
+        await Task.WhenAll(Task.WhenAll(courseTasks), notesTask);
+
+        var coursesByDate = weekdays.Zip(courseTasks.Select(t => t.Result))
+            .ToDictionary(p => p.First.Date, p => p.Second);
+        var allTrimNotes = notesTask.Result;
+        var notesByDate = allTrimNotes.GroupBy(n => n.Date.Date)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         trimWeeks = new List<TrimWeek>();
 
@@ -403,6 +427,7 @@
                 {
                     Date             = date,
                     Courses          = coursesByDate.GetValueOrDefault(date.Date, new()),
+                    Notes            = notesByDate.GetValueOrDefault(date.Date, new()),
                     IsHoliday        = hol != null,
                     HolidayShortName = hol != null ? GetShortHolName(hol.Name) : "",
                     IsInPeriod       = date.Date >= start.Date && date.Date <= end.Date
