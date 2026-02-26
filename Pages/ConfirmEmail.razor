@@ -1,0 +1,86 @@
+@page "/confirm-email"
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<div class="confirm-email-page">
+    <div class="confirm-card">
+        <img src="/icon-192.png" alt="ObriGénie" class="confirm-logo" />
+        <h1 class="confirm-brand">ObriGénie</h1>
+
+        @if (isLoading)
+        {
+            <div class="confirm-state">
+                <div class="confirm-spinner"></div>
+                <p>Vérification en cours...</p>
+            </div>
+        }
+        else if (isSuccess)
+        {
+            <div class="confirm-state confirm-success">
+                <span class="confirm-icon">✅</span>
+                <h2>Compte confirmé !</h2>
+                <p>Votre adresse email a bien été vérifiée.<br />Vous pouvez maintenant vous connecter.</p>
+                <button class="btn-confirm-login" @onclick='() => Nav.NavigateTo("/login")'>
+                    Se connecter
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="confirm-state confirm-error">
+                <span class="confirm-icon">❌</span>
+                <h2>Lien invalide</h2>
+                <p>@errorMessage</p>
+                <button class="btn-confirm-login" @onclick='() => Nav.NavigateTo("/login")'>
+                    Retour à la connexion
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "token")]
+    public string? Token { get; set; }
+
+    private bool isLoading = true;
+    private bool isSuccess = false;
+    private string errorMessage = "Ce lien de confirmation est invalide ou a expiré.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Token))
+        {
+            errorMessage = "Aucun token de confirmation fourni.";
+            isLoading = false;
+            return;
+        }
+
+        try
+        {
+            var response = await Http.GetAsync($"api/auth/confirm?token={Uri.EscapeDataString(Token)}");
+            isSuccess = response.IsSuccessStatusCode;
+
+            if (!isSuccess)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    var json = System.Text.Json.JsonDocument.Parse(body);
+                    errorMessage = json.RootElement.TryGetProperty("message", out var msg)
+                        ? msg.GetString() ?? errorMessage
+                        : errorMessage;
+                }
+                catch { }
+            }
+        }
+        catch
+        {
+            errorMessage = "Impossible de contacter le serveur. Réessayez plus tard.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}
