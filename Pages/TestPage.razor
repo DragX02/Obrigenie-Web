@@ -1,5 +1,6 @@
 @page "/test"
 @inject AuthService Auth
+@inject ApiService Api
 
 <PageTitle>Test Cascade</PageTitle>
 
@@ -22,7 +23,7 @@ else
                         <option value="">-- Sélectionner un cours --</option>
                         @foreach (var cours in listeCours)
                         {
-                            <option value="@cours.Code">@cours.Nom</option>
+                            <option value="@cours.CodeCours">@cours.NomCours</option>
                         }
                     </select>
                 </div>
@@ -35,7 +36,7 @@ else
                             <option value="">-- Sélectionner un niveau --</option>
                             @foreach (var niveau in listeNiveaux)
                             {
-                                <option value="@niveau">@niveau</option>
+                                <option value="@niveau.CodeNiveau">@niveau.NomNiveau</option>
                             }
                         </select>
                     </div>
@@ -62,7 +63,7 @@ else
                             <option value="">-- Sélectionner un domaine --</option>
                             @foreach (var domaine in domainesFiltres)
                             {
-                                <option value="@domaine">@domaine</option>
+                                <option value="@domaine.Nom">@domaine.Nom</option>
                             }
                         </select>
                     </div>
@@ -99,78 +100,55 @@ else
     {
         var role = await Auth.GetRoleAsync();
         isAdmin = role == "ADMIN";
+        if (isAdmin)
+            listeCours = await Api.GetCoursAsync();
     }
 
     // === VARIABLES QUI STOCKENT LES CHOIX DE L'UTILISATEUR ===
-    private string selectedCours = "";
-    private string selectedNiveau = "";
-    private string selectedLangue = "";
+    private string selectedCours   = "";
+    private string selectedNiveau  = "";
+    private string selectedLangue  = "";
     private string selectedDomaine = "";
 
-    // === LISTES DE DONNÉES ===
-    private List<(string Code, string Nom)> listeCours = new()
-    {
-        ("FR",   "Français"),
-        ("MATH", "Mathématiques"),
-        ("SC",   "Sciences"),
-        ("LM",   "Langues modernes")
-    };
-
-    private List<string> listeNiveaux = new() { "P1", "P2", "P3", "P4", "P5", "P6", "S1", "S2", "S3" };
-
-    private List<string> domainesFiltres = new();
+    // === LISTES DE DONNÉES (chargées depuis l'API) ===
+    private List<CoursDto>   listeCours      = new();
+    private List<NiveauDto>  listeNiveaux    = new();
+    private List<DomaineDto> domainesFiltres = new();
 
     // === ÉVÉNEMENTS ===
 
-    private void OnCoursChanged(ChangeEventArgs e)
+    private async Task OnCoursChanged(ChangeEventArgs e)
     {
-        selectedCours  = e.Value?.ToString() ?? "";
-        selectedNiveau = "";
-        selectedLangue = "";
+        selectedCours   = e.Value?.ToString() ?? "";
+        selectedNiveau  = "";
+        selectedLangue  = "";
         selectedDomaine = "";
         domainesFiltres.Clear();
+
+        listeNiveaux = string.IsNullOrEmpty(selectedCours)
+            ? new()
+            : await Api.GetNiveauxAsync(selectedCours);
     }
 
-    private void OnNiveauChanged(ChangeEventArgs e)
+    private async Task OnNiveauChanged(ChangeEventArgs e)
     {
         selectedNiveau  = e.Value?.ToString() ?? "";
         selectedDomaine = "";
-        MettreAJourDomaines();
+        await MettreAJourDomaines();
     }
 
     private void OnLangueChanged(ChangeEventArgs e)
     {
         selectedLangue  = e.Value?.ToString() ?? "";
         selectedDomaine = "";
-        MettreAJourDomaines();
     }
 
-    // === LOGIQUE DE FILTRAGE DES DOMAINES ===
-    private void MettreAJourDomaines()
+    // === LOGIQUE DE CHARGEMENT DES DOMAINES ===
+    private async Task MettreAJourDomaines()
     {
         domainesFiltres.Clear();
-
         if (string.IsNullOrEmpty(selectedCours) || string.IsNullOrEmpty(selectedNiveau))
             return;
-
-        if (selectedCours == "MATH")
-        {
-            domainesFiltres.Add("DE L'ARITHMÉTIQUE À L'ALGÈBRE");
-            domainesFiltres.Add("DES OBJETS DE L'ESPACE À LA GÉOMÉTRIE");
-        }
-        else if (selectedCours == "SC")
-        {
-            domainesFiltres.Add("Savoir-faire liés aux démarches d'investigation");
-        }
-        else if (selectedCours == "LM")
-        {
-            domainesFiltres.Add($"Niveau CECRL visé en {selectedNiveau}");
-            if (!string.IsNullOrEmpty(selectedLangue))
-                domainesFiltres.Add($"Compréhension à l'audition ({selectedLangue})");
-        }
-        else
-        {
-            domainesFiltres.Add("Domaine général");
-        }
+        domainesFiltres = await Api.GetDomainesAsync(selectedCours, selectedNiveau);
     }
 }

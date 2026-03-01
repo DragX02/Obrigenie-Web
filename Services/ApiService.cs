@@ -223,6 +223,26 @@ namespace Obrigenie.Services
             }
             catch { return false; }
         }
+
+        // ============ RÉFÉRENTIEL (cascade) ============
+
+        public async Task<List<CoursDto>> GetCoursAsync()
+        {
+            try { return await _httpClient.GetFromJsonAsync<List<CoursDto>>("api/ref/cours") ?? new(); }
+            catch { return new(); }
+        }
+
+        public async Task<List<NiveauDto>> GetNiveauxAsync(string codeCours)
+        {
+            try { return await _httpClient.GetFromJsonAsync<List<NiveauDto>>($"api/ref/niveaux/{codeCours}") ?? new(); }
+            catch { return new(); }
+        }
+
+        public async Task<List<DomaineDto>> GetDomainesAsync(string codeCours, string codeNiveau)
+        {
+            try { return await _httpClient.GetFromJsonAsync<List<DomaineDto>>($"api/ref/domaines/{codeCours}/{codeNiveau}") ?? new(); }
+            catch { return new(); }
+        }
     }
 
     public class LicenseCheckResult
@@ -242,5 +262,24 @@ namespace Obrigenie.Services
         [JsonPropertyName("createdAt")]     public DateTime CreatedAt { get; set; }
         [JsonPropertyName("expiresAt")]     public DateTime? ExpiresAt { get; set; }
         [JsonPropertyName("assignedAt")]    public DateTime? AssignedAt { get; set; }
+    }
+
+    public class CoursDto
+    {
+        [JsonPropertyName("codeCours")]     public string  CodeCours     { get; set; } = string.Empty;
+        [JsonPropertyName("nomCours")]      public string  NomCours      { get; set; } = string.Empty;
+        [JsonPropertyName("couleurAgenda")] public string? CouleurAgenda { get; set; }
+    }
+
+    public class NiveauDto
+    {
+        [JsonPropertyName("codeNiveau")] public string CodeNiveau { get; set; } = string.Empty;
+        [JsonPropertyName("nomNiveau")]  public string NomNiveau  { get; set; } = string.Empty;
+    }
+
+    public class DomaineDto
+    {
+        [JsonPropertyName("idDom")] public int    IdDom { get; set; }
+        [JsonPropertyName("nom")]   public string Nom   { get; set; } = string.Empty;
     }
 }
