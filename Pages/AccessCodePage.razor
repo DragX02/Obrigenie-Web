@@ -1,86 +1,159 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   AccessCodePage.razor — License access-code entry page.
+
+   After logging in but before reaching the calendar, non-admin users must
+   provide a valid license access code. This page:
+     1. Redirects unauthenticated users to /login (requires a valid session).
+     2. Accepts a code via a text input (keyboard Enter or button click).
+     3. Calls ApiService.ValidateAccessCodeAsync to verify the code server-side.
+     4. On success: stores the code in localStorage so MainLayout can validate
+        it on every subsequent load (real-time revocation support), then
+        navigates to the home calendar page.
+     5. On failure: shows an inline error message.
+
+   A logout button is also provided so the user can switch accounts if needed.
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@* Route: MainLayout redirects here when a logged-in user has no valid license *@
 @page "/access-code"
+
+@* Inject ApiService to call the code-validation endpoint *@
 @inject ApiService Api
+
+@* Inject AuthService to check login state and to remove the token on logout *@
 @inject AuthService Auth
+
+@* Inject ILocalStorageService to persist the validated code for future checks *@
 @inject ILocalStorageService LocalStorage
+
+@* Inject NavigationManager to redirect after validation or logout *@
 @inject NavigationManager Nav
 
+@* ── Page layout ──────────────────────────────────────────────────────────── *@
 <div class="access-container">
     <div class="access-card">
         <div class="access-icon">🔑</div>
         <h1 class="access-title">Obrigenie</h1>
-        <p class="access-subtitle">Insérer code d'invitation ou clé</p>
+        <p class="access-subtitle">Enter your invitation code or license key</p>
 
         <div class="access-form">
+
+            @* ── Code input field ───────────────────────────────────────────
+               Binds to the "code" field and updates on every keystroke (oninput)
+               so the error class can be applied reactively.
+               Pressing Enter triggers the Validate method via OnKeyDown.
+            ── *@
             <input class="access-input @(errorMsg != null ? "access-input-error" : "")"
                    type="text"
-                   placeholder="Code d'accès"
+                   placeholder="Access code"
                    @bind="code"
                    @bind:event="oninput"
                    @onkeydown="OnKeyDown" />
 
+            @* Inline error message displayed when the entered code is invalid *@
             @if (errorMsg != null)
             {
                 <div class="access-error">@errorMsg</div>
             }
 
+            @* Submit button — disabled while the async validation request is in progress *@
             <button class="btn-access-validate" @onclick="Validate" disabled="@isValidating">
-                @(isValidating ? "Vérification..." : "Valider")
+                @(isValidating ? "Verifying..." : "Validate")
             </button>
 
+            @* Logout button — clears the JWT token and returns to the login page *@
             <button class="btn-access-logout" @onclick="Logout">
-                Déconnexion
+                Logout
             </button>
         </div>
     </div>
 </div>
 
 @code {
+    @* The access code currently entered in the text field *@
     private string code = string.Empty;
+
+    @* The error message shown when validation fails; null when no error is displayed *@
     private string? errorMsg = null;
+
+    @* True while the validation API call is in progress; disables the submit button *@
     private bool isValidating = false;
 
+    /// <summary>
+    /// Lifecycle method called on first render.
+    /// Ensures only authenticated users can reach this page.
+    /// Unauthenticated users are redirected to /login immediately.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
-        // Le code d'accès est uniquement accessible après connexion
+        // The access-code page is only reachable when the user already has a valid JWT
         var isLoggedIn = await Auth.IsLoggedInAsync();
         if (!isLoggedIn)
             Nav.NavigateTo("/login");
     }
 
+    /// <summary>
+    /// Handles keyboard events on the code input field.
+    /// Submits the form when the user presses the Enter key, providing
+    /// a more natural UX without requiring a mouse click.
+    /// </summary>
+    /// <param name="e">The keyboard event arguments containing the pressed key.</param>
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
             await Validate();
     }
 
+    /// <summary>
+    /// Logs the user out by removing the stored JWT token and redirecting to /login.
+    /// Provided so the user can switch to a different account if they entered the
+    /// wrong email address or used the wrong OAuth provider.
+    /// </summary>
     private async Task Logout()
     {
         await Auth.RemoveTokenAsync();
         Nav.NavigateTo("/login");
     }
 
+    /// <summary>
+    /// Validates the entered access code by calling the server.
+    /// On success: stores the code in localStorage (so MainLayout can re-validate
+    /// it on each startup) and navigates to the home calendar page.
+    /// On failure: displays an error message and re-enables the submit button.
+    /// </summary>
     private async Task Validate()
     {
+        // Require a non-empty code before making any API call
         if (string.IsNullOrWhiteSpace(code))
         {
-            errorMsg = "Veuillez entrer un code.";
+            errorMsg = "Please enter a code.";
             return;
         }
 
         isValidating = true;
         errorMsg = null;
+
+        // Force an immediate UI update so the "Verifying..." button label renders
         StateHasChanged();
 
+        // Trim whitespace from the code before sending to avoid accidental rejections
         var isValid = await Api.ValidateAccessCodeAsync(code.Trim());
 
         if (isValid)
         {
+            // Persist the validated code under the "licenseCode" key in localStorage.
+            // MainLayout reads this key on every load and re-validates it against the server,
+            // enabling real-time revocation: if the admin revokes this code later,
+            // the user will be redirected back to this page on next app load.
             await LocalStorage.SetItemAsync("licenseCode", code.Trim());
+
+            // Navigate to the calendar home page without a force reload (stays in the SPA)
             Nav.NavigateTo("/", forceLoad: false);
         }
         else
         {
-            errorMsg = "Code invalide. Veuillez réessayer.";
+            // The server rejected the code — show an error and allow the user to try again
+            errorMsg = "Invalid code. Please try again.";
             isValidating = false;
         }
     }

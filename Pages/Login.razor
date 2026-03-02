@@ -1,59 +1,104 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   Login.razor — The authentication page for the Obrigenie application.
+
+   This page handles two flows:
+     1. Email/password login — posts credentials to api/auth/login.
+     2. New user registration — posts form data to api/auth/register with
+        client-side validation (password strength and confirmation matching).
+
+   OAuth flows (Google and Microsoft) are handled by direct <a> links that
+   initiate the server-side OAuth dance; the result arrives at /auth-callback.
+
+   On successful login or registration the JWT token and email are stored in
+   localStorage via AuthService and the user is redirected to the home page.
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@* Route: this page is rendered when the user navigates to /login *@
 @page "/login"
+
+@* Inject ApiService to call the login and register API endpoints *@
 @inject ApiService Api
+
+@* Inject AuthService to persist the JWT token and email after a successful response *@
 @inject AuthService Auth
+
+@* Inject NavigationManager to redirect to the home page after login *@
 @inject NavigationManager Nav
 
+@* ── Page layout ──────────────────────────────────────────────────────────── *@
 <div class="login-container">
     <div class="login-card">
         <h1 class="login-title">Obrigenie</h1>
-        <p class="login-subtitle">Agenda Professionnel</p>
+        <p class="login-subtitle">Professional Agenda</p>
 
-        <!-- OAuth Buttons -->
+        @* ── OAuth single-sign-on buttons ─────────────────────────────────
+           These are plain anchor links that navigate to the server-side OAuth
+           endpoints. The server redirects to the provider, then back to
+           /auth-callback on success. No JavaScript or Blazor event handlers
+           are needed here — the browser follows the link directly.
+        ── *@
         <div class="oauth-buttons">
+            @* Google OAuth: server endpoint initiates the Google sign-in flow *@
             <a href="api/auth/google" class="btn-oauth btn-google">
-                Se connecter avec Google
+                Sign in with Google
             </a>
+
+            @* Microsoft / Outlook OAuth: server endpoint initiates the Microsoft sign-in flow *@
             <a href="api/auth/microsoft" class="btn-oauth btn-microsoft">
-                Se connecter avec Outlook
+                Sign in with Outlook
             </a>
         </div>
 
+        @* Visual separator between OAuth buttons and the email/password form *@
         <div class="separator">
-            <span>ou</span>
+            <span>or</span>
         </div>
 
-        <!-- Toggle Login/Register -->
+        @* ── Login / Register tab switcher ──────────────────────────────────
+           Clicking a tab button sets isRegister which shows the appropriate form.
+           The active button receives the "active" CSS class.
+        ── *@
         <div class="tab-buttons">
-            <button class="@(isRegister ? "" : "active")" @onclick="() => isRegister = false">Connexion</button>
-            <button class="@(isRegister ? "active" : "")" @onclick="() => isRegister = true">Inscription</button>
+            <button class="@(isRegister ? "" : "active")" @onclick="() => isRegister = false">Login</button>
+            <button class="@(isRegister ? "active" : "")" @onclick="() => isRegister = true">Register</button>
         </div>
 
         @if (!isRegister)
         {
-            <!-- Login Form -->
+            @* ── Login form ─────────────────────────────────────────────────
+               Binds email and password fields to component state.
+               The submit button is disabled while the request is in flight.
+            ── *@
             <div class="form-group">
-                <input type="email" @bind="loginEmail" placeholder="Email" class="form-input" />
-                <input type="password" @bind="loginPassword" placeholder="Mot de passe" class="form-input" />
+                <input type="email"    @bind="loginEmail"    placeholder="Email"    class="form-input" />
+                <input type="password" @bind="loginPassword" placeholder="Password" class="form-input" />
                 <button class="btn-submit" @onclick="HandleLogin" disabled="@isLoading">
-                    @(isLoading ? "Connexion..." : "Se connecter")
+                    @(isLoading ? "Logging in..." : "Log in")
                 </button>
             </div>
         }
         else
         {
-            <!-- Register Form -->
+            @* ── Registration form ──────────────────────────────────────────
+               Collects all required fields for a new account.
+               Client-side validation (password match, strength) runs before the API call.
+               The submit button is disabled while the request is in flight.
+            ── *@
             <div class="form-group">
-                <input type="text" @bind="registerNom" placeholder="Nom" class="form-input" />
-                <input type="text" @bind="registerPrenom" placeholder="Prenom" class="form-input" />
-                <input type="email" @bind="registerEmail" placeholder="Email" class="form-input" />
-                <input type="password" @bind="registerPassword" placeholder="Mot de passe (6 car. min, 1 maj, 1 chiffre)" class="form-input" />
-                <input type="password" @bind="registerConfirmPassword" placeholder="Confirmer le mot de passe" class="form-input" />
+                <input type="text"     @bind="registerNom"             placeholder="Last name"                                        class="form-input" />
+                <input type="text"     @bind="registerPrenom"          placeholder="First name"                                       class="form-input" />
+                <input type="email"    @bind="registerEmail"           placeholder="Email"                                            class="form-input" />
+                <input type="password" @bind="registerPassword"        placeholder="Password (min 6 chars, 1 uppercase, 1 digit)"     class="form-input" />
+                <input type="password" @bind="registerConfirmPassword" placeholder="Confirm password"                                 class="form-input" />
                 <button class="btn-submit" @onclick="HandleRegister" disabled="@isLoading">
-                    @(isLoading ? "Inscription..." : "S'inscrire")
+                    @(isLoading ? "Registering..." : "Register")
                 </button>
             </div>
         }
 
+        @* ── Error display ───────────────────────────────────────────────────
+           Shown when login or registration fails (wrong credentials, validation errors, etc.)
+        ── *@
         @if (!string.IsNullOrEmpty(errorMessage))
         {
             <p class="error-message">@errorMessage</p>
@@ -62,77 +107,128 @@
 </div>
 
 @code {
+    @* Controls which form is displayed: false = login form, true = registration form *@
     private bool isRegister = false;
+
+    @* Prevents the form from being submitted again while an async API call is in progress *@
     private bool isLoading = false;
+
+    @* Holds the most recent error message to display beneath the form *@
     private string errorMessage = "";
 
+    @* ── Login form field bindings ───────────────────────────────────────── *@
+
+    @* The email address entered in the login form *@
     private string loginEmail = "";
+
+    @* The password entered in the login form *@
     private string loginPassword = "";
 
+    @* ── Registration form field bindings ───────────────────────────────── *@
+
+    @* Last name entered during registration *@
     private string registerNom = "";
+
+    @* First name entered during registration *@
     private string registerPrenom = "";
+
+    @* Email address entered during registration *@
     private string registerEmail = "";
+
+    @* Password chosen during registration *@
     private string registerPassword = "";
+
+    @* Password confirmation entered during registration — must match registerPassword *@
     private string registerConfirmPassword = "";
 
+    /// <summary>
+    /// Handles submission of the login form.
+    /// Sends email and password to the API, saves the returned JWT token and email
+    /// to localStorage, then performs a hard reload to the home page.
+    /// Displays an error message if the credentials are rejected.
+    /// </summary>
     private async Task HandleLogin()
     {
+        // Clear any previous error before attempting a new login
         errorMessage = "";
         isLoading = true;
 
+        // POST credentials to the login endpoint and await the auth response
         var result = await Api.LoginAsync(new LoginDto { Email = loginEmail, Password = loginPassword });
+
         if (result != null)
         {
+            // Persist the JWT token so subsequent requests include the Authorization header
             await Auth.SaveTokenAsync(result.Token);
+
+            // Persist the email for display purposes elsewhere in the app
             await Auth.SaveEmailAsync(result.Email);
+
+            // forceLoad: true ensures the Blazor app re-initialises and picks up the new token
             Nav.NavigateTo("/", forceLoad: true);
         }
         else
         {
-            errorMessage = "Email ou mot de passe incorrect.";
+            // The API returned a non-success response (e.g., 401 Unauthorized)
+            errorMessage = "Incorrect email or password.";
         }
 
         isLoading = false;
     }
 
+    /// <summary>
+    /// Handles submission of the registration form.
+    /// Performs client-side validation before sending the request to the API:
+    ///   - Passwords must match.
+    ///   - Password must be at least 6 characters, contain at least one uppercase letter,
+    ///     and contain at least one digit.
+    /// On success, saves the JWT and redirects to the home page.
+    /// Displays specific error messages for each validation or API failure.
+    /// </summary>
     private async Task HandleRegister()
     {
+        // Clear any previous error before attempting registration
         errorMessage = "";
 
+        // Validate that the two password fields match before calling the API
         if (registerPassword != registerConfirmPassword)
         {
-            errorMessage = "Les mots de passe ne correspondent pas.";
+            errorMessage = "Passwords do not match.";
             return;
         }
 
+        // Enforce minimum password strength requirements client-side for immediate feedback
         if (registerPassword.Length < 6 ||
             !registerPassword.Any(char.IsUpper) ||
             !registerPassword.Any(char.IsDigit))
         {
-            errorMessage = "Le mot de passe doit contenir au moins 6 caracteres, 1 majuscule et 1 chiffre.";
+            errorMessage = "Password must be at least 6 characters, contain 1 uppercase letter and 1 digit.";
             return;
         }
 
         isLoading = true;
 
+        // Send the registration data to the server
         var result = await Api.RegisterAsync(new RegisterDto
         {
-            Email = registerEmail,
-            Password = registerPassword,
+            Email           = registerEmail,
+            Password        = registerPassword,
             ConfirmPassword = registerConfirmPassword,
-            Nom = registerNom,
-            Prenom = registerPrenom
+            Nom             = registerNom,
+            Prenom          = registerPrenom
         });
 
         if (result != null)
         {
+            // Persist the returned JWT token and email, then navigate to the home page
             await Auth.SaveTokenAsync(result.Token);
             await Auth.SaveEmailAsync(result.Email);
             Nav.NavigateTo("/", forceLoad: true);
         }
         else
         {
-            errorMessage = "Erreur lors de l'inscription.";
+            // The server rejected the registration (e.g., email already in use)
+            errorMessage = "Registration error. Please try again.";
         }
 
         isLoading = false;

@@ -1,37 +1,81 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   AuthCallback.razor — OAuth redirect landing page.
+
+   After a successful Google or Microsoft OAuth sign-in, the server issues a
+   short-lived HttpOnly cookie ("auth_pending") and redirects the browser to
+   this route. The page has one job: call the token-exchange endpoint so that
+   the JWT token and user data are returned to the JavaScript context and stored
+   in localStorage. The token is never passed through the URL (no query-string
+   exposure), which prevents it from appearing in server logs or browser history.
+
+   Flow:
+     1. Check the query string for an "error" parameter. If present, the OAuth
+        provider reported a failure — redirect to /login with the error code.
+     2. Call GET api/auth/exchange which reads the auth_pending cookie server-side
+        and returns the full AuthResponse (JWT + email).
+     3. On success, save the token and email to localStorage and redirect to /.
+     4. On failure (exchange endpoint returned null), redirect to /login.
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@* Route: the server redirects the browser to this URL after an OAuth sign-in *@
 @page "/auth-callback"
+
+@* Inject ApiService to call the token-exchange endpoint *@
 @inject ApiService Api
+
+@* Inject AuthService to persist the JWT token and email to localStorage *@
 @inject AuthService Auth
+
+@* Inject NavigationManager to read the current URL and perform redirects *@
 @inject NavigationManager Nav
 
+@* Minimal loading UI shown while the async exchange is in progress *@
 <div class="login-container">
-    <p>Connexion en cours...</p>
+    <p>Signing in...</p>
 </div>
 
 @code {
+    /// <summary>
+    /// Called immediately when the component is first rendered.
+    /// Inspects the URL for an OAuth error, then exchanges the temporary HttpOnly
+    /// cookie for the application JWT, saves it, and redirects to the home page.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
+        // Parse the query string from the current URL to check for error parameters
         var uri = new Uri(Nav.Uri);
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+        // Read the "error" query parameter that the server appends on OAuth failure
         var error = query["error"];
 
         if (!string.IsNullOrEmpty(error))
         {
+            // The OAuth provider (or server) reported an error — redirect to login with context
             Nav.NavigateTo($"/login?error={error}");
             return;
         }
 
-        // Echanger le cookie temporaire HttpOnly contre les données d'auth
-        // (le token ne passe plus jamais dans l'URL)
+        // Exchange the temporary HttpOnly cookie (auth_pending) for the full auth payload.
+        // The token is returned in the response body rather than the URL, so it is never
+        // exposed in browser history or server access logs.
         var result = await Api.ExchangeOAuthTokenAsync();
+
         if (result != null)
         {
+            // Persist the JWT token to localStorage so AuthHeaderHandler can attach it
             await Auth.SaveTokenAsync(result.Token);
+
+            // Persist the email if provided (some OAuth providers may not return one)
             if (!string.IsNullOrEmpty(result.Email))
                 await Auth.SaveEmailAsync(result.Email);
+
+            // Hard reload to the home page so the Blazor app re-initialises with the new token
             Nav.NavigateTo("/", forceLoad: true);
         }
         else
         {
+            // The exchange failed (cookie expired, invalid, or network error) — go to login
             Nav.NavigateTo("/login");
         }
     }

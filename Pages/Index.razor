@@ -1,37 +1,79 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   Index.razor — Main calendar page of the Obrigenie application.
+
+   This is the home route ("/") and the primary view that authenticated, licensed
+   users interact with. It supports five view modes controlled by a toolbar:
+     • SingleDay   — hourly time grid for one day (06:00–22:00)
+     • Week        — Mon–Fri grid for the current week
+     • WeekAndWeekend — Mon–Sun grid for the current week
+     • Month       — full 6-week month grid
+     • SchoolPeriod — "trimestre" view: all weeks of a school period as columns,
+                      Mon–Fri as rows (horizontal scrollable table)
+
+   Additional features:
+     • Navigation arrows to move forward/backward by day, week, or period
+     • School-period label banner (e.g., "Toussaint → Noël") above the grid
+     • Clicking any day cell in week/month view switches to single-day view
+     • Clicking any hour slot in single-day view opens the note modal
+     • Note modal: create, edit, or delete timed notes (with hour-range selection)
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@* Route: the application home page *@
 @page "/"
+
+@* Inject AuthService to check whether the user is authenticated on load *@
 @inject AuthService Auth
+
+@* Inject NavigationManager to redirect to /login when not authenticated *@
 @inject NavigationManager Nav
+
+@* Inject ApiService for courses and notes HTTP calls *@
 @inject ApiService Api
+
+@* Inject CalendarService to load the school-year holiday data *@
 @inject CalendarService CalendarSvc
 
+@* ── View-mode toolbar ────────────────────────────────────────────────────── *@
 <div class="calendar-container">
-    <!-- Boutons de vue -->
     <div class="view-mode-bar">
-        <button class="@(viewMode == CalendarViewMode.SingleDay ? "view-btn active" : "view-btn")"
-                @onclick='() => SetViewMode(CalendarViewMode.SingleDay)'>Jour</button>
-        <button class="@(viewMode == CalendarViewMode.Week ? "view-btn active" : "view-btn")"
-                @onclick='() => SetViewMode(CalendarViewMode.Week)'>Semaine</button>
+        @* Each button adds the "active" CSS class when its mode matches the current viewMode *@
+        <button class="@(viewMode == CalendarViewMode.SingleDay      ? "view-btn active" : "view-btn")"
+                @onclick='() => SetViewMode(CalendarViewMode.SingleDay)'>Day</button>
+        <button class="@(viewMode == CalendarViewMode.Week           ? "view-btn active" : "view-btn")"
+                @onclick='() => SetViewMode(CalendarViewMode.Week)'>Week</button>
         <button class="@(viewMode == CalendarViewMode.WeekAndWeekend ? "view-btn active" : "view-btn")"
-                @onclick='() => SetViewMode(CalendarViewMode.WeekAndWeekend)'>Sem. +</button>
-        <button class="@(viewMode == CalendarViewMode.Month ? "view-btn active" : "view-btn")"
-                @onclick='() => SetViewMode(CalendarViewMode.Month)'>Mois</button>
-        <button class="@(viewMode == CalendarViewMode.SchoolPeriod ? "view-btn active" : "view-btn")"
-                @onclick='() => SetViewMode(CalendarViewMode.SchoolPeriod)'>Trimestre</button>
+                @onclick='() => SetViewMode(CalendarViewMode.WeekAndWeekend)'>Week+</button>
+        <button class="@(viewMode == CalendarViewMode.Month          ? "view-btn active" : "view-btn")"
+                @onclick='() => SetViewMode(CalendarViewMode.Month)'>Month</button>
+        <button class="@(viewMode == CalendarViewMode.SchoolPeriod   ? "view-btn active" : "view-btn")"
+                @onclick='() => SetViewMode(CalendarViewMode.SchoolPeriod)'>Period</button>
     </div>
 
-    <!-- Header navigation -->
+    @* ── Navigation header ────────────────────────────────────────────────── *@
+    @* Contains the previous/next arrows, the period title, and (in SchoolPeriod
+       mode) the exact start-to-end date range shown beneath the title. *@
     <div class="calendar-header">
+        @* Previous button: moves back by one day, week, month, or school period *@
         <button class="nav-btn" @onclick="MovePrevious">&lt;</button>
         <div class="week-title-group">
+            @* Main title text (e.g., "Week 01/09 – 05/09" or "October 2025") *@
             <h2 class="week-title">@weekTitle</h2>
+            @* In SchoolPeriod mode, also show the exact start and end dates of the period *@
             @if (viewMode == CalendarViewMode.SchoolPeriod && schoolPeriodStart != DateTime.MinValue)
             {
-                <span class="period-dates-sub">@schoolPeriodStart.ToString("dd/MM/yyyy") → @schoolPeriodEnd.ToString("dd/MM/yyyy")</span>
+                <span class="period-dates-sub">
+                    @schoolPeriodStart.ToString("dd/MM/yyyy") → @schoolPeriodEnd.ToString("dd/MM/yyyy")
+                </span>
             }
         </div>
+        @* Next button: moves forward by one day, week, month, or school period *@
         <button class="nav-btn" @onclick="MoveNext">&gt;</button>
     </div>
 
+    @* ── School-period label banner ───────────────────────────────────────── *@
+    @* Shown in all modes except SchoolPeriod itself.
+       Displays the current position in the school year (e.g., "Toussaint → Noël").
+       Holiday periods display "Congé de Toussaint" with a distinct CSS modifier. *@
     @if (!string.IsNullOrEmpty(periodLabel))
     {
         <div class="period-label @(periodLabel.StartsWith("Congé") ? "period-label--holiday" : "")">
@@ -39,42 +81,72 @@
         </div>
     }
 
+    @* ════════════════════════════════════════════════════════════════════════
+       VIEW: SINGLE DAY — hourly time grid
+       ════════════════════════════════════════════════════════════════════════ *@
     @if (viewMode == CalendarViewMode.SingleDay && currentDay != null)
     {
-        <!-- Single Day View with Time Grid -->
+        @* Day header: full weekday name and day number *@
         <div class="single-day-header">
             <span class="day-name">@currentDay.DayOfWeek</span>
             <span class="day-number">@currentDay.DayOfMonth</span>
         </div>
 
+        @* Hourly time grid from 06:00 to 22:00 *@
         <div class="time-grid">
             @for (int h = 6; h <= 22; h++)
             {
+                @* Capture the loop variable so the lambda closure captures the correct value *@
                 var hour = h;
+
+                @* Find a course whose time range covers this hour slot *@
                 var course = currentDay.Courses.FirstOrDefault(c =>
                     c.StartTime.Hours <= hour && c.EndTime.Hours > hour);
-                // Cherche une note qui démarre à cette heure (on l'affiche uniquement sur sa ligne de départ)
+
+                @* Find a note that starts exactly at this hour (rendered only on its start row) *@
                 var noteHere = currentDay.Notes.FirstOrDefault(n => n.Hour == hour);
-                // Cherche si cette heure est couverte par une note qui démarre avant (pour bloquer le clic)
+
+                @* Find a note whose time range covers this hour but started earlier
+                   (used to add a CSS class that blocks the click-to-create behavior) *@
                 var noteCovering = currentDay.Notes.FirstOrDefault(n =>
                     n.Hour < hour && (n.EndHour > 0 ? n.EndHour : n.Hour + 1) > hour);
 
+                @* Each time-row spans one hour; clicking it opens the note modal for that hour.
+                   If a note already covers this row (noteCovering), add the "time-row-covered" class
+                   to signal that clicking will edit the existing note rather than create a new one. *@
                 <div class="time-row @(noteCovering != null ? "time-row-covered" : "")"
                      @onclick="() => OnTimeSlotClicked(hour)">
+
+                    @* Left side: the hour label (e.g., "08:00") *@
                     <div class="time-label">@($"{hour:D2}:00")</div>
+
+                    @* Right side: course block and/or note block for this hour *@
                     <div class="time-content">
+                        @* Render the course block if a course covers this hour *@
                         @if (course != null)
                         {
                             <div class="course-block" style="background-color: @course.Color;">
                                 <span class="course-name">@course.Name</span>
+                                @* Display the exact start and end times of the course *@
                                 <span class="course-time">@($"{course.StartTime:hh\\:mm} - {course.EndTime:hh\\:mm}")</span>
                             </div>
                         }
+
+                        @* Render the note block only on the note's starting hour row.
+                           Notes that span multiple hours are visually anchored here. *@
                         @if (noteHere != null)
                         {
+                            @* Compute the end hour; fall back to hour+1 when EndHour is 0 *@
                             var endH = noteHere.EndHour > 0 ? noteHere.EndHour : noteHere.Hour + 1;
-                            <div class="note-block" @onclick:stopPropagation="true" @onclick="() => OnTimeSlotClicked(hour)">
+
+                            @* stopPropagation prevents the row's onclick from firing again
+                               when the user clicks directly on the note block *@
+                            <div class="note-block"
+                                 @onclick:stopPropagation="true"
+                                 @onclick="() => OnTimeSlotClicked(hour)">
+                                @* Show the note's time range *@
                                 <span class="note-time">@($"{noteHere.Hour:D2}:00 → {endH:D2}:00")</span>
+                                @* The note's text content *@
                                 @noteHere.Content
                             </div>
                         }
@@ -83,54 +155,76 @@
             }
         </div>
     }
+    @* ════════════════════════════════════════════════════════════════════════
+       VIEW: SCHOOL PERIOD (TRIMESTRE) — weeks as columns, days as rows
+       ════════════════════════════════════════════════════════════════════════ *@
     else if (viewMode == CalendarViewMode.SchoolPeriod)
     {
-        <!-- Trimestre : semaines en colonnes, jours en lignes -->
+        @* Loading state shown while the parallel API calls are in progress *@
         @if (trimLoading)
         {
-            <div class="trim-loading">Chargement du trimestre...</div>
+            <div class="trim-loading">Loading period...</div>
         }
         else
         {
+            @* Horizontally scrollable wrapper so the table can be wider than the viewport *@
             <div class="trimestre-scroll">
                 <div class="trimestre-table">
-                    <!-- Colonne fixe : noms des jours -->
+
+                    @* Fixed left column: day-name labels (Mon, Tue, Wed, Thu, Fri) *@
                     <div class="trim-col trim-col-fixed">
+                        @* Empty corner cell aligns with the week-header row *@
                         <div class="trim-cell trim-cell-header trim-corner"></div>
-                        <div class="trim-cell trim-cell-day">Lun</div>
-                        <div class="trim-cell trim-cell-day">Mar</div>
-                        <div class="trim-cell trim-cell-day">Mer</div>
-                        <div class="trim-cell trim-cell-day">Jeu</div>
-                        <div class="trim-cell trim-cell-day">Ven</div>
+                        <div class="trim-cell trim-cell-day">Mon</div>
+                        <div class="trim-cell trim-cell-day">Tue</div>
+                        <div class="trim-cell trim-cell-day">Wed</div>
+                        <div class="trim-cell trim-cell-day">Thu</div>
+                        <div class="trim-cell trim-cell-day">Fri</div>
                     </div>
-                    <!-- Colonnes semaines -->
+
+                    @* One column per school week in the period *@
                     @foreach (var week in trimWeeks)
                     {
+                        @* Full-holiday weeks receive a distinct background CSS class *@
                         <div class="trim-col @(week.IsFullHoliday ? "trim-col-holiday" : "")">
+
+                            @* Week header: school week number (e.g., "S12") and date range *@
                             <div class="trim-cell trim-cell-header">
                                 <span class="trim-week-num">@(week.WeekNum.HasValue ? $"S{week.WeekNum}" : "")</span>
                                 <span class="trim-week-date">@week.DateLabel</span>
                             </div>
+
                             @if (week.IsFullHoliday)
                             {
+                                @* When the entire week is a holiday, merge all 5 day cells
+                                   into a single holiday block spanning the column *@
                                 <div class="trim-cell-holiday-span">@week.HolidayShortName</div>
                             }
                             else
                             {
+                                @* Render individual day cells for non-holiday weeks *@
                                 @foreach (var day in week.Days)
                                 {
+                                    @* Apply CSS classes for holiday days, today, and out-of-period days *@
                                     <div class="trim-cell @(day.IsInPeriod && day.IsHoliday ? "trim-cell-hol" : "") @(day.IsToday ? "trim-cell-today" : "") @(!day.IsInPeriod ? "trim-cell-out" : "")"
                                          @onclick="() => SelectDay(day.Date)">
+
+                                        @* Only render content for days that are inside the current period *@
                                         @if (day.IsInPeriod)
                                         {
+                                            @* Show a "C" badge for holiday (congé) days within the period *@
                                             @if (day.IsHoliday)
                                             {
                                                 <span class="trim-conge">C</span>
                                             }
+
+                                            @* Render a mini course chip for each course scheduled on this day *@
                                             @foreach (var c in day.Courses)
                                             {
                                                 <div class="trim-course" style="background-color: @c.Color;" title="@c.Name">@c.Name</div>
                                             }
+
+                                            @* Show a note indicator dot when the day has at least one note *@
                                             @if (day.Notes.Any())
                                             {
                                                 <div class="trim-note-dot" title="@(day.Notes.Count) note(s)">📝</div>
@@ -145,31 +239,47 @@
             </div>
         }
     }
+    @* ════════════════════════════════════════════════════════════════════════
+       VIEW: WEEK / WEEK+WEEKEND / MONTH — day grid
+       ════════════════════════════════════════════════════════════════════════ *@
     else
     {
-        <!-- Week/Month Grid View -->
+        @* Grid column header row: shows abbreviated day names for each column *@
         <div class="grid-header" style="grid-template-columns: repeat(@gridSpan, 1fr); display: grid;">
             @foreach (var day in days.Take(gridSpan))
             {
+                @* Take only the first 3 characters of the day name (e.g., "Mon", "Tue") *@
                 <div class="grid-header-cell">@day.DayOfWeek[..3]</div>
             }
         </div>
+
+        @* Day cells grid — one cell per day in the current view *@
         <div class="days-grid" style="grid-template-columns: repeat(@gridSpan, 1fr);">
             @foreach (var day in days)
             {
+                @* Apply CSS classes: holiday, school-start (Rentrée), and today highlight *@
                 <div class="day-cell @(day.IsHoliday ? "holiday" : "") @(day.IsSchoolStart ? "school-start" : "") @(day.Date == DateTime.Today ? "today" : "")"
                      @onclick="() => SelectDay(day.Date)">
+
+                    @* Day-of-month number in the top-left corner of the cell *@
                     <span class="day-num">@day.DayOfMonth</span>
+
+                    @* Short holiday name label when the day is a holiday *@
                     @if (!string.IsNullOrEmpty(day.ShortHolidayName))
                     {
                         <span class="holiday-name">@day.ShortHolidayName</span>
                     }
+
+                    @* Show up to 3 course mini-chips to avoid overflowing the cell *@
                     @foreach (var course in day.Courses.Take(3))
                     {
                         <div class="course-mini" style="background-color: @course.Color;">@course.Name</div>
                     }
+
+                    @* Show up to 2 note previews truncated to 16 characters *@
                     @foreach (var note in day.Notes.Take(2))
                     {
+                        @* Truncate long notes and append an ellipsis for readability *@
                         var preview = note.Content.Length > 16 ? note.Content[..16] + "…" : note.Content;
                         <div class="note-mini">📝 @preview</div>
                     }
@@ -179,22 +289,35 @@
     }
 </div>
 
-<!-- Note Modal -->
+@* ════════════════════════════════════════════════════════════════════════════
+   NOTE MODAL — create / edit / delete a timed note
+   ════════════════════════════════════════════════════════════════════════════ *@
+@* The modal overlay and card are only rendered when showNoteModal is true *@
 @if (showNoteModal)
 {
+    @* Semi-transparent overlay: clicking outside the modal card closes it *@
     <div class="modal-overlay" @onclick="CloseNoteModal">
+
+        @* Modal card: stopPropagation prevents a click inside the card from
+           bubbling up to the overlay's close handler *@
         <div class="modal-content" @onclick:stopPropagation="true">
-            <h3>@(editingNote != null ? "Modifier la note" : "Nouvelle note")</h3>
+
+            @* Title changes depending on whether we are creating or editing *@
+            <h3>@(editingNote != null ? "Edit note" : "New note")</h3>
+
+            @* Display the date in full French-locale format for context *@
             <p class="modal-date">@currentDate.ToString("dddd dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</p>
+
+            @* Hour-range selectors: from 06:00 to 22:00 (start), 07:00 to 23:00 (end) *@
             <div class="modal-time-range">
-                <label>De</label>
+                <label>From</label>
                 <select @bind="noteStartHour">
                     @for (int h = 6; h <= 22; h++)
                     {
                         <option value="@h">@($"{h:D2}:00")</option>
                     }
                 </select>
-                <label>à</label>
+                <label>to</label>
                 <select @bind="noteEndHour">
                     @for (int h = 7; h <= 23; h++)
                     {
@@ -202,20 +325,34 @@
                     }
                 </select>
             </div>
-            <textarea @bind="noteContent" placeholder="Tapez votre note ici..." rows="4" maxlength="2000"></textarea>
+
+            @* Note text area: max 2000 characters, placeholder guides the user *@
+            <textarea @bind="noteContent" placeholder="Type your note here..." rows="4" maxlength="2000"></textarea>
+
+            @* Character count display so the user knows how much space remains *@
             <div class="modal-char-count">@noteContent.Length / 2000</div>
+
             <div class="modal-buttons">
-                <button class="btn-save" @onclick="SaveNote" disabled="@(noteEndHour <= noteStartHour)">Enregistrer</button>
+                @* Save button: disabled when the end hour is not after the start hour *@
+                <button class="btn-save" @onclick="SaveNote" disabled="@(noteEndHour <= noteStartHour)">Save</button>
+
+                @* Delete button: only shown when editing an existing note *@
                 @if (editingNote != null)
                 {
-                    <button class="btn-delete" @onclick="DeleteNote">Supprimer</button>
+                    <button class="btn-delete" @onclick="DeleteNote">Delete</button>
                 }
-                <button class="btn-cancel" @onclick="CloseNoteModal">Annuler</button>
+
+                @* Cancel button: closes the modal without saving *@
+                <button class="btn-cancel" @onclick="CloseNoteModal">Cancel</button>
             </div>
+
+            @* Validation error: end hour must be strictly after start hour *@
             @if (noteEndHour <= noteStartHour)
             {
-                <p class="modal-error">L'heure de fin doit être après l'heure de début.</p>
+                <p class="modal-error">The end time must be after the start time.</p>
             }
+
+            @* API/save error shown when the server rejects the note *@
             @if (noteSaveError != null)
             {
                 <p class="modal-error">@noteSaveError</p>
@@ -225,205 +362,378 @@
 }
 
 @code {
+    @* ── View state ──────────────────────────────────────────────────────────── *@
+
+    @* The currently active display mode (Week by default) *@
     private CalendarViewMode viewMode = CalendarViewMode.Week;
+
+    @* The view mode that was active before switching to SingleDay via a cell click.
+       Restored when the user switches back from single-day to a multi-day view. *@
     private CalendarViewMode previousViewMode = CalendarViewMode.Week;
+
+    @* The reference date used by all view calculations (today by default) *@
     private DateTime currentDate = DateTime.Today;
-    private string weekTitle = "Chargement...";
+
+    @* The main title string shown in the navigation header (e.g., "Week 01/09 – 05/09") *@
+    private string weekTitle = "Loading...";
+
+    @* The list of Day models currently displayed in the week/month/grid views *@
     private List<Day> days = new();
+
+    @* The single Day model used in SingleDay view (holds courses and notes for that day) *@
     private Day? currentDay;
+
+    @* All holiday periods loaded from CalendarService; used for school-period calculations *@
     private List<Holiday> cachedHolidays = new();
+
+    @* The label shown in the period banner (e.g., "Toussaint → Noël"). Null hides the banner. *@
     private string? periodLabel;
+
+    @* Start date of the current school period (used in SchoolPeriod view header) *@
     private DateTime schoolPeriodStart;
+
+    @* End date of the current school period *@
     private DateTime schoolPeriodEnd;
+
+    @* True while the school-period data is being loaded in parallel from the API *@
     private bool trimLoading = false;
+
+    @* The list of TrimWeek objects that drive the SchoolPeriod (trimestre) view *@
     private List<TrimWeek> trimWeeks = new();
+
+    @* Computed property: the number of columns in the grid header.
+       Week = 5 columns, WeekAndWeekend/Month = 7, SingleDay = 1 (unused in that view). *@
     private int gridSpan => viewMode == CalendarViewMode.Week ? 5 :
         viewMode == CalendarViewMode.SingleDay ? 1 : 7;
 
-    // Note modal
+    @* ── Note modal state ──────────────────────────────────────────────────── *@
+
+    @* Controls whether the note creation/editing modal overlay is displayed *@
     private bool showNoteModal = false;
+
+    @* The text content of the note being created or edited *@
     private string noteContent = "";
+
+    @* The note being edited, or null when creating a new note *@
     private Note? editingNote = null;
+
+    @* The start hour selected in the modal's "From" dropdown *@
     private int noteStartHour = 8;
+
+    @* The end hour selected in the modal's "to" dropdown *@
     private int noteEndHour = 9;
+
+    @* Error message from the API if saving the note fails; null when no error *@
     private string? noteSaveError = null;
 
-    // Numérotation scolaire : S1 = semaine de la rentrée (semaine contenant le 1er sept),
-    // compte jusqu'à fin juin, juillet/août = null sauf si c'est la semaine de rentrée
-    // (ex: rentrée mardi 1er sept → lundi = 31 août → S1 quand même).
-    // Repart à S1 chaque année scolaire.
+    @* ══════════════════════════════════════════════════════════════════════════
+       SCHOOL WEEK NUMBERING
+       Computes the school-week number (S1 = week of September 1st) for a given
+       Monday date. Returns null for July and August (summer holidays), except for
+       the Monday of the week that contains September 1st (which is S1 even when
+       that Monday falls in late August, e.g., Aug 31 when Sept 1 is a Tuesday).
+       The counter resets to S1 at the start of each new school year.
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    /// <summary>
+    /// Returns the school-week number for the given Monday date, or null when the week
+    /// falls entirely within the summer holidays (July or August) and is not the S1 week.
+    /// </summary>
+    /// <param name="weekMonday">The Monday that starts the week to number.</param>
+    /// <returns>The school-week number (1-based), or null for summer holiday weeks.</returns>
     private static int? GetSchoolWeekNumber(DateTime weekMonday)
     {
         int startYear;
 
         if (weekMonday.Month >= 9)
         {
+            // September onwards: the school year started in this calendar year
             startYear = weekMonday.Year;
         }
         else if (weekMonday.Month <= 6)
         {
+            // January through June: the school year started in the previous calendar year
             startYear = weekMonday.Year - 1;
         }
         else
         {
-            // Juillet ou août : null, SAUF si c'est le lundi de la semaine de rentrée
-            // (ex: rentrée le mardi 1er sept → lundi = 31 août)
+            // July or August: normally null, but check for the S1 special case.
+            // If September 1st of this year falls mid-week, the Monday of that same week
+            // might be in August (e.g., Sept 1 is Tuesday → Monday = Aug 31 = S1).
             var sept1Check = new DateTime(weekMonday.Year, 9, 1);
+
+            // Calculate how many days back from Sept 1 we need to go to reach the Monday
             int d = ((int)sept1Check.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+
             if (weekMonday.Date == sept1Check.AddDays(-d).Date)
-                startYear = weekMonday.Year;
+                startYear = weekMonday.Year;  // This is the S1 week despite being in August
             else
-                return null;
+                return null;  // Regular summer week — no school-week number
         }
 
-        // Lundi de la semaine contenant le 1er septembre = S1
+        // The anchor for week S1 is the Monday of the week that contains September 1st
         var sept1 = new DateTime(startYear, 9, 1);
         int daysToMonday = ((int)sept1.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
         var rentreeMonday = sept1.AddDays(-daysToMonday);
 
+        // Week number = number of full weeks since S1's Monday + 1
         int weekNum = (int)((weekMonday.Date - rentreeMonday.Date).TotalDays / 7) + 1;
+
+        // Return null if the number is somehow negative (shouldn't happen in normal use)
         return weekNum >= 1 ? weekNum : null;
     }
 
-    // ── Classes pour la vue Trimestre ──────────────────────────────────
+    @* ══════════════════════════════════════════════════════════════════════════
+       INNER DATA CLASSES FOR THE SCHOOL-PERIOD (TRIMESTRE) VIEW
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    @* Represents one calendar week column in the SchoolPeriod view *@
     private class TrimWeek
     {
+        @* The Monday date that starts this week *@
         public DateTime WeekStart { get; set; }
+
+        @* The school-week number (S1, S2, …) or null for summer weeks *@
         public int? WeekNum { get; set; }
+
+        @* Formatted date range string for the column header (e.g., "01/09 – 05/09") *@
         public string DateLabel { get; set; } = "";
+
+        @* The five weekday (Mon–Fri) TrimDay objects for this week *@
         public List<TrimDay> Days { get; set; } = new();
+
+        @* True when all 5 weekdays in this week are holiday days.
+           Used to collapse the entire week column into a single holiday block. *@
         public bool IsFullHoliday => Days.Count == 5 && Days.All(d => d.IsHoliday);
-        public string HolidayShortName => Days.FirstOrDefault(d => d.IsHoliday)?.HolidayShortName ?? "Congé";
+
+        @* The short holiday name to display when IsFullHoliday is true (e.g., "Toussaint") *@
+        public string HolidayShortName => Days.FirstOrDefault(d => d.IsHoliday)?.HolidayShortName ?? "Holiday";
     }
 
+    @* Represents a single weekday cell within a TrimWeek column *@
     private class TrimDay
     {
+        @* The calendar date of this day *@
         public DateTime Date { get; set; }
+
+        @* The courses scheduled for this day *@
         public List<Course> Courses { get; set; } = new();
+
+        @* The notes written for this day *@
         public List<Note> Notes { get; set; } = new();
+
+        @* True when this day falls within a holiday period *@
         public bool IsHoliday { get; set; }
+
+        @* Short name of the holiday covering this day (e.g., "Toussaint") *@
         public string HolidayShortName { get; set; } = "";
+
+        @* True when this day is within the current school period's date range *@
         public bool IsInPeriod { get; set; }
+
+        @* Computed: true when this day is today (compared without time component) *@
         public bool IsToday => Date.Date == DateTime.Today;
     }
 
-    // ── Initialisation ─────────────────────────────────────────────────
+    @* ══════════════════════════════════════════════════════════════════════════
+       LIFECYCLE
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    /// <summary>
+    /// Called once when the page is first rendered.
+    /// Redirects to /login when the user is not authenticated.
+    /// Otherwise loads holiday data from CalendarService (for period calculations)
+    /// and then renders the initial calendar view.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
+        // Guard: unauthenticated users must log in first
         var isLoggedIn = await Auth.IsLoggedInAsync();
         if (!isLoggedIn) { Nav.NavigateTo("/login"); return; }
 
         try
         {
+            // Load holiday data (API → localStorage cache → offline fallback)
             var calendarData = await CalendarSvc.GetCalendarData();
             cachedHolidays = calendarData.Holidays;
         }
-        catch { }
+        catch
+        {
+            // On failure, cachedHolidays stays empty; the calendar renders without holiday info
+        }
 
+        // Render the default week view for today
         await UpdateCalendarView();
     }
 
+    @* ══════════════════════════════════════════════════════════════════════════
+       VIEW DISPATCH
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    /// <summary>
+    /// Dispatches to the appropriate update method based on the current viewMode,
+    /// then computes the period label for the navigation banner.
+    /// Called whenever viewMode or currentDate changes.
+    /// </summary>
     private async Task UpdateCalendarView()
     {
-        if (viewMode == CalendarViewMode.SingleDay) await UpdateSingleDayView();
-        else if (viewMode == CalendarViewMode.Month) await UpdateMonthView();
-        else if (viewMode == CalendarViewMode.SchoolPeriod) await UpdateSchoolPeriodView();
-        else await UpdateWeekView();
+        if      (viewMode == CalendarViewMode.SingleDay)     await UpdateSingleDayView();
+        else if (viewMode == CalendarViewMode.Month)         await UpdateMonthView();
+        else if (viewMode == CalendarViewMode.SchoolPeriod)  await UpdateSchoolPeriodView();
+        else                                                  await UpdateWeekView();
 
+        // The period label is not shown in SchoolPeriod view (it already has its own header)
         periodLabel = viewMode == CalendarViewMode.SchoolPeriod
             ? null
             : SchoolPeriodHelper.GetLabel(currentDate, cachedHolidays);
     }
 
-    // ── Vues ──────────────────────────────────────────────────────────
+    @* ══════════════════════════════════════════════════════════════════════════
+       VIEW BUILDERS
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    /// <summary>
+    /// Prepares data for the SingleDay view.
+    /// Sets the title to the full date string and loads the current day's courses and notes.
+    /// </summary>
     private async Task UpdateSingleDayView()
     {
+        // Format: "lundi 01 septembre 2025" (French locale)
         weekTitle = currentDate.ToString("dddd dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"));
+
+        // Load the day with its courses and notes via a single API sequence
         currentDay = await CreateDayWithDataAsync(currentDate);
+
+        // Keep the days list in sync so the grid view renders correctly if the mode is toggled
         days = new List<Day> { currentDay };
     }
 
+    /// <summary>
+    /// Prepares data for the Week (Mon–Fri) and WeekAndWeekend (Mon–Sun) views.
+    /// Calculates the Monday of the current week, builds day models for the range,
+    /// then loads all notes for the range in a single batch request.
+    /// Courses are loaded per-day only when the user switches to single-day view.
+    /// </summary>
     private async Task UpdateWeekView()
     {
+        // Find the Monday of the week containing currentDate
         int delta = System.DayOfWeek.Monday - currentDate.DayOfWeek;
-        if (delta > 0) delta -= 7;
+        if (delta > 0) delta -= 7;  // if today is before Monday (e.g., Sunday), step back
         DateTime monday = currentDate.AddDays(delta);
         DateTime sunday = monday.AddDays(6);
-        weekTitle = $"Semaine du {monday:dd/MM} au {sunday:dd/MM}";
+
+        weekTitle = $"Week {monday:dd/MM} – {sunday:dd/MM}";
+
+        // 5 days for Week mode, 7 for WeekAndWeekend mode
         int daysToShow = viewMode == CalendarViewMode.Week ? 5 : 7;
         days = new List<Day>();
         for (int i = 0; i < daysToShow; i++)
             days.Add(CreateDayModel(monday.AddDays(i)));
 
+        // Load notes for all displayed days in one request (more efficient than one per day)
         var allNotes = await Api.GetNotesForRangeAsync(monday, monday.AddDays(daysToShow - 1));
+
+        // Distribute the notes to their respective day models
         foreach (var day in days)
             day.Notes = allNotes.Where(n => n.Date.Date == day.Date.Date).ToList();
     }
 
+    /// <summary>
+    /// Prepares data for the Month view.
+    /// Builds a 6-week (42-day) grid starting from the Monday of the week that contains
+    /// the first day of the month, then loads notes for the entire visible range.
+    /// </summary>
     private async Task UpdateMonthView()
     {
+        // Title format: "OCTOBER 2025"
         weekTitle = currentDate.ToString("MMMM yyyy", new System.Globalization.CultureInfo("fr-FR")).ToUpper();
+
+        // Calculate the first day of the displayed month
         DateTime first = new DateTime(currentDate.Year, currentDate.Month, 1);
+
+        // How many days to back-pad so the grid starts on a Monday
         int offset = ((int)first.DayOfWeek - (int)System.DayOfWeek.Monday + 7) % 7;
         DateTime start = first.AddDays(-offset);
+
+        // Build 42 day models (6 weeks × 7 days)
         days = new List<Day>();
         for (int i = 0; i < 42; i++)
             days.Add(CreateDayModel(start.AddDays(i)));
 
+        // Batch-load notes for the entire 42-day visible range
         var allNotes = await Api.GetNotesForRangeAsync(start, start.AddDays(41));
         foreach (var day in days)
             day.Notes = allNotes.Where(n => n.Date.Date == day.Date.Date).ToList();
     }
 
+    /// <summary>
+    /// Prepares data for the SchoolPeriod (trimestre) view.
+    /// Computes the start and end dates of the school period that contains currentDate,
+    /// then loads courses and notes for all weekdays in the period in parallel.
+    /// Sets trimLoading = true to show a spinner while the data is being fetched.
+    /// </summary>
     private async Task UpdateSchoolPeriodView()
     {
+        // Show loading indicator immediately so the UI is not blank during the async work
         trimLoading = true;
         StateHasChanged();
 
+        // Compute the boundaries (start date, end date, and title) of the current period
         var (start, end, title) = SchoolPeriodHelper.GetPeriodBounds(currentDate, cachedHolidays);
         schoolPeriodStart = start;
         schoolPeriodEnd   = end;
-        weekTitle = title;
+        weekTitle         = title;
 
-        // Lundi précédant le début
+        // Find the Monday of the week that contains the period start date
         int off = ((int)start.DayOfWeek - (int)System.DayOfWeek.Monday + 7) % 7;
         DateTime gridStart = start.AddDays(-off);
 
-        // Collecter tous les jours ouvrés (lun-ven) pour les requêtes API
+        // Collect all weekdays (Mon–Fri) in the period for batched API requests
         var weekdays = new List<DateTime>();
         for (DateTime d = gridStart; d.Date <= end.Date; d = d.AddDays(1))
             if (d.DayOfWeek != System.DayOfWeek.Saturday && d.DayOfWeek != System.DayOfWeek.Sunday)
                 weekdays.Add(d);
 
-        // Charger les cours et les notes en parallèle
+        // Launch one course-fetch task per weekday and one notes range request — all in parallel
         var courseTasks = weekdays.Select(d => Api.GetCoursesForDateAsync(d)).ToArray();
         var notesTask   = Api.GetNotesForRangeAsync(gridStart, end);
         await Task.WhenAll(Task.WhenAll(courseTasks), notesTask);
 
-        var coursesByDate = weekdays.Zip(courseTasks.Select(t => t.Result))
+        // Index courses by date for O(1) lookups when building TrimDay objects
+        var coursesByDate = weekdays
+            .Zip(courseTasks.Select(t => t.Result))
             .ToDictionary(p => p.First.Date, p => p.Second);
+
+        // Group notes by date for O(1) lookups
         var allTrimNotes = notesTask.Result;
-        var notesByDate = allTrimNotes.GroupBy(n => n.Date.Date)
+        var notesByDate = allTrimNotes
+            .GroupBy(n => n.Date.Date)
             .ToDictionary(g => g.Key, g => g.ToList());
 
         trimWeeks = new List<TrimWeek>();
 
+        // Iterate one week at a time from gridStart to the period end
         for (DateTime ws = gridStart; ws.Date <= end.Date; ws = ws.AddDays(7))
         {
             var week = new TrimWeek
             {
                 WeekStart = ws,
                 WeekNum   = GetSchoolWeekNumber(ws),
-                DateLabel = $"{ws:dd/MM} - {ws.AddDays(6):dd/MM}"
+                DateLabel = $"{ws:dd/MM} – {ws.AddDays(6):dd/MM}"
             };
 
-            for (int d = 0; d < 5; d++) // Lun → Ven
+            // Build five TrimDay objects for Mon–Fri of this week
+            for (int d = 0; d < 5; d++)
             {
                 DateTime date = ws.AddDays(d);
-                // Priorité à la Rentrée sur les congés qui chevauchent le même jour
+
+                // A "Rentrée" entry has priority: a day marked as back-to-school should not
+                // also be marked as a holiday even if a holiday period overlaps it.
                 bool isRentreeDay = cachedHolidays.Any(h =>
                     date.Date >= h.StartDate.Date && date.Date <= h.EndDate.Date &&
                     (h.Name.Contains("Rentree") || h.Name.Contains("Rentrée")));
+
+                // Find the holiday covering this day, skipping it if it's a Rentrée day
                 var hol = isRentreeDay ? null : cachedHolidays.FirstOrDefault(h =>
                     date.Date >= h.StartDate.Date && date.Date <= h.EndDate.Date &&
                     !h.Name.Contains("Rentree") && !h.Name.Contains("Rentrée"));
@@ -435,15 +745,24 @@
                     Notes            = notesByDate.GetValueOrDefault(date.Date, new()),
                     IsHoliday        = hol != null,
                     HolidayShortName = hol != null ? GetShortHolName(hol.Name) : "",
+                    // IsInPeriod marks whether this day falls within the school period's range
                     IsInPeriod       = date.Date >= start.Date && date.Date <= end.Date
                 });
             }
+
             trimWeeks.Add(week);
         }
 
         trimLoading = false;
     }
 
+    /// <summary>
+    /// Maps a full holiday name to a short display string for use in TrimDay cells.
+    /// Mirrors the mapping used by SchoolPeriodHelper but is kept here because
+    /// TrimDay is a private inner class that does not have access to the static helper.
+    /// </summary>
+    /// <param name="name">The full holiday name from the Holiday.Name property.</param>
+    /// <returns>A short label such as "Toussaint", "Noël", "Pâques", or "Été".</returns>
     private static string GetShortHolName(string name)
     {
         if (name.Contains("Toussaint") || name.Contains("automne")) return "Toussaint";
@@ -451,157 +770,281 @@
         if (name.Contains("Carnaval") || name.Contains("detente"))   return "Carnaval";
         if (name.Contains("Paques")   || name.Contains("Pâques"))    return "Pâques";
         if (name.Contains("ete")      || name.Contains("été"))        return "Été";
-        return "Congé";
+        return "Holiday";
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────
+    @* ══════════════════════════════════════════════════════════════════════════
+       HELPER METHODS
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    /// <summary>
+    /// Creates a Day model for the given date by resolving any holiday that covers it.
+    /// A "Rentrée" holiday has priority: if the same day is covered by both a Rentrée
+    /// and a regular holiday, it is treated as a school-start day (not a holiday).
+    /// </summary>
+    /// <param name="date">The date to model.</param>
+    /// <returns>A Day object with all metadata set; Courses and Notes are empty (loaded separately).</returns>
     private Day CreateDayModel(DateTime date)
     {
-        // Une entrée "Rentree" a priorité sur un congé qui chevaucherait le même jour
+        // Check whether any "Rentrée" entry covers this date
         var rentree = cachedHolidays.FirstOrDefault(h =>
             date >= h.StartDate && date <= h.EndDate &&
             (h.Name.Contains("Rentree") || h.Name.Contains("Rentre")));
+
+        // Find the holiday covering this date, ignoring Rentrée entries
         var holiday = rentree ?? cachedHolidays.FirstOrDefault(h =>
             date >= h.StartDate && date <= h.EndDate &&
             !h.Name.Contains("Rentree") && !h.Name.Contains("Rentre"));
+
         bool isRentree = rentree != null;
+
         return new Day
         {
-            Date        = date,
-            DayOfWeek   = date.ToString("dddd", new System.Globalization.CultureInfo("fr-FR")),
-            DayOfMonth  = date.Day.ToString(),
-            IsHoliday   = holiday != null && !isRentree,
+            Date         = date,
+            DayOfWeek    = date.ToString("dddd", new System.Globalization.CultureInfo("fr-FR")),
+            DayOfMonth   = date.Day.ToString(),
+            // A day is marked as a holiday only when a holiday covers it AND it is not a Rentrée day
+            IsHoliday    = holiday != null && !isRentree,
+            // IsSchoolStart flags the Rentrée day for the distinctive CSS marker
             IsSchoolStart = isRentree,
-            HolidayName = holiday?.Name ?? string.Empty,
+            HolidayName  = holiday?.Name ?? string.Empty,
         };
     }
 
+    /// <summary>
+    /// Creates a Day model and populates it with the courses and notes for that date
+    /// by making two async API calls.
+    /// Used in single-day view and after note saves/deletes when the day must be refreshed.
+    /// </summary>
+    /// <param name="date">The date to load data for.</param>
+    /// <returns>A fully populated Day object with courses and notes.</returns>
     private async Task<Day> CreateDayWithDataAsync(DateTime date)
     {
         var day = CreateDayModel(date);
+        // Load courses for this specific date
         day.Courses = await Api.GetCoursesForDateAsync(date);
+        // Load notes for this specific date
         day.Notes   = await Api.GetNotesForDateAsync(date);
         return day;
     }
 
-    // ── Navigation ────────────────────────────────────────────────────
+    @* ══════════════════════════════════════════════════════════════════════════
+       NAVIGATION HANDLERS
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    /// <summary>
+    /// Moves the calendar backwards by one unit (day, week, or month) depending on viewMode.
+    /// In SchoolPeriod mode, jumps to the previous school period by finding the holiday
+    /// that ends just before the current period starts, then stepping one day before it.
+    /// </summary>
     private async Task MovePrevious()
     {
         if (viewMode == CalendarViewMode.SingleDay)
+        {
+            // Move back by exactly one calendar day
             currentDate = currentDate.AddDays(-1);
+        }
         else if (viewMode == CalendarViewMode.Month)
+        {
+            // Move back by one calendar month
             currentDate = currentDate.AddMonths(-1);
+        }
         else if (viewMode == CalendarViewMode.SchoolPeriod)
         {
-            // Trouver le congé juste AVANT le début de la période courante
-            // puis aller un jour AVANT ce congé → on atterrit dans la période précédente
+            // Find the holiday that ended most recently before the current period's start date.
+            // Ignoring Rentrée entries so we only navigate between genuine vacation breaks.
             var prevHol = cachedHolidays
                 .Where(h => h.EndDate.Date < schoolPeriodStart.Date &&
                             !h.Name.Contains("Rentree") && !h.Name.Contains("Rentrée"))
                 .OrderByDescending(h => h.EndDate)
                 .FirstOrDefault();
+
+            // Land one day before that holiday's start to place ourselves in the previous period
             currentDate = prevHol != null
                 ? prevHol.StartDate.AddDays(-1)
-                : schoolPeriodStart.AddDays(-30);
+                : schoolPeriodStart.AddDays(-30);  // fallback: go 30 days back
         }
         else
+        {
+            // Week and WeekAndWeekend: move back by 7 days
             currentDate = currentDate.AddDays(-7);
+        }
+
         await UpdateCalendarView();
     }
 
+    /// <summary>
+    /// Moves the calendar forwards by one unit (day, week, or month) depending on viewMode.
+    /// In SchoolPeriod mode, jumps to the next school period by finding the holiday that
+    /// starts just after the current period ends, then stepping one day past it.
+    /// </summary>
     private async Task MoveNext()
     {
         if (viewMode == CalendarViewMode.SingleDay)
+        {
             currentDate = currentDate.AddDays(1);
+        }
         else if (viewMode == CalendarViewMode.Month)
+        {
             currentDate = currentDate.AddMonths(1);
+        }
         else if (viewMode == CalendarViewMode.SchoolPeriod)
         {
-            // Trouver le congé juste APRÈS la fin de la période courante
-            // puis aller un jour APRÈS ce congé → on atterrit dans la période suivante
+            // Find the holiday that starts most immediately after the current period's end.
             var nextHol = cachedHolidays
                 .Where(h => h.StartDate.Date > schoolPeriodEnd.Date &&
                             !h.Name.Contains("Rentree") && !h.Name.Contains("Rentrée"))
                 .OrderBy(h => h.StartDate)
                 .FirstOrDefault();
+
+            // Land one day after the holiday ends to place ourselves in the next period
             currentDate = nextHol != null
                 ? nextHol.EndDate.AddDays(1)
-                : schoolPeriodEnd.AddDays(10);
+                : schoolPeriodEnd.AddDays(10);  // fallback: jump 10 days forward
         }
         else
+        {
             currentDate = currentDate.AddDays(7);
+        }
+
         await UpdateCalendarView();
     }
 
+    /// <summary>
+    /// Switches to the specified view mode and refreshes the calendar view.
+    /// Saves the previous mode (if not already in SingleDay) so it can be
+    /// restored when the user returns from single-day view.
+    /// </summary>
+    /// <param name="mode">The view mode to activate.</param>
     private async Task SetViewMode(CalendarViewMode mode)
     {
+        // Record the current mode as "previous" before switching away from a multi-day view
         if (viewMode != CalendarViewMode.SingleDay)
             previousViewMode = viewMode;
+
         viewMode = mode;
         await UpdateCalendarView();
     }
 
+    /// <summary>
+    /// Switches to SingleDay view for the specified date.
+    /// Called when the user clicks a day cell in week, month, or school-period view.
+    /// Saves the current multi-day view mode so it can be restored later.
+    /// </summary>
+    /// <param name="date">The date of the day that was clicked.</param>
     private async Task SelectDay(DateTime date)
     {
+        // Preserve the current mode before switching to single-day
         if (viewMode != CalendarViewMode.SingleDay)
             previousViewMode = viewMode;
+
         viewMode = CalendarViewMode.SingleDay;
         currentDate = date;
         await UpdateCalendarView();
     }
 
+    /// <summary>
+    /// Cycles through view modes in a fixed order or returns to the previous mode
+    /// when currently in SingleDay view.
+    /// Used by a toggle gesture; not directly wired to a button in the current UI
+    /// but available for keyboard shortcuts or swipe gestures.
+    /// </summary>
     private async Task ToggleViewMode()
     {
         viewMode = viewMode switch
         {
-            CalendarViewMode.SingleDay     => previousViewMode,
-            CalendarViewMode.Week          => CalendarViewMode.WeekAndWeekend,
-            CalendarViewMode.WeekAndWeekend=> CalendarViewMode.Month,
-            CalendarViewMode.Month         => CalendarViewMode.Week,
-            _ => CalendarViewMode.Week
+            CalendarViewMode.SingleDay      => previousViewMode,          // return to previous multi-day mode
+            CalendarViewMode.Week           => CalendarViewMode.WeekAndWeekend,
+            CalendarViewMode.WeekAndWeekend => CalendarViewMode.Month,
+            CalendarViewMode.Month          => CalendarViewMode.Week,
+            _                               => CalendarViewMode.Week
         };
+
         await UpdateCalendarView();
     }
 
-    // ── Notes ─────────────────────────────────────────────────────────
+    @* ══════════════════════════════════════════════════════════════════════════
+       NOTE HANDLERS
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    /// <summary>
+    /// Called when the user clicks an hour slot in the single-day time grid.
+    /// If a note already covers the clicked hour, it opens the modal in edit mode.
+    /// Otherwise it opens the modal in create mode with the clicked hour pre-filled.
+    /// </summary>
+    /// <param name="hour">The hour (0–23) of the time slot that was clicked.</param>
     private void OnTimeSlotClicked(int hour)
     {
-        // Cherche une note qui couvre cette heure (commence ici ou la couvre)
+        // Find the note whose time range includes the clicked hour (may be null if no note exists)
         editingNote = currentDay?.Notes.FirstOrDefault(n =>
             hour >= n.Hour && hour < (n.EndHour > 0 ? n.EndHour : n.Hour + 1));
 
-        noteContent = editingNote?.Content ?? "";
+        // Pre-fill the modal fields from the existing note (edit mode) or defaults (create mode)
+        noteContent   = editingNote?.Content ?? "";
         noteStartHour = editingNote?.Hour ?? hour;
-        noteEndHour = editingNote?.EndHour > 0 ? editingNote.EndHour : hour + 1;
+        noteEndHour   = editingNote?.EndHour > 0 ? editingNote.EndHour : hour + 1;
+
+        // Clear any previous save error when opening a fresh modal
         noteSaveError = null;
+
         showNoteModal = true;
     }
 
+    /// <summary>
+    /// Saves the current note to the API.
+    /// Builds a UTC-midnight date to avoid timezone-shift issues during JSON serialisation
+    /// (e.g., a date serialised at +01:00 offset would appear as the previous day in UTC).
+    /// Refreshes the single-day view after a successful save.
+    /// </summary>
     private async Task SaveNote()
     {
+        // Do nothing if there is no day context or the time range is invalid
         if (currentDay == null || noteEndHour <= noteStartHour) return;
+
         noteSaveError = null;
-        // Forcer UTC midnight pour éviter le décalage fuseau horaire lors du JSON encode (+01:00 → veille en UTC)
-        var noteDate = new DateTime(currentDay.Date.Year, currentDay.Date.Month, currentDay.Date.Day, 0, 0, 0, DateTimeKind.Utc);
+
+        // Construct a UTC midnight DateTime to prevent timezone drift in the JSON body.
+        // Using DateTimeKind.Utc ensures the serialiser does not append a +HH:mm offset.
+        var noteDate = new DateTime(
+            currentDay.Date.Year, currentDay.Date.Month, currentDay.Date.Day,
+            0, 0, 0, DateTimeKind.Utc);
+
+        // Reuse the existing note object when editing; create a new one when adding
         var note = editingNote ?? new Note { Date = noteDate };
-        note.Hour = noteStartHour;
+        note.Hour    = noteStartHour;
         note.EndHour = noteEndHour;
         note.Content = noteContent;
+
+        // Submit the note to the API and check for errors
         var (success, error) = await Api.SaveNoteAsync(note);
         if (!success) { noteSaveError = error; return; }
+
+        // Close the modal and reload the day's data to reflect the saved note
         showNoteModal = false;
         currentDay = await CreateDayWithDataAsync(currentDate);
         days = new List<Day> { currentDay };
     }
 
+    /// <summary>
+    /// Deletes the note currently being edited from the API.
+    /// Refreshes the single-day view after a successful deletion.
+    /// Does nothing when no note is being edited (editingNote is null).
+    /// </summary>
     private async Task DeleteNote()
     {
+        // Guard: can only delete when there is an existing note being edited
         if (editingNote == null) return;
+
         await Api.DeleteNoteAsync(editingNote.Id);
+
+        // Close the modal and reload the day to remove the deleted note from the view
         showNoteModal = false;
         currentDay = await CreateDayWithDataAsync(currentDate);
         days = new List<Day> { currentDay };
     }
 
+    /// <summary>
+    /// Closes the note modal without saving any changes.
+    /// </summary>
     private void CloseNoteModal() => showNoteModal = false;
 }

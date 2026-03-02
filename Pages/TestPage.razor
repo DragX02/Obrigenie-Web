@@ -1,26 +1,61 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   TestPage.razor — Admin-only cascading dropdown selection test page.
+
+   This page demonstrates and tests the three-level cascading selection flow used
+   in the reference data API:
+     1. Cours   (course code and name)
+     2. Niveau  (educational level, filtered by selected course)
+     3. Domaine (pedagogical domain, filtered by selected course + level)
+
+   An optional language sub-selection appears when the course "LM" (Langues Modernes)
+   is chosen. A summary card shows the current selections in real time.
+
+   Access is restricted to ADMIN users — non-admin users see an "Access denied" message.
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@* Route: accessible at /test; shown in the admin flyout nav *@
 @page "/test"
+
+@* Inject AuthService to read the user's role from the JWT on initialisation *@
 @inject AuthService Auth
+
+@* Inject ApiService to load the reference data lists from the API *@
 @inject ApiService Api
 
-<PageTitle>Test Cascade</PageTitle>
+<PageTitle>Cascade Test</PageTitle>
 
+@* ── Access guard ─────────────────────────────────────────────────────────── *@
 @if (!isAdmin)
 {
-    <div style="padding:2rem;text-align:center;color:var(--text-muted)">Accès refusé.</div>
+    @* Non-admin users see only this message; no reference data is loaded or shown *@
+    <div style="padding:2rem;text-align:center;color:var(--text-muted)">Access denied.</div>
+}
+
+@* ── API error banner (only shown when the reference data load fails) ───── *@
+@if (loadError != null)
+{
+    <div class="alert alert-danger m-3">
+        <strong>API error:</strong> @loadError
+    </div>
 }
 else
 {
     <div class="container mt-4">
-        <h2>🧪 Test des Sélections en Cascade</h2>
+        <h2>🧪 Cascading Selection Test</h2>
         <hr />
 
         <div class="row">
+            @* ── Left column: cascading dropdowns ──────────────────────────── *@
             <div class="col-md-6">
 
+                @* ── Step 1: Course selection ─────────────────────────────────
+                   Uses @onchange instead of @bind so we can run async logic
+                   (loading the niveau list) when the selection changes.
+                ── *@
                 <div class="mb-3">
-                    <label class="form-label fw-bold">1. Choisir un Cours :</label>
+                    <label class="form-label fw-bold">1. Choose a Course:</label>
                     <select class="form-select" value="@selectedCours" @onchange="OnCoursChanged">
-                        <option value="">-- Sélectionner un cours --</option>
+                        <option value="">-- Select a course --</option>
                         @foreach (var cours in listeCours)
                         {
                             <option value="@cours.CodeCours">@cours.NomCours</option>
@@ -28,12 +63,16 @@ else
                     </select>
                 </div>
 
+                @* ── Step 2: Level selection ───────────────────────────────────
+                   Only shown after a course has been selected (selectedCours is non-empty).
+                   The list is populated by OnCoursChanged calling GetNiveauxAsync.
+                ── *@
                 @if (!string.IsNullOrEmpty(selectedCours))
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">2. Choisir un Niveau :</label>
+                        <label class="form-label fw-bold">2. Choose a Level:</label>
                         <select class="form-select" value="@selectedNiveau" @onchange="OnNiveauChanged">
-                            <option value="">-- Sélectionner un niveau --</option>
+                            <option value="">-- Select a level --</option>
                             @foreach (var niveau in listeNiveaux)
                             {
                                 <option value="@niveau.CodeNiveau">@niveau.NomNiveau</option>
@@ -42,25 +81,36 @@ else
                     </div>
                 }
 
+                @* ── Language sub-selection (LM course only) ──────────────────
+                   When the user selects the "LM" (Modern Languages) course,
+                   an additional dropdown lets them specify which language.
+                   This sub-selection does not affect the domain list but is
+                   captured in the summary card below.
+                ── *@
                 @if (selectedCours == "LM")
                 {
                     <div class="mb-3 p-3 bg-light border rounded">
-                        <label class="form-label fw-bold text-primary">⭐ Choisir la langue spécifique :</label>
+                        <label class="form-label fw-bold text-primary">⭐ Choose the specific language:</label>
                         <select class="form-select border-primary" value="@selectedLangue" @onchange="OnLangueChanged">
-                            <option value="">-- Quelle langue ? --</option>
-                            <option value="Anglais">Anglais</option>
-                            <option value="Néerlandais">Néerlandais</option>
-                            <option value="Allemand">Allemand</option>
+                            <option value="">-- Which language? --</option>
+                            <option value="English">English</option>
+                            <option value="Dutch">Dutch</option>
+                            <option value="German">German</option>
                         </select>
                     </div>
                 }
 
+                @* ── Step 3: Domain selection ──────────────────────────────────
+                   Only shown after both a course and a level have been selected.
+                   The list is populated by MettreAJourDomaines calling GetDomainesAsync.
+                ── *@
                 @if (!string.IsNullOrEmpty(selectedCours) && !string.IsNullOrEmpty(selectedNiveau))
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">3. Choisir un Domaine :</label>
+                        <label class="form-label fw-bold">3. Choose a Domain:</label>
+                        @* @bind is used here because no async logic is needed on change *@
                         <select class="form-select" @bind="selectedDomaine">
-                            <option value="">-- Sélectionner un domaine --</option>
+                            <option value="">-- Select a domain --</option>
                             @foreach (var domaine in domainesFiltres)
                             {
                                 <option value="@domaine.Nom">@domaine.Nom</option>
@@ -71,20 +121,26 @@ else
 
             </div>
 
+            @* ── Right column: live selection summary ─────────────────────── *@
             <div class="col-md-6">
                 <div class="card bg-dark text-light mt-4">
                     <div class="card-body">
-                        <h5 class="card-title">Résumé de ta sélection :</h5>
+                        <h5 class="card-title">Your selection summary:</h5>
                         <ul>
-                            <li><strong>Cours :</strong> @(string.IsNullOrEmpty(selectedCours) ? "..." : selectedCours)</li>
-                            <li><strong>Niveau :</strong> @(string.IsNullOrEmpty(selectedNiveau) ? "..." : selectedNiveau)</li>
+                            @* Course: shows the code or a placeholder *@
+                            <li><strong>Course:</strong>  @(string.IsNullOrEmpty(selectedCours)   ? "..." : selectedCours)</li>
 
+                            @* Level: shows the code or a placeholder *@
+                            <li><strong>Level:</strong>   @(string.IsNullOrEmpty(selectedNiveau)  ? "..." : selectedNiveau)</li>
+
+                            @* Language row: only rendered when LM course is selected *@
                             @if (selectedCours == "LM")
                             {
-                                <li class="text-warning"><strong>Langue :</strong> @(string.IsNullOrEmpty(selectedLangue) ? "..." : selectedLangue)</li>
+                                <li class="text-warning"><strong>Language:</strong> @(string.IsNullOrEmpty(selectedLangue) ? "..." : selectedLangue)</li>
                             }
 
-                            <li><strong>Domaine :</strong> @(string.IsNullOrEmpty(selectedDomaine) ? "..." : selectedDomaine)</li>
+                            @* Domain: shows the name or a placeholder *@
+                            <li><strong>Domain:</strong>  @(string.IsNullOrEmpty(selectedDomaine) ? "..." : selectedDomaine)</li>
                         </ul>
                     </div>
                 </div>
@@ -94,61 +150,141 @@ else
 }
 
 @code {
+    @* True when the user's JWT contains the ADMIN role *@
     private bool isAdmin = false;
 
+    @* Holds the error message from the last failed API call; null when everything is OK *@
+    private string? loadError;
+
+    /// <summary>
+    /// Lifecycle method called on first render.
+    /// Decodes the user's role; if ADMIN, loads the course list from the API.
+    /// Non-admin users see the access-denied message and no data is fetched.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
         var role = await Auth.GetRoleAsync();
         isAdmin = role == "ADMIN";
+
+        // Load the first-level reference data (courses) only when the user is authorised
         if (isAdmin)
-            listeCours = await Api.GetCoursAsync();
+        {
+            try
+            {
+                listeCours = await Api.GetCoursAsync();
+            }
+            catch (Exception ex)
+            {
+                // Surface the real HTTP error (404 = endpoint not deployed, 401 = auth failure, etc.)
+                loadError = ex.Message;
+            }
+        }
     }
 
-    // === VARIABLES QUI STOCKENT LES CHOIX DE L'UTILISATEUR ===
+    @* ── Current selections (bound to the dropdown values) ──────────────── *@
+
+    @* The code of the currently selected course (e.g., "LM", "SC") *@
     private string selectedCours   = "";
+
+    @* The code of the currently selected educational level *@
     private string selectedNiveau  = "";
+
+    @* The name of the currently selected language (LM course only) *@
     private string selectedLangue  = "";
+
+    @* The name of the currently selected domain *@
     private string selectedDomaine = "";
 
-    // === LISTES DE DONNÉES (chargées depuis l'API) ===
+    @* ── Data lists loaded from the API ─────────────────────────────────── *@
+
+    @* The master list of all available courses; populated on init *@
     private List<CoursDto>   listeCours      = new();
+
+    @* The levels available for the selected course; populated after course selection *@
     private List<NiveauDto>  listeNiveaux    = new();
+
+    @* The domains matching the selected course and level; populated after level selection *@
     private List<DomaineDto> domainesFiltres = new();
 
-    // === ÉVÉNEMENTS ===
+    @* ── Event handlers ──────────────────────────────────────────────────── *@
 
+    /// <summary>
+    /// Called when the user changes the course dropdown selection.
+    /// Resets all downstream selections (level, language, domain) and
+    /// fetches the level list for the newly selected course.
+    /// </summary>
+    /// <param name="e">The change event containing the new course code value.</param>
     private async Task OnCoursChanged(ChangeEventArgs e)
     {
+        // Update the selected course from the dropdown value
         selectedCours   = e.Value?.ToString() ?? "";
+
+        // Reset all downstream selections so stale data is not shown
         selectedNiveau  = "";
         selectedLangue  = "";
         selectedDomaine = "";
         domainesFiltres.Clear();
 
-        listeNiveaux = string.IsNullOrEmpty(selectedCours)
-            ? new()
-            : await Api.GetNiveauxAsync(selectedCours);
+        // Load the level list for the newly selected course, or clear it if deselected
+        if (!string.IsNullOrEmpty(selectedCours))
+        {
+            try
+            {
+                listeNiveaux = await Api.GetNiveauxAsync(selectedCours);
+            }
+            catch (Exception ex)
+            {
+                loadError = ex.Message;
+            }
+        }
     }
 
+    /// <summary>
+    /// Called when the user changes the level dropdown selection.
+    /// Resets the domain selection and triggers a domain list refresh.
+    /// </summary>
+    /// <param name="e">The change event containing the new level code value.</param>
     private async Task OnNiveauChanged(ChangeEventArgs e)
     {
         selectedNiveau  = e.Value?.ToString() ?? "";
         selectedDomaine = "";
+
+        // Refresh the domain list based on the current course + new level combination
         await MettreAJourDomaines();
     }
 
+    /// <summary>
+    /// Called when the user changes the language dropdown (LM course only).
+    /// Stores the selected language and clears any previously selected domain.
+    /// </summary>
+    /// <param name="e">The change event containing the new language value.</param>
     private void OnLangueChanged(ChangeEventArgs e)
     {
         selectedLangue  = e.Value?.ToString() ?? "";
         selectedDomaine = "";
     }
 
-    // === LOGIQUE DE CHARGEMENT DES DOMAINES ===
+    /// <summary>
+    /// Fetches the domain list filtered by the currently selected course and level.
+    /// Does nothing if either selection is missing (guards against partial state).
+    /// </summary>
     private async Task MettreAJourDomaines()
     {
+        // Clear the current domain list before loading new data
         domainesFiltres.Clear();
+
+        // Both course and level must be selected before a domain list can be requested
         if (string.IsNullOrEmpty(selectedCours) || string.IsNullOrEmpty(selectedNiveau))
             return;
-        domainesFiltres = await Api.GetDomainesAsync(selectedCours, selectedNiveau);
+
+        // Load domains matching the current course + level combination
+        try
+        {
+            domainesFiltres = await Api.GetDomainesAsync(selectedCours, selectedNiveau);
+        }
+        catch (Exception ex)
+        {
+            loadError = ex.Message;
+        }
     }
 }

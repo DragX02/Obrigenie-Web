@@ -1,12 +1,38 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   App.razor — The top-level Blazor router component for the Obrigenie application.
+   This component is mounted at the <div id="app"> element in wwwroot/index.html
+   and is responsible for matching the current browser URL to a @page component.
+
+   The Router inspects all components in the application assembly (via AppAssembly)
+   and renders the one whose @page directive matches the current URI.
+
+   DefaultLayout specifies that MainLayout is used for every routed page unless
+   a page explicitly overrides it with its own @layout directive.
+   ───────────────────────────────────────────────────────────────────────────── *@
+
 <Router AppAssembly="@typeof(App).Assembly">
+
+    @* ── Matched route ──────────────────────────────────────────────────────
+       Rendered when the current URL matches a @page directive in the assembly.
+       RouteView renders the matched component inside the DefaultLayout (MainLayout).
+       FocusOnNavigate moves focus to the first <h1> element after each navigation,
+       which is an accessibility best practice for single-page applications.
+    ── *@
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
+
+    @* ── No matching route ──────────────────────────────────────────────────
+       Rendered when the current URL does not match any @page directive.
+       Uses the same MainLayout so the global navigation shell is still visible.
+       Displays a simple "page not found" message to the user.
+    ── *@
     <NotFound>
-        <PageTitle>Pas trouve</PageTitle>
+        <PageTitle>Page not found</PageTitle>
         <LayoutView Layout="@typeof(Layout.MainLayout)">
-            <p>Page non trouvee.</p>
+            <p>Page not found.</p>
         </LayoutView>
     </NotFound>
+
 </Router>

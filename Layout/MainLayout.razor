@@ -1,104 +1,196 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   MainLayout.razor — The root shell layout for the Obrigenie application.
+
+   Responsibilities:
+     1. Authenticate the user on first render (check JWT in localStorage).
+     2. Validate the user's license code against the server (real-time revocation).
+     3. Redirect unauthenticated users to /login and unlicensed users to /access-code.
+     4. Render the flyout sidebar, top bar, and main content area for authenticated users.
+     5. Manage dark/light theme toggle and persist the choice in localStorage.
+     6. Display a live server-status badge (online / offline).
+     7. Expose a logout button that clears the token and redirects to /login.
+
+   Admin users bypass the license check and always have access to all routes.
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@* This component extends LayoutComponentBase, which provides the @Body render fragment
+   that outputs the current page's content inside this layout. *@
 @inherits LayoutComponentBase
+
+@* Inject AuthService to check login state, decode user role, and remove the token on logout. *@
 @inject AuthService Auth
+
+@* Inject NavigationManager to redirect the user programmatically (e.g., to /login). *@
 @inject NavigationManager Nav
+
+@* Inject ApiService to perform the license check and health-check ping. *@
 @inject ApiService Api
+
+@* Inject ILocalStorageService to persist and retrieve the theme preference and license code. *@
 @inject ILocalStorageService LocalStorage
 
+@* ── Outer wrapper — applies the active theme class to the root element ── *@
 <div class="@(isDark ? "dark" : "light")" id="app-root">
 
+    @* ── Loading state ──────────────────────────────────────────────────────
+       A blank loading overlay is shown while OnInitializedAsync performs its
+       async checks (auth, license, theme, health). Once initialisation completes
+       the overlay is replaced by the correct content.
+    ── *@
     @if (isInitializing)
     {
         <div class="app-loading"></div>
     }
     else if (isLoggedIn && hasAccess)
     {
+        @* ── Authenticated and licensed — render the full application shell ── *@
+
+        @* Semi-transparent overlay that closes the flyout when clicked outside of it *@
         @if (flyoutOpen)
         {
             <div class="flyout-overlay" @onclick="CloseFlyout"></div>
         }
 
-        <!-- Flyout sidebar -->
+        @* ── Flyout sidebar navigation ─────────────────────────────────────
+           The flyout slides in from the left when flyoutOpen is true.
+           Contains the app logo, server status badge, navigation links,
+           theme toggle, and logout button.
+        ── *@
         <nav class="flyout @(flyoutOpen ? "flyout-open" : "")">
+
+            @* Header area: app name and live server status badge *@
             <div class="flyout-header">
                 <div class="flyout-logo-text">Obrigenie</div>
+
+                @* Server status badge — green dot when online, red dot when offline *@
                 <div class="server-badge @(serverOnline ? "badge-online" : "badge-offline")">
                     <span class="status-dot-flyout"></span>
                     <span class="badge-text">@serverStatus</span>
+                    @* Button to manually re-ping the health endpoint *@
                     <button class="btn-refresh-status" @onclick="RefreshStatus">↻</button>
                 </div>
             </div>
 
+            @* Navigation links — close the flyout after navigating *@
             <div class="flyout-items">
+                @* Calendar link: always visible for authenticated licensed users *@
                 <a href="/" class="flyout-item" @onclick="CloseFlyout">
-                    <span class="flyout-icon">📅</span> Calendrier
+                    <span class="flyout-icon">📅</span> Calendar
                 </a>
+
+                @* Admin-only links: license management and the cascade-selection test page *@
                 @if (isAdmin)
                 {
                     <a href="/admin" class="flyout-item" @onclick="CloseFlyout">
-                        <span class="flyout-icon">🔑</span> Licences
+                        <span class="flyout-icon">🔑</span> Licenses
                     </a>
                     <a href="/test" class="flyout-item" @onclick="CloseFlyout">
-                    <span class="flyout-icon">🧪</span> Test
+                        <span class="flyout-icon">🧪</span> Test
                     </a>
                 }
             </div>
-            
 
-
+            @* Flyout footer: theme toggle and logout *@
             <div class="flyout-footer">
+                @* Toggle between dark and light theme; persists the choice to localStorage *@
                 <button class="btn-theme-toggle" @onclick="ToggleTheme">
-                    @(isDark ? "☀️  Mode clair" : "🌙  Mode sombre")
+                    @(isDark ? "☀️  Light mode" : "🌙  Dark mode")
                 </button>
+
+                @* Clears the JWT token from localStorage and redirects to the login page *@
                 <button class="btn-logout-flyout" @onclick="Logout">
-                    🚪  Déconnexion
+                    🚪  Logout
                 </button>
             </div>
         </nav>
 
-        <!-- Main area -->
+        @* ── Main content area ────────────────────────────────────────────
+           The top bar contains the hamburger button (to open the flyout)
+           and the app title. @Body renders the current routed page's content.
+        ── *@
         <div class="main-wrapper">
             <div class="top-bar">
+                @* Hamburger button: toggles the flyout sidebar open/closed *@
                 <button class="btn-hamburger" @onclick="ToggleFlyout">☰</button>
                 <span class="top-bar-title">Obrigenie</span>
             </div>
             <main class="content-area">
+                @* @Body is the render fragment provided by LayoutComponentBase;
+                   it outputs the currently matched page component *@
                 @Body
             </main>
         </div>
     }
     else
     {
+        @* ── Not authenticated or no license ────────────────────────────────
+           Render only @Body without the navigation shell.
+           Login.razor, AccessCodePage.razor, and AuthCallback.razor are designed
+           to work as stand-alone full-page views without the sidebar.
+        ── *@
         @Body
     }
 </div>
 
 @code {
+    @* True while the async initialisation (auth check, license check, theme load) is running.
+       Keeps the blank loading overlay visible to prevent a flash of unauthenticated content. *@
     private bool isInitializing = true;
-    private bool flyoutOpen = false;
-    private bool isDark = true;
-    private bool isLoggedIn = false;
-    private bool hasAccess = false;
-    private bool isAdmin = false;
-    private bool serverOnline = false;
-    private string serverStatus = "Vérification...";
 
+    @* Tracks whether the flyout sidebar is currently open *@
+    private bool flyoutOpen = false;
+
+    @* True when the dark color scheme is active; false for the light scheme.
+       Defaults to dark so there is no flash on first load if no theme is saved. *@
+    private bool isDark = true;
+
+    @* True when a valid JWT token was found in localStorage on startup *@
+    private bool isLoggedIn = false;
+
+    @* True when the user's license code was validated successfully (or the user is an admin) *@
+    private bool hasAccess = false;
+
+    @* True when the user's JWT contains the "ADMIN" role claim *@
+    private bool isAdmin = false;
+
+    @* True when the last health-check ping to the API returned a 2xx status *@
+    private bool serverOnline = false;
+
+    @* Human-readable server status text shown in the badge (e.g., "Server connected", "Offline") *@
+    private string serverStatus = "Checking...";
+
+    /// <summary>
+    /// Blazor lifecycle method called once when the component is first rendered.
+    /// Performs all startup checks in sequence:
+    ///   1. Check whether the user is logged in (JWT in localStorage).
+    ///   2. If admin: bypass license check and grant full access.
+    ///   3. If not admin: validate the stored license code against the server.
+    ///      Redirect to /access-code if the license is missing or has been revoked.
+    ///   4. Load the saved theme preference from localStorage.
+    ///   5. Ping the health endpoint to determine whether the server is reachable.
+    /// Sets isInitializing = false at the end to reveal the correct UI.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
+        // Step 1: check whether a JWT token exists in localStorage
         isLoggedIn = await Auth.IsLoggedInAsync();
 
         if (isLoggedIn)
         {
-            // L'ADMIN bypasse la vérification de licence
+            // Step 2: decode the role from the JWT payload (client-side, no server round-trip)
             var role = await Auth.GetRoleAsync();
             isAdmin = role == "ADMIN";
 
             if (isAdmin)
             {
+                // Admin accounts bypass the license system entirely
                 hasAccess = true;
             }
             else
             {
-                // Validation serveur de la licence (révocation en temps réel)
+                // Step 3: validate the license code stored in localStorage against the server.
+                // This enforces real-time license revocation: if an admin revokes a code,
+                // the user is kicked out on the next page load.
                 var licenseCode = await LocalStorage.GetItemAsync<string>("licenseCode");
 
                 if (!string.IsNullOrEmpty(licenseCode))
@@ -106,45 +198,82 @@
 
                 if (!hasAccess)
                 {
+                    // License is missing or revoked — remove the stale code and redirect
                     await LocalStorage.RemoveItemAsync("licenseCode");
                     isInitializing = false;
+
+                    // Avoid redirect loops if the user is already on the access-code page
                     if (!Nav.Uri.Contains("/access-code"))
                         Nav.NavigateTo("/access-code");
+
                     return;
                 }
             }
 
+            // Step 4: load the user's theme preference ("dark" or "light")
             var savedTheme = await LocalStorage.GetItemAsync<string>("theme");
-            isDark = savedTheme != "light";
+            isDark = savedTheme != "light";  // default to dark when no preference is stored
 
+            // Step 5: ping the health endpoint to show the correct online/offline badge
             serverOnline = await Api.CheckHealthAsync();
-            serverStatus = serverOnline ? "Serveur connecté" : "Hors ligne";
+            serverStatus = serverOnline ? "Server connected" : "Offline";
         }
 
+        // Initialisation complete — replace the loading overlay with the real content
         isInitializing = false;
     }
 
+    /// <summary>
+    /// Toggles the flyout sidebar between open and closed states.
+    /// Called by the hamburger (☰) button in the top bar.
+    /// </summary>
     private void ToggleFlyout() => flyoutOpen = !flyoutOpen;
+
+    /// <summary>
+    /// Closes the flyout sidebar.
+    /// Called when the user clicks a navigation link or the semi-transparent overlay.
+    /// </summary>
     private void CloseFlyout() => flyoutOpen = false;
 
+    /// <summary>
+    /// Flips the active theme between dark and light and persists the new preference
+    /// to localStorage so it is restored on the next page load.
+    /// </summary>
     private async Task ToggleTheme()
     {
         isDark = !isDark;
+        // Store "dark" or "light" as a plain string under the "theme" key
         await LocalStorage.SetItemAsync("theme", isDark ? "dark" : "light");
     }
 
+    /// <summary>
+    /// Re-pings the server health endpoint and updates the status badge text and color.
+    /// Called by the refresh (↻) button next to the status badge in the flyout header.
+    /// </summary>
     private async Task RefreshStatus()
     {
-        serverStatus = "Vérification...";
+        // Show a "Checking..." label while the request is in flight
+        serverStatus = "Checking...";
         serverOnline = await Api.CheckHealthAsync();
-        serverStatus = serverOnline ? "Serveur connecté" : "Hors ligne";
+        serverStatus = serverOnline ? "Server connected" : "Offline";
     }
 
+    /// <summary>
+    /// Logs the user out by removing the JWT token from localStorage, closing the flyout,
+    /// updating the isLoggedIn flag, and redirecting to the login page.
+    /// </summary>
     private async Task Logout()
     {
+        // Clear the stored JWT (and email) from localStorage
         await Auth.RemoveTokenAsync();
+
+        // Close the flyout so it does not linger on the login page after redirect
         flyoutOpen = false;
+
+        // Update state so the layout re-renders without the navigation shell
         isLoggedIn = false;
+
+        // Navigate to the login page
         Nav.NavigateTo("/login");
     }
 }

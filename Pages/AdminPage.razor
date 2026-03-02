@@ -1,99 +1,164 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   AdminPage.razor — License management dashboard for administrators.
+
+   This page is only accessible to users whose JWT contains the "ADMIN" role.
+   Non-admin users see an "Access denied" message; the page content is never rendered.
+
+   Features:
+     1. Create a new license with an optional label, custom code, and expiry date.
+        A "generate" button creates a random alphanumeric code suggestion.
+     2. View the full list of all licenses with their status, assigned user, and dates.
+     3. Revoke an active license (immediately prevents the assigned user from accessing
+        the app on their next page load, thanks to real-time server-side validation).
+     4. Reactivate a previously revoked license.
+     5. Permanently delete a license record.
+     6. Trigger the school-calendar scraper that updates holiday dates from enseignement.be.
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@* Route: accessible at /admin; shown in the flyout nav for admin accounts *@
 @page "/admin"
+
+@* Inject ApiService for all license CRUD calls and the scraper trigger *@
 @inject ApiService Api
+
+@* Inject AuthService to read the user's role from the JWT *@
 @inject AuthService Auth
+
+@* Inject NavigationManager (available for future redirects if needed) *@
 @inject NavigationManager Nav
 
+@* ── Access guard ─────────────────────────────────────────────────────────── *@
 @if (!isAdmin)
 {
-    <div style="padding:2rem;text-align:center;color:var(--text-muted)">Accès refusé.</div>
+    @* Show a minimal "Access denied" message to non-admin users.
+       The full page markup is never rendered, so no license data leaks. *@
+    <div style="padding:2rem;text-align:center;color:var(--text-muted)">Access denied.</div>
 }
 else
 {
     <div class="admin-page">
-        <h2 class="admin-title">Gestion des licences</h2>
+        <h2 class="admin-title">License Management</h2>
 
-        <!-- Créer une nouvelle licence -->
+        @* ── Section: Create a new license ────────────────────────────────── *@
         <div class="admin-create-card">
-            <h3 class="admin-section-title">Nouvelle licence</h3>
+            <h3 class="admin-section-title">New license</h3>
             <div class="admin-create-form">
-                <input class="admin-input" type="text" placeholder="Libellé (ex: PROF-DUPONT)"
+
+                @* Optional human-readable label for the license (e.g., "PROF-DUPONT") *@
+                <input class="admin-input" type="text" placeholder="Label (e.g. PROF-DUPONT)"
                        @bind="newLabel" />
-                            <div class="admin-code-group">
-                <input class="admin-input" type="text" placeholder="Code personnalisé (optionnel)"
-                    @bind="newCode" />
-                <button class="btn-generate-code" type="button" @onclick="GenerateCodeSuggestion"
-                        title="Générer un code automatiquement">⟳</button>
-            </div>
-                <input class="admin-input" type="date" title="Date d'expiration (optionnel)"
+
+                @* Optional custom code group — the admin can type a code or click ⟳ to auto-generate *@
+                <div class="admin-code-group">
+                    <input class="admin-input" type="text" placeholder="Custom code (optional)"
+                           @bind="newCode" />
+                    @* Click to fill the code field with a randomly generated suggestion *@
+                    <button class="btn-generate-code" type="button" @onclick="GenerateCodeSuggestion"
+                            title="Generate a code automatically">⟳</button>
+                </div>
+
+                @* Optional expiry date — null means the license never expires *@
+                <input class="admin-input" type="date" title="Expiry date (optional)"
                        @bind="newExpiry" />
+
+                @* Submit button — disabled while the create request is in flight *@
                 <button class="btn-admin-create" @onclick="CreateLicense" disabled="@isCreating">
-                    @(isCreating ? "Création..." : "+ Créer")
+                    @(isCreating ? "Creating..." : "+ Create")
                 </button>
             </div>
+
+            @* Feedback message after a create attempt (success = green, error = red) *@
             @if (createMsg != null)
             {
                 <div class="admin-create-msg @(createSuccess ? "msg-ok" : "msg-err")">@createMsg</div>
             }
         </div>
 
-        <!-- Calendrier scolaire -->
+        @* ── Section: School calendar scraper ─────────────────────────────── *@
         <div class="admin-create-card">
-            <h3 class="admin-section-title">Calendrier scolaire</h3>
+            <h3 class="admin-section-title">School calendar</h3>
             <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:.75rem">
-                Met à jour les dates de congés depuis enseignement.be.
+                Updates holiday dates from enseignement.be.
             </p>
+
+            @* Trigger button — disabled while the scrape request is in progress *@
             <button class="btn-admin-create" @onclick="RunScraper" disabled="@isScraping">
-                @(isScraping ? "Mise à jour..." : "↻ Mettre à jour")
+                @(isScraping ? "Updating..." : "↻ Update")
             </button>
+
+            @* Feedback message after the scraper completes (success = green, error = red) *@
             @if (scraperMsg != null)
             {
                 <div class="admin-create-msg @(scraperSuccess ? "msg-ok" : "msg-err")">@scraperMsg</div>
             }
         </div>
 
-        <!-- Liste des licences -->
+        @* ── Section: License list ────────────────────────────────────────── *@
         <div class="admin-licenses-list">
             @if (isLoading)
             {
-                <div class="admin-loading">Chargement...</div>
+                @* Spinner placeholder while the license list is being fetched *@
+                <div class="admin-loading">Loading...</div>
             }
             else if (licenses.Count == 0)
             {
-                <div class="admin-empty">Aucune licence. Créez-en une ci-dessus.</div>
+                @* Empty-state message when no licenses have been created yet *@
+                <div class="admin-empty">No licenses. Create one above.</div>
             }
             else
             {
+                @* Render a row for each license in the list *@
                 @foreach (var lic in licenses)
                 {
+                    @* Revoked licenses receive the "row-revoked" CSS class for visual distinction *@
                     <div class="admin-license-row @(lic.IsActive ? "" : "row-revoked")">
+
+                        @* Left section: code, optional label, and status badge *@
                         <div class="lic-info">
                             <span class="lic-code">@lic.Code</span>
+
+                            @* Only show the label when one has been assigned *@
                             @if (!string.IsNullOrEmpty(lic.Label))
                             {
                                 <span class="lic-label">@lic.Label</span>
                             }
+
+                            @* Status badge — CSS class derived from status text (accent-safe) *@
                             <span class="lic-status status-@(lic.Status.ToLower().Replace("é","e").Replace("è","e"))">@lic.Status</span>
                         </div>
+
+                        @* Middle section: assigned user, optional expiry, and creation date *@
                         <div class="lic-meta">
+                            @* Show assigned email only when the license has been redeemed *@
                             @if (lic.AssignedEmail != null)
                             {
                                 <span class="lic-assigned">👤 @lic.AssignedEmail</span>
                             }
+
+                            @* Show expiry date only when one was set at creation *@
                             @if (lic.ExpiresAt.HasValue)
                             {
                                 <span class="lic-expiry">⏰ @lic.ExpiresAt.Value.ToString("dd/MM/yyyy")</span>
                             }
+
+                            @* Creation date is always shown *@
                             <span class="lic-date">🗓 @lic.CreatedAt.ToString("dd/MM/yyyy")</span>
                         </div>
+
+                        @* Right section: action buttons for this license row *@
                         <div class="lic-actions">
                             @if (lic.IsActive)
                             {
-                                <button class="btn-lic-revoke" @onclick="() => Revoke(lic.Id)">Révoquer</button>
+                                @* Active license: offer a Revoke button *@
+                                <button class="btn-lic-revoke" @onclick="() => Revoke(lic.Id)">Revoke</button>
                             }
                             else
                             {
-                                <button class="btn-lic-reactivate" @onclick="() => Reactivate(lic.Id)">Réactiver</button>
+                                @* Revoked license: offer a Reactivate button *@
+                                <button class="btn-lic-reactivate" @onclick="() => Reactivate(lic.Id)">Reactivate</button>
                             }
+
+                            @* Delete button — permanently removes the record from the database *@
                             <button class="btn-lic-delete" @onclick="() => Delete(lic.Id)">🗑</button>
                         </div>
                     </div>
@@ -104,94 +169,186 @@ else
 }
 
 @code {
+    @* True when the user's JWT contains the ADMIN role; controls whether the page renders *@
     private bool isAdmin = false;
+
+    @* True while the initial license list is being fetched *@
     private bool isLoading = true;
+
+    @* True while a create-license request is in flight; disables the create button *@
     private bool isCreating = false;
+
+    @* The current list of licenses fetched from the admin API *@
     private List<LicenseDto> licenses = new();
 
+    @* ── New license form bindings ──────────────────────────────────────── *@
+
+    @* The optional label entered by the admin for the new license *@
     private string? newLabel;
+
+    @* The optional custom code string entered or auto-generated for the new license *@
     private string? newCode;
+
+    @* The optional expiry date selected for the new license *@
     private DateTime? newExpiry;
+
+    @* Feedback message shown after a create attempt *@
     private string? createMsg;
+
+    @* True when the last create attempt succeeded (drives the green vs. red CSS class) *@
     private bool createSuccess;
 
+    @* ── Scraper state ──────────────────────────────────────────────────── *@
+
+    @* True while the scraper HTTP request is in progress *@
     private bool isScraping = false;
+
+    @* Feedback message shown after the scraper completes *@
     private string? scraperMsg;
+
+    @* True when the last scraper run succeeded *@
     private bool scraperSuccess;
 
+    /// <summary>
+    /// Lifecycle method called on first render.
+    /// Checks the user's role from the JWT; if ADMIN, loads the license list.
+    /// Non-admin users see only the access-denied message.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
+        // Decode the role claim from the stored JWT (client-side, no server round-trip)
         var role = await Auth.GetRoleAsync();
         isAdmin = role == "ADMIN";
+
+        // Only load data when the user actually has admin access
         if (!isAdmin) return;
 
         await LoadLicenses();
     }
 
+    /// <summary>
+    /// Fetches the full license list from the admin API and updates the component state.
+    /// Called on init and after every create/revoke/reactivate/delete operation.
+    /// </summary>
     private async Task LoadLicenses()
     {
         isLoading = true;
         licenses = await Api.GetLicensesAsync();
         isLoading = false;
     }
+
+    /// <summary>
+    /// Generates a random alphanumeric access-code suggestion and places it in the
+    /// newCode field so the admin can use or modify it before creating the license.
+    /// Uses cryptographically random bytes to avoid predictable codes.
+    /// Format: five uppercase consonant-like letters, a dash, then five digits.
+    /// </summary>
     private void GenerateCodeSuggestion()
     {
-        const string lettres = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-    const string chiffres = "23456789";
-    var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(10);
-    var part1 = new string(bytes.Take(5).Select(b => lettres[b % lettres.Length]).ToArray());
-    var part2 = new string(bytes.Skip(5).Select(b => chiffres[b % chiffres.Length]).ToArray());
-    newCode = $"{part1}-{part2}";
+        // Character sets that avoid visually ambiguous characters (0/O, 1/I, etc.)
+        const string letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const string digits  = "23456789";
+
+        // Generate 10 cryptographically random bytes — 5 for letters, 5 for digits
+        var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(10);
+
+        // Map each byte to a character in the respective set using modulo
+        var part1 = new string(bytes.Take(5).Select(b => letters[b % letters.Length]).ToArray());
+        var part2 = new string(bytes.Skip(5).Select(b => digits[b % digits.Length]).ToArray());
+
+        // Combine into a "XXXXX-DDDDD" formatted code and populate the input field
+        newCode = $"{part1}-{part2}";
     }
 
+    /// <summary>
+    /// Submits the new-license form to the API.
+    /// On success: displays the generated code, clears the form, and refreshes the list.
+    /// On failure: displays the server's error message in red.
+    /// </summary>
     private async Task CreateLicense()
     {
         isCreating = true;
         createMsg = null;
 
+        // Send the label, expiry, and optional custom code to the API
         var (result, error) = await Api.CreateLicenseAsync(newLabel, newExpiry, newCode);
+
         if (result != null)
         {
+            // Show the generated or submitted code as confirmation
             createSuccess = true;
-            createMsg = $"Licence créée : {result.Code}";
-            newLabel = null;
-            newCode = null;
+            createMsg = $"License created: {result.Code}";
+
+            // Clear the form fields so the admin can immediately create another license
+            newLabel  = null;
+            newCode   = null;
             newExpiry = null;
+
+            // Refresh the license list to include the newly created entry
             await LoadLicenses();
         }
         else
         {
+            // Display the error message returned by the API (e.g., "Code already exists")
             createSuccess = false;
-            createMsg = error ?? "Erreur lors de la création";
+            createMsg = error ?? "Error during creation";
         }
+
         isCreating = false;
     }
 
+    /// <summary>
+    /// Revokes the license with the given ID, then refreshes the list.
+    /// A revoked license immediately prevents its assigned user from accessing the app
+    /// on their next page load (because MainLayout re-validates on startup).
+    /// </summary>
+    /// <param name="id">The unique identifier of the license to revoke.</param>
     private async Task Revoke(int id)
     {
         await Api.RevokeLicenseAsync(id);
         await LoadLicenses();
     }
 
+    /// <summary>
+    /// Reactivates a previously revoked license, then refreshes the list.
+    /// The user associated with this code will regain access on their next page load.
+    /// </summary>
+    /// <param name="id">The unique identifier of the license to reactivate.</param>
     private async Task Reactivate(int id)
     {
         await Api.ReactivateLicenseAsync(id);
         await LoadLicenses();
     }
 
+    /// <summary>
+    /// Permanently deletes a license record from the database, then refreshes the list.
+    /// Deleted licenses cannot be recovered.
+    /// </summary>
+    /// <param name="id">The unique identifier of the license to delete.</param>
     private async Task Delete(int id)
     {
         await Api.DeleteLicenseAsync(id);
         await LoadLicenses();
     }
 
+    /// <summary>
+    /// Triggers the server-side web scraper that fetches updated school-calendar holiday
+    /// dates from enseignement.be and writes them to the database.
+    /// Displays a success or failure message when the operation completes.
+    /// </summary>
     private async Task RunScraper()
     {
         isScraping = true;
         scraperMsg = null;
+
+        // Call the scraper trigger endpoint and await the result
         var (success, message) = await Api.TriggerScraperAsync();
+
         scraperSuccess = success;
-        scraperMsg = success ? "Calendrier mis à jour avec succès." : $"Échec : {message}";
+        scraperMsg = success
+            ? "Calendar updated successfully."
+            : $"Failed: {message}";
+
         isScraping = false;
     }
 }

@@ -1,38 +1,75 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   ConfirmEmail.razor — Email address confirmation landing page.
+
+   When a new user registers with an email/password, the server sends a
+   confirmation email containing a link to this page with a "token" query
+   parameter. On load the page calls the confirmation API endpoint which
+   validates the token and marks the account as verified.
+
+   The component renders three distinct states:
+     1. Loading — spinner while the API call is in progress.
+     2. Success — green confirmation message with a "Log in" button.
+     3. Error   — red error message (invalid/expired token or server unreachable)
+                  with a "Back to login" button.
+
+   The [SupplyParameterFromQuery] attribute automatically populates the Token
+   property from the "?token=..." query string before OnInitializedAsync runs.
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@* Route: the confirmation link in the email points to /confirm-email?token=... *@
 @page "/confirm-email"
+
+@* Inject the raw HttpClient (not the named API client) for the confirmation call.
+   The confirmation endpoint is public and does not require the JWT auth header. *@
 @inject HttpClient Http
+
+@* Inject NavigationManager to navigate to /login after confirming or on error *@
 @inject NavigationManager Nav
 
+@* ── Page layout ──────────────────────────────────────────────────────────── *@
 <div class="confirm-email-page">
     <div class="confirm-card">
-        <img src="/icon-192.png" alt="ObriGénie" class="confirm-logo" />
-        <h1 class="confirm-brand">ObriGénie</h1>
 
+        @* App logo and brand name displayed at the top of the card *@
+        <img src="/icon-192.png" alt="ObriGenie" class="confirm-logo" />
+        <h1 class="confirm-brand">ObriGenie</h1>
+
+        @* ── State: Loading ───────────────────────────────────────────────── *@
         @if (isLoading)
         {
             <div class="confirm-state">
+                @* Animated CSS spinner shown while the API call is awaited *@
                 <div class="confirm-spinner"></div>
-                <p>Vérification en cours...</p>
+                <p>Verifying...</p>
             </div>
         }
+        @* ── State: Success ───────────────────────────────────────────────── *@
         else if (isSuccess)
         {
             <div class="confirm-state confirm-success">
                 <span class="confirm-icon">✅</span>
-                <h2>Compte confirmé !</h2>
-                <p>Votre adresse email a bien été vérifiée.<br />Vous pouvez maintenant vous connecter.</p>
+                <h2>Account confirmed!</h2>
+                <p>Your email address has been verified.<br />You can now log in.</p>
+
+                @* Navigate to the login page when the user clicks the button *@
                 <button class="btn-confirm-login" @onclick='() => Nav.NavigateTo("/login")'>
-                    Se connecter
+                    Log in
                 </button>
             </div>
         }
+        @* ── State: Error ─────────────────────────────────────────────────── *@
         else
         {
             <div class="confirm-state confirm-error">
                 <span class="confirm-icon">❌</span>
-                <h2>Lien invalide</h2>
+                <h2>Invalid link</h2>
+
+                @* Dynamic error message: may be updated with the server's response body *@
                 <p>@errorMessage</p>
+
+                @* Allow the user to navigate back and request a new confirmation link *@
                 <button class="btn-confirm-login" @onclick='() => Nav.NavigateTo("/login")'>
-                    Retour à la connexion
+                    Back to login
                 </button>
             </div>
         }
@@ -40,46 +77,74 @@
 </div>
 
 @code {
+    /// <summary>
+    /// The confirmation token extracted from the "?token=..." query parameter.
+    /// Automatically populated by Blazor's [SupplyParameterFromQuery] before
+    /// OnInitializedAsync is invoked. Null or empty when the link is incomplete.
+    /// </summary>
     [SupplyParameterFromQuery(Name = "token")]
     public string? Token { get; set; }
 
+    @* True while the confirmation API call is awaited; hides result states *@
     private bool isLoading = true;
-    private bool isSuccess = false;
-    private string errorMessage = "Ce lien de confirmation est invalide ou a expiré.";
 
+    @* Set to true when the server responds with a 2xx status *@
+    private bool isSuccess = false;
+
+    @* The error message displayed when confirmation fails.
+       Default covers the most common case (invalid or expired link);
+       updated with the server's actual message when available. *@
+    private string errorMessage = "This confirmation link is invalid or has expired.";
+
+    /// <summary>
+    /// Called once when the page is first rendered.
+    /// Validates the presence of the token, then calls the API endpoint to confirm the email.
+    /// Updates isSuccess and errorMessage based on the server's response.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
+        // If no token is present in the URL, the user navigated to the page directly
         if (string.IsNullOrWhiteSpace(Token))
         {
-            errorMessage = "Aucun token de confirmation fourni.";
+            errorMessage = "No confirmation token provided.";
             isLoading = false;
             return;
         }
 
         try
         {
+            // Call the confirmation endpoint with the URL-encoded token
             var response = await Http.GetAsync($"api/auth/confirm?token={Uri.EscapeDataString(Token)}");
+
+            // A 2xx status means the token was valid and the account is now confirmed
             isSuccess = response.IsSuccessStatusCode;
 
             if (!isSuccess)
             {
+                // Try to read a structured error message from the JSON response body
                 var body = await response.Content.ReadAsStringAsync();
                 try
                 {
+                    // Parse the JSON and look for a "message" property
                     var json = System.Text.Json.JsonDocument.Parse(body);
                     errorMessage = json.RootElement.TryGetProperty("message", out var msg)
-                        ? msg.GetString() ?? errorMessage
-                        : errorMessage;
+                        ? msg.GetString() ?? errorMessage  // use server message if not null
+                        : errorMessage;                     // fall back to the default message
                 }
-                catch { }
+                catch
+                {
+                    // The body was not valid JSON; keep the default error message
+                }
             }
         }
         catch
         {
-            errorMessage = "Impossible de contacter le serveur. Réessayez plus tard.";
+            // HttpRequestException or other transport-level error
+            errorMessage = "Unable to reach the server. Please try again later.";
         }
         finally
         {
+            // Always hide the loading state when the operation completes (success or failure)
             isLoading = false;
         }
     }
