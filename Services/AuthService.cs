@@ -2,160 +2,127 @@ using Blazored.LocalStorage;
 
 namespace Obrigenie.Services
 {
-    /// <summary>
-    /// Manages authentication state for the Blazor WebAssembly client.
-    /// Provides methods to persist and retrieve the JWT token and user email in the browser's
-    /// local storage, to check whether the user is currently logged in, and to decode the
-    /// user's role from the JWT payload without requiring a server round-trip.
-    /// This service is registered as Scoped in Program.cs and injected into pages and layouts
-    /// that need to react to authentication state.
-    /// </summary>
+    // Gère l'état d'authentification pour le client Blazor WebAssembly.
+    // Fournit des méthodes pour persister et récupérer le jeton JWT et l'adresse e-mail de l'utilisateur
+    // dans le stockage local du navigateur, pour vérifier si l'utilisateur est actuellement connecté,
+    // et pour décoder le rôle de l'utilisateur depuis la charge utile JWT sans nécessiter
+    // d'aller-retour avec le serveur.
+    // Ce service est enregistré en tant que Scoped dans Program.cs et injecté dans les pages et layouts
+    // qui doivent réagir à l'état d'authentification.
     public class AuthService
     {
-        /// <summary>
-        /// The Blazored.LocalStorage service used to read and write values in browser local storage.
-        /// Injected via constructor dependency injection.
-        /// </summary>
+        // Le service Blazored.LocalStorage utilisé pour lire et écrire des valeurs dans le stockage local du navigateur.
+        // Injecté via l'injection de dépendances par constructeur.
         private readonly ILocalStorageService _localStorage;
 
-        /// <summary>
-        /// The local storage key under which the JWT bearer token is stored.
-        /// </summary>
+        // La clé de stockage local sous laquelle le jeton Bearer JWT est stocké.
         private const string TokenKey = "jwt_token";
 
-        /// <summary>
-        /// The local storage key under which the authenticated user's email address is stored.
-        /// </summary>
+        // La clé de stockage local sous laquelle l'adresse e-mail de l'utilisateur authentifié est stockée.
         private const string EmailKey = "user_email";
 
-        /// <summary>
-        /// Initialises the service with the required local storage dependency.
-        /// </summary>
-        /// <param name="localStorage">The Blazored local storage abstraction.</param>
+        // Initialise le service avec la dépendance de stockage local requise.
         public AuthService(ILocalStorageService localStorage)
         {
             _localStorage = localStorage;
         }
 
-        /// <summary>
-        /// Persists the JWT bearer token to browser local storage so that it survives page refreshes.
-        /// Called immediately after a successful login or registration response is received.
-        /// </summary>
-        /// <param name="token">The JWT token string returned by the server.</param>
+        // Persiste le jeton Bearer JWT dans le stockage local du navigateur afin qu'il survive aux rechargements de page.
+        // Appelé immédiatement après la réception d'une réponse de connexion ou d'inscription réussie.
         public async Task SaveTokenAsync(string token)
         {
-            // Write the token as a raw string (not JSON-serialised) to keep it compact
+            // Écrire le jeton en tant que chaîne brute (non sérialisée en JSON) pour rester compact
             await _localStorage.SetItemAsStringAsync(TokenKey, token);
         }
 
-        /// <summary>
-        /// Retrieves the stored JWT bearer token from browser local storage.
-        /// Returns null if no token has been saved (i.e., the user is not logged in).
-        /// </summary>
-        /// <returns>The stored token string, or null if absent.</returns>
+        // Récupère le jeton Bearer JWT stocké depuis le stockage local du navigateur.
+        // Retourne null si aucun jeton n'a été enregistré (c'est-à-dire si l'utilisateur n'est pas connecté).
         public async Task<string?> GetTokenAsync()
         {
             return await _localStorage.GetItemAsStringAsync(TokenKey);
         }
 
-        /// <summary>
-        /// Persists the authenticated user's email address to browser local storage.
-        /// Called alongside SaveTokenAsync so the email is available for display without
-        /// requiring a separate API call.
-        /// </summary>
-        /// <param name="email">The email address of the authenticated user.</param>
+        // Persiste l'adresse e-mail de l'utilisateur authentifié dans le stockage local du navigateur.
+        // Appelé en même temps que SaveTokenAsync afin que l'e-mail soit disponible pour l'affichage
+        // sans nécessiter un appel API séparé.
         public async Task SaveEmailAsync(string email)
         {
             await _localStorage.SetItemAsStringAsync(EmailKey, email);
         }
 
-        /// <summary>
-        /// Retrieves the stored email address from browser local storage.
-        /// Returns null if the email has not been saved.
-        /// </summary>
-        /// <returns>The stored email address, or null if absent.</returns>
+        // Récupère l'adresse e-mail stockée depuis le stockage local du navigateur.
+        // Retourne null si l'e-mail n'a pas été enregistré.
         public async Task<string?> GetEmailAsync()
         {
             return await _localStorage.GetItemAsStringAsync(EmailKey);
         }
 
-        /// <summary>
-        /// Removes both the JWT token and the stored email address from local storage,
-        /// effectively logging the user out on the client side.
-        /// Called by the logout button in MainLayout and the AccessCodePage.
-        /// </summary>
+        // Supprime à la fois le jeton JWT et l'adresse e-mail stockée du stockage local,
+        // déconnectant effectivement l'utilisateur côté client.
+        // Appelé par le bouton de déconnexion dans MainLayout et la page AccessCodePage.
         public async Task RemoveTokenAsync()
         {
-            // Remove the token so IsLoggedInAsync returns false on the next check
+            // Supprimer le jeton pour que IsLoggedInAsync retourne false lors de la prochaine vérification
             await _localStorage.RemoveItemAsync(TokenKey);
-            // Also remove the cached email to avoid stale data being shown after re-login
+            // Supprimer également l'e-mail mis en cache pour éviter l'affichage de données périmées après reconnexion
             await _localStorage.RemoveItemAsync(EmailKey);
         }
 
-        /// <summary>
-        /// Checks whether the user is currently authenticated by verifying that a non-empty
-        /// JWT token exists in local storage. Does not validate the token's signature or expiry.
-        /// </summary>
-        /// <returns>True if a token is present; false otherwise.</returns>
+        // Vérifie si l'utilisateur est actuellement authentifié en contrôlant qu'un jeton JWT
+        // non vide existe dans le stockage local. Ne valide pas la signature ou l'expiration du jeton.
         public async Task<bool> IsLoggedInAsync()
         {
             var token = await GetTokenAsync();
-            // A non-null, non-empty token string is treated as proof of a logged-in session
+            // Une chaîne de jeton non nulle et non vide est considérée comme preuve d'une session connectée
             return !string.IsNullOrEmpty(token);
         }
 
-        /// <summary>
-        /// Decodes the JWT payload on the client side to extract the user's role claim.
-        /// This avoids a server round-trip for role-based UI decisions (e.g., showing the
-        /// admin panel). Note: the signature is NOT verified client-side; the server still
-        /// validates the token on every protected API call.
-        ///
-        /// The JWT format is three base64url-encoded parts separated by dots:
-        ///   header.payload.signature
-        ///
-        /// ASP.NET Core's JwtSecurityTokenHandler maps ClaimTypes.Role to the short key "role"
-        /// in the JSON payload, which is what this method reads.
-        /// </summary>
-        /// <returns>
-        /// The role string (e.g., "ADMIN", "PROF") extracted from the token,
-        /// or null if no token exists, the token is malformed, or the "role" claim is absent.
-        /// </returns>
+        // Décode la charge utile JWT côté client pour extraire la revendication de rôle de l'utilisateur.
+        // Cela évite un aller-retour serveur pour les décisions d'interface basées sur les rôles (ex. : afficher le
+        // panneau d'administration). Note : la signature n'est PAS vérifiée côté client ; le serveur
+        // valide toujours le jeton à chaque appel API protégé.
+        //
+        // Le format JWT est trois parties encodées en base64url séparées par des points :
+        //   en-tête.charge_utile.signature
+        //
+        // Le JwtSecurityTokenHandler d'ASP.NET Core mappe ClaimTypes.Role à la clé courte "role"
+        // dans la charge utile JSON, ce que cette méthode lit.
         public async Task<string?> GetRoleAsync()
         {
             var token = await GetTokenAsync();
 
-            // No token means the user is not logged in; return null immediately
+            // Pas de jeton signifie que l'utilisateur n'est pas connecté ; retourner null immédiatement
             if (string.IsNullOrEmpty(token)) return null;
 
             try
             {
-                // Split the JWT into its three dot-separated components
+                // Diviser le JWT en ses trois composants séparés par des points
                 var parts = token.Split('.');
 
-                // A valid JWT must have exactly 3 parts; anything else is malformed
+                // Un JWT valide doit avoir exactement 3 parties ; sinon il est malformé
                 if (parts.Length != 3) return null;
 
-                // The second part (index 1) is the Base64url-encoded JSON payload
+                // La deuxième partie (index 1) est la charge utile JSON encodée en Base64url
                 var payload = parts[1];
 
-                // Base64url uses '-' and '_' instead of '+' and '/'; padding '=' may be stripped.
-                // Re-add the required '=' padding so Convert.FromBase64String can decode it.
+                // Base64url utilise '-' et '_' à la place de '+' et '/' ; le rembourrage '=' peut être supprimé.
+                // Rajouter le rembourrage '=' requis pour que Convert.FromBase64String puisse le décoder.
                 payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
 
-                // Decode the base64 bytes and interpret them as UTF-8 JSON
+                // Décoder les octets base64 et les interpréter comme du JSON UTF-8
                 var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(payload));
 
-                // Parse the JSON and look for the "role" property
+                // Analyser le JSON et rechercher la propriété "role"
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
 
-                // ASP.NET Core JwtSecurityTokenHandler maps ClaimTypes.Role to the key "role"
+                // Le JwtSecurityTokenHandler d'ASP.NET Core mappe ClaimTypes.Role à la clé "role"
                 if (doc.RootElement.TryGetProperty("role", out var role))
                     return role.GetString();
             }
             catch
             {
-                // Any decoding or parsing error (invalid base64, malformed JSON, etc.) is
-                // silently swallowed; the method returns null to indicate an unknown role.
+                // Toute erreur de décodage ou d'analyse (base64 invalide, JSON malformé, etc.) est
+                // silencieusement ignorée ; la méthode retourne null pour indiquer un rôle inconnu.
             }
 
             return null;

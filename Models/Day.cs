@@ -1,76 +1,56 @@
 namespace Obrigenie.Models
 {
-    /// <summary>
-    /// Represents a single calendar day with all data needed to render it in any view mode.
-    /// Instances are created by Index.razor's helper methods and populated with courses and notes
-    /// fetched from the API.
-    /// </summary>
+    // Représente un seul jour du calendrier avec toutes les données nécessaires pour le rendre dans n'importe quel mode d'affichage.
+    // Les instances sont créées par les méthodes d'aide d'Index.razor et renseignées avec les cours et les notes
+    // récupérés depuis l'API.
     public class Day
     {
-        /// <summary>
-        /// The exact date this object represents.
-        /// </summary>
+        // La date exacte que cet objet représente.
         public DateTime Date { get; set; }
 
-        /// <summary>
-        /// The localised name of the day of the week (e.g., "lundi", "mardi") formatted in French.
-        /// Used as a header label in the single-day view.
-        /// </summary>
+        // Le nom localisé du jour de la semaine (ex. : "lundi", "mardi") formaté en français.
+        // Utilisé comme étiquette d'en-tête dans la vue d'un seul jour.
         public string DayOfWeek { get; set; } = string.Empty;
 
-        /// <summary>
-        /// The day-of-month number as a string (e.g., "1", "15", "31").
-        /// Displayed in the top-left corner of each day cell in grid views.
-        /// </summary>
+        // Le numéro du jour du mois sous forme de chaîne (ex. : "1", "15", "31").
+        // Affiché dans le coin supérieur gauche de chaque cellule de jour dans les vues en grille.
         public string DayOfMonth { get; set; } = string.Empty;
 
-        /// <summary>
-        /// True when this day falls within a school holiday period (excluding "Rentrée" markers).
-        /// Holiday days are rendered with a distinct CSS class to visually differentiate them.
-        /// </summary>
+        // Vrai lorsque ce jour tombe pendant une période de congé scolaire (excluant les marqueurs "Rentrée").
+        // Les jours de congé sont rendus avec une classe CSS distincte pour les différencier visuellement.
         public bool IsHoliday { get; set; }
 
-        /// <summary>
-        /// The full name of the holiday that covers this day (e.g., "Conge d'automne (Toussaint)").
-        /// Empty string when the day is not a holiday.
-        /// Used as the source for the ShortHolidayName computed property.
-        /// </summary>
+        // Le nom complet du congé qui couvre ce jour (ex. : "Conge d'automne (Toussaint)").
+        // Chaîne vide lorsque le jour n'est pas un jour de congé.
+        // Utilisé comme source pour la propriété calculée ShortHolidayName.
         public string HolidayName { get; set; } = string.Empty;
 
-        /// <summary>
-        /// True when this day coincides with the school "Rentrée" (back-to-school) marker.
-        /// Such days receive a special CSS class to distinguish them from regular holiday days,
-        /// since the Rentrée entry overlaps with the end of summer holidays in the data.
-        /// </summary>
+        // Vrai lorsque ce jour coïncide avec le marqueur de "Rentrée" scolaire.
+        // Ces jours reçoivent une classe CSS spéciale pour les distinguer des jours de congé ordinaires,
+        // car l'entrée Rentrée chevauche la fin des vacances d'été dans les données.
         public bool IsSchoolStart { get; set; }
 
-        /// <summary>
-        /// The list of courses scheduled for this day, loaded from the API.
-        /// Populated asynchronously after the day model is created.
-        /// </summary>
+        // La liste des cours programmés pour ce jour, chargée depuis l'API.
+        // Renseignée de manière asynchrone après la création du modèle de jour.
         public List<Course> Courses { get; set; } = new();
 
-        /// <summary>
-        /// The list of notes written by the user for this day, loaded from the API.
-        /// Populated asynchronously either per-day or in a batch range request.
-        /// </summary>
+        // La liste des notes écrites par l'utilisateur pour ce jour, chargée depuis l'API.
+        // Renseignée de manière asynchrone, soit par jour soit dans une requête de plage groupée.
         public List<Note> Notes { get; set; } = new();
 
-        /// <summary>
-        /// Returns a short, human-readable version of the holiday name for display inside
-        /// the compact day cells of the week and month grid views.
-        /// Performs a series of string replacements to shorten long official holiday names
-        /// (e.g., "Vacances de printemps (Paques)" → "Paques").
-        /// Returns an empty string when the day has no holiday name.
-        /// </summary>
+        // Retourne une version courte et lisible du nom du congé pour l'affichage dans
+        // les cellules de jour compactes des vues en grille semaine et mois.
+        // Effectue une série de remplacements de chaînes pour raccourcir les noms officiels longs
+        // (ex. : "Vacances de printemps (Paques)" → "Paques").
+        // Retourne une chaîne vide lorsque le jour n'a pas de nom de congé.
         public string ShortHolidayName
         {
             get
             {
-                // Return empty string immediately when there is no holiday name to shorten
+                // Retourner une chaîne vide immédiatement lorsqu'il n'y a pas de nom de congé à raccourcir
                 if (string.IsNullOrEmpty(HolidayName)) return string.Empty;
 
-                // Apply a chain of replacements from longest/most-specific to shortest/generic
+                // Appliquer une chaîne de remplacements du plus long/spécifique au plus court/générique
                 return HolidayName
                     .Replace("Vacances d'hiver (Noel)",          "Noel")
                     .Replace("Vacances d'hiver",                  "Hiver")
