@@ -1,4 +1,5 @@
 using Obrigenie.Models;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 
@@ -26,12 +27,20 @@ namespace Obrigenie.Services
         private readonly HttpClient _httpClient;
 
         /// <summary>
-        /// Initialises the service with the HTTP client provided by dependency injection.
+        /// Provides direct access to the stored JWT token for endpoints that need
+        /// the Bearer header added manually (belt-and-suspenders alongside AuthHeaderHandler).
+        /// </summary>
+        private readonly AuthService _auth;
+
+        /// <summary>
+        /// Initialises the service with the HTTP client and auth service provided by DI.
         /// </summary>
         /// <param name="httpClient">The HTTP client used for all API calls.</param>
-        public ApiService(HttpClient httpClient)
+        /// <param name="auth">The auth service used to read the JWT token from localStorage.</param>
+        public ApiService(HttpClient httpClient, AuthService auth)
         {
             _httpClient = httpClient;
+            _auth = auth;
         }
 
         // ──────────────────────────────────────────────────────────────────
@@ -474,6 +483,23 @@ namespace Obrigenie.Services
         // ──────────────────────────────────────────────────────────────────
 
         /// <summary>
+        /// Builds an HttpRequestMessage with the Authorization Bearer header set from localStorage.
+        /// Used by ref endpoints as a fallback to ensure the token is always attached,
+        /// regardless of whether AuthHeaderHandler has already populated the header.
+        /// </summary>
+        /// <param name="method">The HTTP method (GET, POST, etc.)</param>
+        /// <param name="url">The relative URL of the API endpoint.</param>
+        private async Task<HttpRequestMessage> BuildAuthRequest(HttpMethod method, string url)
+        {
+            var request = new HttpRequestMessage(method, url);
+            // Read the stored JWT token and attach it as a Bearer Authorization header
+            var token = await _auth.GetTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            return request;
+        }
+
+        /// <summary>
         /// Retrieves the master list of all courses (cours) available in the reference database.
         /// Used to populate the first dropdown in the cascading-selection test page.
         /// Endpoint: GET api/ref/cours
@@ -482,8 +508,10 @@ namespace Obrigenie.Services
         /// <returns>A list of <see cref="CoursDto"/> items.</returns>
         public async Task<List<CoursDto>> GetCoursAsync()
         {
-            // Throws on non-2xx so callers can display the real error (404 = endpoint missing, 401 = auth)
-            var response = await _httpClient.GetAsync("api/ref/cours");
+            // Build the request with the Bearer token attached manually for reliability
+            var request = await BuildAuthRequest(HttpMethod.Get, "api/ref/cours");
+            var response = await _httpClient.SendAsync(request);
+            // Throws on non-2xx so the caller can surface the real error (401 = auth, 404 = not deployed)
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadFromJsonAsync<List<CoursDto>>() ?? new();
         }
@@ -498,7 +526,8 @@ namespace Obrigenie.Services
         /// <returns>A list of <see cref="NiveauDto"/> items.</returns>
         public async Task<List<NiveauDto>> GetNiveauxAsync(string codeCours)
         {
-            var response = await _httpClient.GetAsync($"api/ref/niveaux/{codeCours}");
+            var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/niveaux/{codeCours}");
+            var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadFromJsonAsync<List<NiveauDto>>() ?? new();
         }
@@ -514,7 +543,8 @@ namespace Obrigenie.Services
         /// <returns>A list of <see cref="DomaineDto"/> items.</returns>
         public async Task<List<DomaineDto>> GetDomainesAsync(string codeCours, string codeNiveau)
         {
-            var response = await _httpClient.GetAsync($"api/ref/domaines/{codeCours}/{codeNiveau}");
+            var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/domaines/{codeCours}/{codeNiveau}");
+            var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadFromJsonAsync<List<DomaineDto>>() ?? new();
         }

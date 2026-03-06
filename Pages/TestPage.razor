@@ -36,6 +36,10 @@
 {
     <div class="alert alert-danger m-3">
         <strong>API error:</strong> @loadError
+        <br/>
+        <small>
+            Token present: @(tokenDebug != null ? $"yes ({tokenDebug})" : "NO — not logged in?")
+        </small>
     </div>
 }
 else
@@ -156,6 +160,9 @@ else
     @* Holds the error message from the last failed API call; null when everything is OK *@
     private string? loadError;
 
+    @* First 20 chars of the stored JWT token, used to confirm the token is present in localStorage *@
+    private string? tokenDebug;
+
     /// <summary>
     /// Lifecycle method called on first render.
     /// Decodes the user's role; if ADMIN, loads the course list from the API.
@@ -169,6 +176,10 @@ else
         // Load the first-level reference data (courses) only when the user is authorised
         if (isAdmin)
         {
+            // Read and show the first 20 chars of the token so the error banner can confirm it's present
+            var token = await Auth.GetTokenAsync();
+            tokenDebug = string.IsNullOrEmpty(token) ? null : token[..Math.Min(20, token.Length)] + "…";
+
             try
             {
                 listeCours = await Api.GetCoursAsync();
