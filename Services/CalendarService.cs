@@ -5,135 +5,113 @@ using System.Text.Json;
 
 namespace Obrigenie.Services
 {
-    /// <summary>
-    /// Responsible for fetching, caching, and providing school-year calendar data
-    /// (holiday periods and the back-to-school date) to the rest of the application.
-    ///
-    /// Data flow:
-    ///   1. Attempt to fetch the current calendar from the API endpoint "api/values".
-    ///   2. If the API is reachable, cache the raw JSON in browser local storage.
-    ///   3. If the API is unreachable, attempt to serve the data from the local cache.
-    ///   4. If neither source is available, generate a hard-coded offline fallback calendar.
-    ///
-    /// This service is registered as Scoped in Program.cs.
-    /// </summary>
+    // Responsable de la récupération, de la mise en cache et de la fourniture
+    // des données du calendrier scolaire (périodes de congé et date de rentrée)
+    // au reste de l'application.
+    //
+    // Flux de données :
+    //   1. Tenter de récupérer le calendrier courant depuis le point d'API "api/values".
+    //   2. Si l'API est accessible, mettre en cache le JSON brut dans le stockage local du navigateur.
+    //   3. Si l'API est inaccessible, tenter de servir les données depuis le cache local.
+    //   4. Si aucune source n'est disponible, générer un calendrier hors-ligne codé en dur.
+    //
+    // Ce service est enregistré en tant que Scoped dans Program.cs.
     public class CalendarService
     {
-        /// <summary>
-        /// The HTTP client pre-configured with the API base address and the auth header handler.
-        /// Used to call "api/values" to retrieve school-year event data.
-        /// </summary>
+        // Le client HTTP préconfiguré avec l'adresse de base de l'API et le gestionnaire d'en-tête d'authentification.
+        // Utilisé pour appeler "api/values" et récupérer les données d'événements de l'année scolaire.
         private readonly HttpClient _httpClient;
 
-        /// <summary>
-        /// The Blazored local storage service used to cache the raw API response JSON
-        /// so calendar data is available when the server cannot be reached.
-        /// </summary>
+        // Le service de stockage local Blazored utilisé pour mettre en cache le JSON brut de la réponse API
+        // afin que les données du calendrier soient disponibles lorsque le serveur est inaccessible.
         private readonly ILocalStorageService _localStorage;
 
-        /// <summary>
-        /// The key used to store and retrieve the serialised calendar JSON in local storage.
-        /// </summary>
+        // La clé utilisée pour stocker et récupérer le JSON du calendrier sérialisé dans le stockage local.
         private const string CacheKey = "CachedCalendarData";
 
-        /// <summary>
-        /// Initialises the service with its HTTP and local storage dependencies.
-        /// </summary>
-        /// <param name="httpClient">The HTTP client for API calls.</param>
-        /// <param name="localStorage">The local storage service for caching.</param>
+        // Initialise le service avec ses dépendances HTTP et de stockage local.
         public CalendarService(HttpClient httpClient, ILocalStorageService localStorage)
         {
             _httpClient = httpClient;
             _localStorage = localStorage;
         }
 
-        /// <summary>
-        /// Returns the school-year calendar, following the three-tier strategy:
-        /// live API → local storage cache → hard-coded offline fallback.
-        /// The result is always a fully populated <see cref="SchoolYearCalendar"/> instance.
-        /// </summary>
-        /// <returns>
-        /// A <see cref="SchoolYearCalendar"/> containing the school-year start date
-        /// and the full list of holiday periods.
-        /// </returns>
+        // Retourne le calendrier scolaire en suivant la stratégie à trois niveaux :
+        // API en direct → cache du stockage local → solution de repli hors-ligne codée en dur.
+        // Le résultat est toujours une instance SchoolYearCalendar entièrement renseignée.
         public async Task<SchoolYearCalendar> GetCalendarData()
         {
             try
             {
-                // Attempt to fetch live data from the server API
+                // Tentative de récupération des données en direct depuis l'API du serveur
                 var apiData = await _httpClient.GetFromJsonAsync<List<ApiCalendrierDto>>("api/values");
 
                 if (apiData != null && apiData.Count > 0)
                 {
-                    // Serialise the raw API response and persist it to local storage for offline use
+                    // Sérialiser la réponse brute de l'API et la conserver dans le stockage local pour une utilisation hors-ligne
                     await _localStorage.SetItemAsStringAsync(CacheKey, JsonSerializer.Serialize(apiData));
 
-                    // Convert the raw DTO list to the application model and return it
+                    // Convertir la liste de DTO brute en modèle applicatif et la retourner
                     return ConvertApiDataToModel(apiData);
                 }
             }
             catch (Exception ex)
             {
-                // The API may be unreachable (e.g., no network). Log and fall through to the cache.
+                // L'API peut être inaccessible (ex. : pas de réseau). Journaliser et passer au cache.
                 Console.WriteLine($"[INFO] API unreachable ({ex.Message}). Attempting to read from cache...");
             }
 
             try
             {
-                // Attempt to read previously cached calendar data from local storage
+                // Tentative de lecture des données du calendrier précédemment mises en cache dans le stockage local
                 var cachedJson = await _localStorage.GetItemAsStringAsync(CacheKey);
 
                 if (!string.IsNullOrEmpty(cachedJson))
                 {
-                    // Deserialise the cached JSON back to the DTO list
+                    // Désérialiser le JSON mis en cache vers la liste de DTO
                     var cachedData = JsonSerializer.Deserialize<List<ApiCalendrierDto>>(cachedJson);
 
                     if (cachedData != null && cachedData.Count > 0)
                     {
-                        // Convert cached data to the application model and return it
+                        // Convertir les données en cache en modèle applicatif et les retourner
                         return ConvertApiDataToModel(cachedData);
                     }
                 }
             }
             catch
             {
-                // Silently ignore cache read or deserialisation errors; fall through to offline mode
+                // Ignorer silencieusement les erreurs de lecture du cache ou de désérialisation ; passer en mode hors-ligne
             }
 
-            // Last resort: generate a static offline calendar with hard-coded Belgian school dates
+            // Dernier recours : générer un calendrier statique hors-ligne avec des dates scolaires belges codées en dur
             return GenerateOfflineCalendar();
         }
 
-        /// <summary>
-        /// Converts a list of raw API calendar DTOs into the application's
-        /// <see cref="SchoolYearCalendar"/> model.
-        /// During conversion:
-        ///   - The "Rentrée" event for the current school year is used to set SchoolYearStart.
-        ///   - Rentrée markers are injected for the current and following years if missing.
-        /// </summary>
-        /// <param name="apiData">The raw list of event DTOs received from or cached from the API.</param>
-        /// <returns>A fully populated <see cref="SchoolYearCalendar"/> instance.</returns>
+        // Convertit une liste de DTO bruts du calendrier API en modèle SchoolYearCalendar de l'application.
+        // Lors de la conversion :
+        //   - L'événement "Rentrée" de l'année scolaire courante est utilisé pour définir SchoolYearStart.
+        //   - Des marqueurs de Rentrée sont injectés pour l'année courante et la suivante s'ils sont absents.
         private SchoolYearCalendar ConvertApiDataToModel(List<ApiCalendrierDto> apiData)
         {
             var allHolidays = new List<Holiday>();
             DateTime schoolYearStart = DateTime.MinValue;
 
-            // Determine the "YYYY-YYYY" string for the current school year (e.g., "2024-2025")
+            // Déterminer la chaîne "AAAA-AAAA" pour l'année scolaire courante (ex. : "2024-2025")
             string currentSchoolYearStr = GetCurrentSchoolYearString();
 
             foreach (var item in apiData)
             {
-                // Find the Rentrée entry for the current school year to use as the year start anchor
+                // Trouver l'entrée Rentrée de l'année scolaire courante pour l'utiliser comme ancre de début d'année
                 if (schoolYearStart == DateTime.MinValue &&
                     item.nomEvenement != null &&
                     item.nomEvenement.Contains("Rentree") &&
                     item.anneeScolaire == currentSchoolYearStr)
                 {
-                    // Convert DateOnly to DateTime (midnight) for consistent comparisons
+                    // Convertir DateOnly en DateTime (minuit) pour des comparaisons cohérentes
                     schoolYearStart = item.dateDebut.ToDateTime(TimeOnly.MinValue);
                 }
 
-                // Add every event (holiday or Rentrée) to the holidays list
+                // Ajouter chaque événement (congé ou Rentrée) à la liste des vacances
                 allHolidays.Add(new Holiday
                 {
                     Name      = item.nomEvenement ?? "Conge",
@@ -142,38 +120,35 @@ namespace Obrigenie.Services
                 });
             }
 
-            // If no Rentrée was found in the API data, use the default date (Aug 26)
+            // Si aucune Rentrée n'a été trouvée dans les données API, utiliser la date par défaut (26 août)
             if (schoolYearStart == DateTime.MinValue)
                 schoolYearStart = GetDefaultRentreeDate(DateTime.Today.Year);
 
-            // Ensure Rentrée markers exist for both the current and the following school year
+            // S'assurer que des marqueurs de Rentrée existent pour l'année scolaire courante et la suivante
             EnsureSchoolStartExists(allHolidays, GetDefaultRentreeDate(schoolYearStart.Year));
             EnsureSchoolStartExists(allHolidays, GetDefaultRentreeDate(schoolYearStart.Year + 1));
 
             return new SchoolYearCalendar { SchoolYearStart = schoolYearStart, Holidays = allHolidays };
         }
 
-        /// <summary>
-        /// Generates a minimal offline calendar using hard-coded Belgian school holiday dates
-        /// when both the API and the local storage cache are unavailable.
-        /// Covers the current and the following school year so that navigation still works.
-        /// </summary>
-        /// <returns>A <see cref="SchoolYearCalendar"/> built from static fallback holiday data.</returns>
+        // Génère un calendrier hors-ligne minimal en utilisant des dates de vacances scolaires belges codées en dur
+        // lorsque l'API et le cache du stockage local sont tous deux indisponibles.
+        // Couvre l'année scolaire courante et la suivante pour que la navigation fonctionne toujours.
         private SchoolYearCalendar GenerateOfflineCalendar()
         {
-            // Determine the start and end years of the current school year
+            // Déterminer les années de début et de fin de l'année scolaire courante
             var (startYear, endYear) = GetCurrentSchoolYear();
 
             var holidays = new List<Holiday>();
 
-            // Add fallback holidays for the current school year (e.g., 2024-2025)
+            // Ajouter les congés de repli pour l'année scolaire courante (ex. : 2024-2025)
             holidays.AddRange(GetFallbackHolidays(startYear, endYear));
 
-            // Add fallback holidays for the following school year (e.g., 2025-2026)
-            // so that the calendar still works when browsing into the next year
+            // Ajouter les congés de repli pour l'année scolaire suivante (ex. : 2025-2026)
+            // afin que le calendrier fonctionne encore lors de la navigation vers l'année suivante
             holidays.AddRange(GetFallbackHolidays(startYear + 1, endYear + 1));
 
-            // Determine the back-to-school date and ensure Rentrée markers are present
+            // Déterminer la date de rentrée et s'assurer que les marqueurs de Rentrée sont présents
             DateTime rentreeCurrent = GetDefaultRentreeDate(startYear);
             EnsureSchoolStartExists(holidays, rentreeCurrent);
 
@@ -183,114 +158,86 @@ namespace Obrigenie.Services
             return new SchoolYearCalendar { SchoolYearStart = rentreeCurrent, Holidays = holidays };
         }
 
-        /// <summary>
-        /// Adds a synthetic "Rentree scolaire" marker to the holiday list if no such entry
-        /// already exists for the given date.
-        /// This guarantees that SchoolPeriodHelper always finds a Rentrée anchor when computing
-        /// period boundaries, even when the API data is incomplete.
-        /// </summary>
-        /// <param name="holidays">The holiday list to check and potentially modify.</param>
-        /// <param name="rentreeDate">The expected Rentrée date to ensure exists.</param>
+        // Ajoute un marqueur synthétique "Rentree scolaire" à la liste des congés si aucune entrée de ce type
+        // n'existe déjà pour la date donnée.
+        // Cela garantit que SchoolPeriodHelper trouve toujours une ancre de Rentrée lors du calcul
+        // des limites de période, même lorsque les données de l'API sont incomplètes.
         private void EnsureSchoolStartExists(List<Holiday> holidays, DateTime rentreeDate)
         {
-            // Only add a synthetic Rentrée entry if none already exists for this exact date
+            // Ajouter une entrée Rentrée synthétique uniquement si aucune n'existe déjà pour cette date exacte
             if (!holidays.Any(h => h.Name.Contains("Rentree") && h.StartDate == rentreeDate))
             {
                 holidays.Add(new Holiday
                 {
                     Name      = "Rentree scolaire",
                     StartDate = rentreeDate,
-                    EndDate   = rentreeDate  // Rentrée is a single-day marker
+                    EndDate   = rentreeDate  // La Rentrée est un marqueur d'un seul jour
                 });
             }
         }
 
-        /// <summary>
-        /// Returns the default back-to-school date for a given year.
-        /// Defaults to August 26 of the provided year, which is typically
-        /// the earliest possible Rentrée date in the Belgian school calendar.
-        /// </summary>
-        /// <param name="year">The year in which the school year begins (e.g., 2024).</param>
-        /// <returns>August 26 of the given year.</returns>
+        // Retourne la date de rentrée par défaut pour une année donnée.
+        // Par défaut le 26 août de l'année fournie, qui est généralement
+        // la date de Rentrée la plus précoce possible dans le calendrier scolaire belge.
         private DateTime GetDefaultRentreeDate(int year) => new DateTime(year, 8, 26);
 
-        /// <summary>
-        /// Determines the start and end years of the current school year based on today's date.
-        /// In Belgium, the school year runs from September to June:
-        ///   - If today is in August or later, the school year started this calendar year.
-        ///   - Otherwise, the school year started the previous calendar year.
-        /// </summary>
-        /// <returns>
-        /// A tuple (startYear, endYear) where startYear is the September start year
-        /// and endYear is the June end year.
-        /// </returns>
+        // Détermine les années de début et de fin de l'année scolaire courante en fonction de la date du jour.
+        // En Belgique, l'année scolaire va de septembre à juin :
+        //   - Si aujourd'hui est en août ou après, l'année scolaire a commencé cette année civile.
+        //   - Sinon, l'année scolaire a commencé l'année civile précédente.
         private (int startYear, int endYear) GetCurrentSchoolYear()
         {
             var today = DateTime.Today;
 
-            // School year starts in August (or September), so months 8-12 belong to the new year
+            // L'année scolaire commence en août (ou septembre), donc les mois 8-12 appartiennent à la nouvelle année
             if (today.Month >= 8) return (today.Year, today.Year + 1);
 
-            // Months 1-7 belong to a school year that started last calendar year
+            // Les mois 1-7 appartiennent à une année scolaire qui a commencé l'année civile précédente
             return (today.Year - 1, today.Year);
         }
 
-        /// <summary>
-        /// Returns the school-year identifier string in "YYYY-YYYY" format
-        /// (e.g., "2024-2025") for the current school year.
-        /// This string matches the "anneeScolaire" field in the API response DTOs.
-        /// </summary>
-        /// <returns>The school year string for the current year.</returns>
+        // Retourne la chaîne d'identifiant de l'année scolaire au format "AAAA-AAAA"
+        // (ex. : "2024-2025") pour l'année scolaire courante.
+        // Cette chaîne correspond au champ "anneeScolaire" dans les DTO de réponse de l'API.
         private string GetCurrentSchoolYearString()
         {
             var (start, end) = GetCurrentSchoolYear();
             return $"{start}-{end}";
         }
 
-        /// <summary>
-        /// Returns a hard-coded list of typical Belgian school holiday periods
-        /// for a school year spanning the given start and end calendar years.
-        /// Used only when neither the API nor the local cache is available.
-        /// </summary>
-        /// <param name="startYear">The calendar year in which the school year begins (e.g., 2024).</param>
-        /// <param name="endYear">The calendar year in which the school year ends (e.g., 2025).</param>
-        /// <returns>A list of five standard Belgian school holiday periods.</returns>
+        // Retourne une liste codée en dur des périodes de vacances scolaires belges typiques
+        // pour une année scolaire couvrant les années civiles de début et de fin données.
+        // Utilisé uniquement lorsque ni l'API ni le cache local ne sont disponibles.
         private List<Holiday> GetFallbackHolidays(int startYear, int endYear)
         {
             return new List<Holiday>
             {
-                // Autumn break (Toussaint) — late October to early November
+                // Congé d'automne (Toussaint) — fin octobre à début novembre
                 new() { Name = "Conge d'automne (Toussaint)",       StartDate = new DateTime(startYear, 10, 20), EndDate = new DateTime(startYear, 11, 3) },
 
-                // Winter break (Christmas) — late December to early January
+                // Vacances d'hiver (Noël) — fin décembre à début janvier
                 new() { Name = "Vacances d'hiver (Noel)",           StartDate = new DateTime(startYear, 12, 23), EndDate = new DateTime(endYear, 1, 4) },
 
-                // Carnival break (spring relaxation) — mid February to early March
+                // Congé de détente (Carnaval) — mi-février à début mars
                 new() { Name = "Conge de detente (Carnaval)",       StartDate = new DateTime(endYear, 2, 16),   EndDate = new DateTime(endYear, 3, 1) },
 
-                // Spring break (Easter) — early to mid April
+                // Vacances de printemps (Pâques) — début à mi-avril
                 new() { Name = "Vacances de printemps (Paques)",    StartDate = new DateTime(endYear, 4, 6),    EndDate = new DateTime(endYear, 4, 19) },
 
-                // Summer holidays — early July to late August
+                // Vacances d'été — début juillet à fin août
                 new() { Name = "Vacances d'ete",                    StartDate = new DateTime(endYear, 7, 5),    EndDate = new DateTime(endYear, 8, 25) },
             };
         }
     }
 
-    /// <summary>
-    /// A static helper class that provides methods for computing school-period boundaries
-    /// and generating human-readable period labels based on a list of holiday periods.
-    /// Used by Index.razor to determine the date range for the "Trimestre" view and to
-    /// display the navigation strip label (e.g., "Toussaint → Noël") above the calendar.
-    /// </summary>
+    // Classe d'aide statique qui fournit des méthodes pour calculer les limites des périodes scolaires
+    // et générer des étiquettes de période lisibles à partir d'une liste de périodes de vacances.
+    // Utilisée par Index.razor pour déterminer la plage de dates de la vue "Trimestre" et pour
+    // afficher l'étiquette de la barre de navigation (ex. : "Toussaint → Noël") au-dessus du calendrier.
     public static class SchoolPeriodHelper
     {
-        /// <summary>
-        /// Maps a full holiday name to a short display label suitable for the period navigation strip.
-        /// Falls back to the original name when no specific match is found.
-        /// </summary>
-        /// <param name="holidayName">The full holiday name stored in the Holiday.Name property.</param>
-        /// <returns>A short display name (e.g., "Toussaint", "Noël", "Été").</returns>
+        // Associe un nom complet de congé à une étiquette d'affichage courte adaptée à la barre de navigation des périodes.
+        // Retourne le nom original lorsqu'aucune correspondance spécifique n'est trouvée.
         private static string GetShortName(string holidayName)
         {
             if (holidayName.Contains("Toussaint") || holidayName.Contains("automne"))                                     return "Toussaint";
@@ -300,67 +247,55 @@ namespace Obrigenie.Services
             if (holidayName.Contains("ete") || holidayName.Contains("été") || holidayName.Contains("Ete") || holidayName.Contains("Été")) return "Été";
             if (holidayName.Contains("Rentree") || holidayName.Contains("Rentrée"))                                       return "Rentrée";
 
-            // No specific match found: return the original name as-is
+            // Aucune correspondance spécifique trouvée : retourner le nom original tel quel
             return holidayName;
         }
 
-        /// <summary>
-        /// Computes the start date, end date, and title string for the school period that
-        /// contains the given date.
-        ///
-        /// A "school period" (trimester) is the segment of school days between two consecutive
-        /// holiday breaks. For example, the period between Toussaint and Noël.
-        ///
-        /// If the given date falls inside a holiday, the function moves back to the day before
-        /// that holiday begins, so it lands in the preceding school period instead.
-        ///
-        /// If the API provides a "Rentrée" entry immediately after the previous holiday,
-        /// that exact date is used as the period start (instead of the day after the holiday ends).
-        /// </summary>
-        /// <param name="date">The reference date used to determine which period to display.</param>
-        /// <param name="holidays">
-        /// The complete list of holidays (including Rentrée markers) for all school years.
-        /// </param>
-        /// <returns>
-        /// A tuple containing:
-        ///   start  — the first day of the school period (inclusive),
-        ///   end    — the last day of the school period (inclusive),
-        ///   title  — a human-readable label such as "Toussaint → Noël".
-        /// </returns>
+        // Calcule la date de début, la date de fin et la chaîne de titre de la période scolaire qui
+        // contient la date donnée.
+        //
+        // Une "période scolaire" (trimestre) est le segment de jours d'école entre deux congés consécutifs.
+        // Par exemple, la période entre Toussaint et Noël.
+        //
+        // Si la date donnée tombe pendant un congé, la fonction recule jusqu'au jour précédant
+        // le début de ce congé, pour atterrir dans la période scolaire précédente.
+        //
+        // Si l'API fournit une entrée "Rentrée" immédiatement après le congé précédent,
+        // cette date exacte est utilisée comme début de période (au lieu du lendemain de la fin du congé).
         public static (DateTime start, DateTime end, string title) GetPeriodBounds(
             DateTime date,
             List<Holiday> holidays)
         {
-            // Work only with real holiday breaks; Rentrée markers are handled separately below
+            // Ne travailler qu'avec de vraies périodes de congé ; les marqueurs de Rentrée sont traités séparément ci-dessous
             var vacations = holidays
                 .Where(h => !h.Name.Contains("Rentree") && !h.Name.Contains("Rentrée"))
                 .OrderBy(h => h.StartDate)
                 .ToList();
 
-            // If the reference date is inside a holiday, retreat to the day before it starts
-            // so the algorithm lands in the preceding (more useful) school period
+            // Si la date de référence est pendant un congé, reculer jusqu'au jour précédent son début
+            // afin que l'algorithme atterrisse dans la période scolaire précédente (plus utile)
             var inHoliday = vacations.FirstOrDefault(
                 h => date.Date >= h.StartDate.Date && date.Date <= h.EndDate.Date);
             if (inHoliday != null)
                 date = inHoliday.StartDate.AddDays(-1);
 
-            // Find the holiday that ended most recently before the (adjusted) date
+            // Trouver le congé qui s'est terminé le plus récemment avant la date (ajustée)
             var prev = vacations
                 .Where(h => h.EndDate.Date < date.Date)
                 .OrderByDescending(h => h.EndDate)
                 .FirstOrDefault();
 
-            // Find the next upcoming holiday after the (adjusted) date
+            // Trouver le prochain congé à venir après la date (ajustée)
             var next = vacations
                 .Where(h => h.StartDate.Date > date.Date)
                 .OrderBy(h => h.StartDate)
                 .FirstOrDefault();
 
-            // Default period start: the day after the previous holiday ended (or 60 days ago)
+            // Début de période par défaut : le lendemain de la fin du congé précédent (ou 60 jours en arrière)
             DateTime defaultStart = prev != null ? prev.EndDate.AddDays(1) : date.AddDays(-60);
 
-            // If there is a Rentrée marker between defaultStart and the next holiday,
-            // use its date as the precise period start
+            // S'il existe un marqueur de Rentrée entre defaultStart et le prochain congé,
+            // utiliser sa date comme début précis de la période
             var rentreeAfterPrev = holidays
                 .Where(h => (h.Name.Contains("Rentree") || h.Name.Contains("Rentrée")) &&
                             h.StartDate.Date >= defaultStart.Date &&
@@ -368,13 +303,13 @@ namespace Obrigenie.Services
                 .OrderBy(h => h.StartDate)
                 .FirstOrDefault();
 
-            // Use the Rentrée date when available; otherwise use the default start
+            // Utiliser la date de Rentrée si disponible ; sinon utiliser le début par défaut
             DateTime start = rentreeAfterPrev != null ? rentreeAfterPrev.StartDate : defaultStart;
 
-            // Period end: the day before the next holiday starts (or 60 days into the future)
+            // Fin de période : le jour précédant le début du prochain congé (ou 60 jours dans le futur)
             DateTime end = next != null ? next.StartDate.AddDays(-1) : date.AddDays(60);
 
-            // Build a human-readable title for the period (e.g., "Toussaint → Noël")
+            // Construire un titre lisible pour la période (ex. : "Toussaint → Noël")
             string prevName = prev != null ? GetShortName(prev.Name) : "Rentrée";
             string nextName = next != null ? GetShortName(next.Name) : "Fin d'année";
             string title    = $"{prevName} → {nextName}";
@@ -382,38 +317,34 @@ namespace Obrigenie.Services
             return (start, end, title);
         }
 
-        /// <summary>
-        /// Returns a short human-readable label describing the school-period context of a given date.
-        /// This label is displayed in the narrow banner below the view-mode toolbar in week/month views.
-        ///
-        /// Possible label formats:
-        ///   - "Congé de Toussaint"         (date is inside a holiday)
-        ///   - "Toussaint → Noël"           (date is between two known holidays)
-        ///   - "Rentrée → Toussaint"        (date is before the first known holiday)
-        ///   - "Après Été"                  (date is after the last known holiday)
-        ///   - null                          (no holiday data is available)
-        /// </summary>
-        /// <param name="date">The date for which to generate the label.</param>
-        /// <param name="holidays">The complete holiday list for all school years.</param>
-        /// <returns>A label string, or null when no data is available.</returns>
+        // Retourne une étiquette courte et lisible décrivant le contexte de la période scolaire d'une date donnée.
+        // Cette étiquette est affichée dans la bannière étroite sous la barre d'outils de mode d'affichage
+        // dans les vues semaine/mois.
+        //
+        // Formats d'étiquette possibles :
+        //   - "Congé de Toussaint"         (la date est pendant un congé)
+        //   - "Toussaint → Noël"           (la date est entre deux congés connus)
+        //   - "Rentrée → Toussaint"        (la date est avant le premier congé connu)
+        //   - "Après Été"                  (la date est après le dernier congé connu)
+        //   - null                          (aucune donnée de congé disponible)
         public static string? GetLabel(DateTime date, List<Holiday> holidays)
         {
-            // Return null immediately if there is no holiday data to work with
+            // Retourner null immédiatement s'il n'y a pas de données de congé avec lesquelles travailler
             if (holidays == null || holidays.Count == 0) return null;
 
-            // Work only with proper vacation periods, not Rentrée markers (which are single-day)
+            // Ne travailler qu'avec de vraies périodes de vacances, pas les marqueurs de Rentrée (qui sont sur un seul jour)
             var vacations = holidays
                 .Where(h => !h.Name.Contains("Rentree") && !h.Name.Contains("Rentrée"))
                 .OrderBy(h => h.StartDate)
                 .ToList();
 
-            // Check whether the given date falls inside an active holiday break
+            // Vérifier si la date donnée tombe pendant un congé actif
             var current = vacations.FirstOrDefault(
                 h => date.Date >= h.StartDate.Date && date.Date <= h.EndDate.Date);
             if (current != null)
                 return $"Congé de {GetShortName(current.Name)}";
 
-            // Find the most recent past holiday and the next upcoming holiday
+            // Trouver le congé passé le plus récent et le prochain congé à venir
             var prev = vacations
                 .Where(h => h.EndDate.Date < date.Date)
                 .OrderByDescending(h => h.EndDate)
@@ -424,56 +355,44 @@ namespace Obrigenie.Services
                 .OrderBy(h => h.StartDate)
                 .FirstOrDefault();
 
-            // Both a previous and a next holiday are known: show the transition arrow
+            // Un congé précédent et un congé suivant sont tous deux connus : afficher la flèche de transition
             if (prev != null && next != null)
                 return $"{GetShortName(prev.Name)} → {GetShortName(next.Name)}";
 
-            // Only a future holiday is known (date is before any vacation has occurred)
+            // Seul un congé futur est connu (la date est avant qu'une vacance se soit produite)
             if (next != null)
                 return $"Rentrée → {GetShortName(next.Name)}";
 
-            // Only a past holiday is known (date is after the last known vacation)
+            // Seul un congé passé est connu (la date est après le dernier congé connu)
             if (prev != null)
                 return $"Après {GetShortName(prev.Name)}";
 
-            // No surrounding holidays found at all
+            // Aucun congé environnant trouvé du tout
             return null;
         }
     }
 
-    /// <summary>
-    /// Raw Data Transfer Object that maps the JSON structure returned by the "api/values" endpoint.
-    /// Each instance represents one school-year event (holiday, Rentrée, etc.) as stored
-    /// in the backend database.
-    /// </summary>
+    // Objet de transfert de données brutes qui correspond à la structure JSON retournée par le point d'API "api/values".
+    // Chaque instance représente un événement de l'année scolaire (congé, Rentrée, etc.) tel que stocké
+    // dans la base de données du serveur.
     public class ApiCalendrierDto
     {
-        /// <summary>
-        /// The name of the school calendar event (e.g., "Conge d'automne (Toussaint)",
-        /// "Rentree scolaire"). Used to classify events and generate short display labels.
-        /// </summary>
+        // Le nom de l'événement du calendrier scolaire (ex. : "Conge d'automne (Toussaint)",
+        // "Rentree scolaire"). Utilisé pour classer les événements et générer des étiquettes d'affichage courtes.
         public string? nomEvenement { get; set; }
 
-        /// <summary>
-        /// The first day of the event period, stored as a DateOnly value (no time component).
-        /// </summary>
+        // Le premier jour de la période de l'événement, stocké en tant que valeur DateOnly (sans composante horaire).
         public DateOnly dateDebut { get; set; }
 
-        /// <summary>
-        /// The last day of the event period, stored as a DateOnly value (no time component).
-        /// </summary>
+        // Le dernier jour de la période de l'événement, stocké en tant que valeur DateOnly (sans composante horaire).
         public DateOnly dateFin { get; set; }
 
-        /// <summary>
-        /// The type or category of the event as returned by the API
-        /// (e.g., "CONGE", "RENTREE"). May be null.
-        /// </summary>
+        // Le type ou la catégorie de l'événement tel que retourné par l'API
+        // (ex. : "CONGE", "RENTREE"). Peut être null.
         public string? typeEvenement { get; set; }
 
-        /// <summary>
-        /// The school year to which this event belongs, in "YYYY-YYYY" format
-        /// (e.g., "2024-2025"). Used to identify the Rentrée for the current school year.
-        /// </summary>
+        // L'année scolaire à laquelle appartient cet événement, au format "AAAA-AAAA"
+        // (ex. : "2024-2025"). Utilisé pour identifier la Rentrée de l'année scolaire courante.
         public string? anneeScolaire { get; set; }
     }
 }

@@ -18,10 +18,7 @@ jobs:
 
       - name: Deploy static files
         run: |
-          sudo mkdir -p /var/www/obrigenie-web
-          sudo rm -rf /var/www/obrigenie-web/*
-          sudo cp -r ./publish/wwwroot/* /var/www/obrigenie-web/
-          sudo chown -R www-data:www-data /var/www/obrigenie-web
-          sudo systemctl restart nginx
+          rm -rf /var/www/obrigenie-web/*
+          cp -r ./publish/wwwroot/* /var/www/obrigenie-web/
           echo "Obrigenie Web deployed successfully!"
 # updatest

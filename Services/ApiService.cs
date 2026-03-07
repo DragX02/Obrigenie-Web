@@ -1,61 +1,59 @@
 using Obrigenie.Models;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 
 namespace Obrigenie.Services
 {
-    /// <summary>
-    /// The central HTTP service for the Obrigenie Blazor WebAssembly client.
-    /// Wraps all communication with the backend REST API and exposes strongly typed
-    /// methods for authentication, courses, notes, license management, the school-calendar
-    /// scraper trigger, and the cascading reference data (cours / niveaux / domaines).
-    ///
-    /// Every method handles its own exceptions and returns a safe default (null, false, or empty
-    /// list) rather than propagating exceptions to the calling component, making the UI resilient
-    /// to transient network failures.
-    ///
-    /// The underlying HttpClient is injected through the named "API" factory registered in
-    /// Program.cs. AuthHeaderHandler automatically attaches the JWT Bearer token to every request,
-    /// so this service does not need to manage authentication headers manually.
-    /// </summary>
+    // Service HTTP central pour le client Blazor WebAssembly Obrigenie.
+    // Encapsule toute la communication avec l'API REST du backend et expose des méthodes
+    // fortement typées pour l'authentification, les cours, les notes, la gestion des licences,
+    // le déclenchement du scraper du calendrier scolaire et les données de référence en cascade
+    // (cours / niveaux / domaines).
+    //
+    // Chaque méthode gère ses propres exceptions et retourne une valeur par défaut sûre (null,
+    // false ou liste vide) plutôt que de propager les exceptions au composant appelant, rendant
+    // l'interface résistante aux pannes réseau transitoires.
+    //
+    // Le HttpClient sous-jacent est injecté via la fabrique nommée "API" enregistrée dans
+    // Program.cs. AuthHeaderHandler attache automatiquement le jeton JWT Bearer à chaque requête,
+    // donc ce service n'a pas besoin de gérer les en-têtes d'authentification manuellement.
     public class ApiService
     {
-        /// <summary>
-        /// The HTTP client pre-configured with the API base address and the JWT auth handler.
-        /// </summary>
+        // Client HTTP préconfiguré avec l'adresse de base de l'API et le gestionnaire d'auth JWT.
         private readonly HttpClient _httpClient;
 
-        /// <summary>
-        /// Initialises the service with the HTTP client provided by dependency injection.
-        /// </summary>
-        /// <param name="httpClient">The HTTP client used for all API calls.</param>
-        public ApiService(HttpClient httpClient)
+        // Fournit un accès direct au jeton JWT stocké pour les endpoints qui nécessitent
+        // l'en-tête Bearer ajouté manuellement (en complément d'AuthHeaderHandler).
+        private readonly AuthService _auth;
+
+        // Initialise le service avec le client HTTP et le service d'auth fournis par l'injection de dépendances.
+        // httpClient : le client HTTP utilisé pour tous les appels API.
+        // auth : le service d'auth utilisé pour lire le jeton JWT depuis localStorage.
+        public ApiService(HttpClient httpClient, AuthService auth)
         {
             _httpClient = httpClient;
+            _auth = auth;
         }
 
         // ──────────────────────────────────────────────────────────────────
-        // AUTHENTICATION
+        // AUTHENTIFICATION
         // ──────────────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Exchanges the temporary "auth_pending" HttpOnly cookie (set by the server after a
-        /// successful OAuth redirect) for the application's JWT token and user data.
-        /// The token is never passed through the URL; this endpoint reads the cookie server-side
-        /// and returns the auth payload directly to the client.
-        /// Called by AuthCallback.razor immediately after the OAuth provider redirects back.
-        /// Endpoint: GET api/auth/exchange
-        /// </summary>
-        /// <returns>
-        /// An <see cref="AuthResponse"/> with the JWT and user details on success; null on failure.
-        /// </returns>
+        // Échange le cookie HttpOnly temporaire "auth_pending" (défini par le serveur après une
+        // redirection OAuth réussie) contre le jeton JWT et les données utilisateur de l'application.
+        // Le jeton n'est jamais transmis via l'URL ; cet endpoint lit le cookie côté serveur
+        // et retourne le payload d'auth directement au client.
+        // Appelé par AuthCallback.razor immédiatement après la redirection du fournisseur OAuth.
+        // Endpoint : GET api/auth/exchange
+        // Retourne un AuthResponse avec le JWT et les détails utilisateur en cas de succès ; null en cas d'échec.
         public async Task<AuthResponse?> ExchangeOAuthTokenAsync()
         {
             try
             {
                 var response = await _httpClient.GetAsync("api/auth/exchange");
 
-                // Return the deserialised AuthResponse on success; null on any non-success status
+                // Retourne l'AuthResponse désérialisé en cas de succès ; null pour tout statut non-succès
                 if (response.IsSuccessStatusCode)
                     return await response.Content.ReadFromJsonAsync<AuthResponse>();
 
@@ -63,42 +61,34 @@ namespace Obrigenie.Services
             }
             catch
             {
-                // Network or serialisation errors return null; the caller handles the redirect
+                // Les erreurs réseau ou de sérialisation retournent null ; l'appelant gère la redirection
                 return null;
             }
         }
 
-        /// <summary>
-        /// Sends email/password credentials to the login endpoint and returns the server's
-        /// authentication response if the credentials are valid.
-        /// Endpoint: POST api/auth/login
-        /// </summary>
-        /// <param name="loginDto">DTO containing the user's email and password.</param>
-        /// <returns>
-        /// An <see cref="AuthResponse"/> with the JWT and user details on success;
-        /// null when credentials are invalid or a network error occurs.
-        /// </returns>
+        // Envoie les identifiants email/mot de passe à l'endpoint de connexion et retourne la réponse
+        // d'authentification du serveur si les identifiants sont valides.
+        // Endpoint : POST api/auth/login
+        // loginDto : DTO contenant l'email et le mot de passe de l'utilisateur.
+        // Retourne un AuthResponse avec le JWT et les détails utilisateur en cas de succès ;
+        // null si les identifiants sont invalides ou en cas d'erreur réseau.
         public async Task<AuthResponse?> LoginAsync(LoginDto loginDto)
         {
             var response = await _httpClient.PostAsJsonAsync("api/auth/login", loginDto);
 
-            // Deserialise and return the token payload on HTTP 200; null on any other status
+            // Désérialise et retourne le payload du jeton sur HTTP 200 ; null pour tout autre statut
             if (response.IsSuccessStatusCode)
                 return await response.Content.ReadFromJsonAsync<AuthResponse>();
 
             return null;
         }
 
-        /// <summary>
-        /// Sends registration data to the server to create a new user account.
-        /// The server validates password strength and email uniqueness.
-        /// Endpoint: POST api/auth/register
-        /// </summary>
-        /// <param name="registerDto">DTO with all registration fields including password confirmation.</param>
-        /// <returns>
-        /// An <see cref="AuthResponse"/> (and JWT) for the new account on success;
-        /// null on validation error or network failure.
-        /// </returns>
+        // Envoie les données d'inscription au serveur pour créer un nouveau compte utilisateur.
+        // Le serveur valide la robustesse du mot de passe et l'unicité de l'email.
+        // Endpoint : POST api/auth/register
+        // registerDto : DTO avec tous les champs d'inscription incluant la confirmation du mot de passe.
+        // Retourne un AuthResponse (et JWT) pour le nouveau compte en cas de succès ;
+        // null en cas d'erreur de validation ou de panne réseau.
         public async Task<AuthResponse?> RegisterAsync(RegisterDto registerDto)
         {
             var response = await _httpClient.PostAsJsonAsync("api/auth/register", registerDto);
@@ -110,40 +100,36 @@ namespace Obrigenie.Services
         }
 
         // ──────────────────────────────────────────────────────────────────
-        // COURSES
+        // COURS
         // ──────────────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Retrieves the list of courses scheduled for a specific calendar date.
-        /// The server filters recurring courses by their DaysOfWeek bitmask and date range.
-        /// Endpoint: GET api/courses/date/{yyyy-MM-dd}
-        /// </summary>
-        /// <param name="date">The date for which to load courses.</param>
-        /// <returns>A list of courses for that date, or an empty list on error.</returns>
+        // Récupère la liste des cours planifiés pour une date calendaire spécifique.
+        // Le serveur filtre les cours récurrents par leur masque de bits DaysOfWeek et la plage de dates.
+        // Endpoint : GET api/courses/date/{yyyy-MM-dd}
+        // date : la date pour laquelle charger les cours.
+        // Retourne une liste de cours pour cette date, ou une liste vide en cas d'erreur.
         public async Task<List<Course>> GetCoursesForDateAsync(DateTime date)
         {
             try
             {
-                // Format the date in ISO 8601 (yyyy-MM-dd) as expected by the API route
+                // Formate la date en ISO 8601 (yyyy-MM-dd) tel qu'attendu par la route API
                 return await _httpClient.GetFromJsonAsync<List<Course>>(
                     $"api/courses/date/{date:yyyy-MM-dd}") ?? new();
             }
             catch
             {
-                // Return an empty list so the calendar renders without crashing on API errors
+                // Retourne une liste vide pour que le calendrier s'affiche sans planter en cas d'erreur API
                 return new();
             }
         }
 
-        /// <summary>
-        /// Retrieves all user notes whose date falls within the given inclusive date range.
-        /// Used by week and month views to load notes for all displayed days in a single request,
-        /// which is more efficient than one request per day.
-        /// Endpoint: GET api/notes/range?start={yyyy-MM-dd}&end={yyyy-MM-dd}
-        /// </summary>
-        /// <param name="start">The first date of the range (inclusive).</param>
-        /// <param name="end">The last date of the range (inclusive).</param>
-        /// <returns>All notes whose date is within [start, end], or an empty list on error.</returns>
+        // Récupère toutes les notes utilisateur dont la date se situe dans la plage de dates inclusive donnée.
+        // Utilisé par les vues semaine et mois pour charger les notes de tous les jours affichés en une seule
+        // requête, ce qui est plus efficace qu'une requête par jour.
+        // Endpoint : GET api/notes/range?start={yyyy-MM-dd}&end={yyyy-MM-dd}
+        // start : la première date de la plage (inclusive).
+        // end : la dernière date de la plage (inclusive).
+        // Retourne toutes les notes dont la date est dans [start, end], ou une liste vide en cas d'erreur.
         public async Task<List<Note>> GetNotesForRangeAsync(DateTime start, DateTime end)
         {
             try
@@ -157,22 +143,18 @@ namespace Obrigenie.Services
             }
         }
 
-        /// <summary>
-        /// Saves a new course or updates an existing one by posting it to the courses endpoint.
-        /// The server determines create vs. update based on the Course.Id value.
-        /// Endpoint: POST api/courses
-        /// </summary>
-        /// <param name="course">The course model to create or update.</param>
+        // Sauvegarde un nouveau cours ou met à jour un cours existant en le postant à l'endpoint des cours.
+        // Le serveur détermine création ou mise à jour selon la valeur de Course.Id.
+        // Endpoint : POST api/courses
+        // course : le modèle de cours à créer ou mettre à jour.
         public async Task SaveCourseAsync(Course course)
         {
             await _httpClient.PostAsJsonAsync("api/courses", course);
         }
 
-        /// <summary>
-        /// Permanently deletes a course by its server-assigned identifier.
-        /// Endpoint: DELETE api/courses/{id}
-        /// </summary>
-        /// <param name="id">The unique identifier of the course to delete.</param>
+        // Supprime définitivement un cours par son identifiant assigné par le serveur.
+        // Endpoint : DELETE api/courses/{id}
+        // id : l'identifiant unique du cours à supprimer.
         public async Task DeleteCourseAsync(int id)
         {
             await _httpClient.DeleteAsync($"api/courses/{id}");
@@ -182,13 +164,11 @@ namespace Obrigenie.Services
         // NOTES
         // ──────────────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Retrieves all notes for a single specific date.
-        /// Used by the single-day view when only one day's notes are needed.
-        /// Endpoint: GET api/notes/date/{yyyy-MM-dd}
-        /// </summary>
-        /// <param name="date">The date for which to load notes.</param>
-        /// <returns>All notes for that date, or an empty list on error.</returns>
+        // Récupère toutes les notes pour une seule date spécifique.
+        // Utilisé par la vue journalière lorsqu'on n'a besoin que des notes d'un seul jour.
+        // Endpoint : GET api/notes/date/{yyyy-MM-dd}
+        // date : la date pour laquelle charger les notes.
+        // Retourne toutes les notes pour cette date, ou une liste vide en cas d'erreur.
         public async Task<List<Note>> GetNotesForDateAsync(DateTime date)
         {
             try
@@ -202,16 +182,13 @@ namespace Obrigenie.Services
             }
         }
 
-        /// <summary>
-        /// Creates a new note or updates an existing one (determined by Note.Id being 0 or set).
-        /// Returns a success flag and an optional error message so the UI can show inline feedback.
-        /// Endpoint: POST api/notes
-        /// </summary>
-        /// <param name="note">The note to save. Id == 0 means a new note.</param>
-        /// <returns>
-        /// (true, null) on success;
-        /// (false, errorMessage) when the server returns a non-success status or a network error occurs.
-        /// </returns>
+        // Crée une nouvelle note ou met à jour une existante (déterminé par Note.Id valant 0 ou non).
+        // Retourne un indicateur de succès et un message d'erreur optionnel pour que l'interface
+        // puisse afficher un retour inline.
+        // Endpoint : POST api/notes
+        // note : la note à sauvegarder. Id == 0 signifie une nouvelle note.
+        // Retourne (true, null) en cas de succès ;
+        // (false, messageErreur) si le serveur retourne un statut non-succès ou en cas d'erreur réseau.
         public async Task<(bool Success, string? Error)> SaveNoteAsync(Note note)
         {
             try
@@ -220,43 +197,39 @@ namespace Obrigenie.Services
 
                 if (response.IsSuccessStatusCode) return (true, null);
 
-                // Read the raw response body to include the server's error description
+                // Lit le corps brut de la réponse pour inclure la description d'erreur du serveur
                 var body = await response.Content.ReadAsStringAsync();
                 return (false, $"Error {(int)response.StatusCode}: {body}");
             }
             catch (Exception ex)
             {
-                // Network or serialisation failure: surface the exception message
+                // Panne réseau ou de sérialisation : remonte le message de l'exception
                 return (false, ex.Message);
             }
         }
 
-        /// <summary>
-        /// Permanently deletes a note by its server-assigned identifier.
-        /// Endpoint: DELETE api/notes/{id}
-        /// </summary>
-        /// <param name="id">The unique identifier of the note to delete.</param>
+        // Supprime définitivement une note par son identifiant assigné par le serveur.
+        // Endpoint : DELETE api/notes/{id}
+        // id : l'identifiant unique de la note à supprimer.
         public async Task DeleteNoteAsync(int id)
         {
             await _httpClient.DeleteAsync($"api/notes/{id}");
         }
 
         // ──────────────────────────────────────────────────────────────────
-        // LICENSE — VALIDATION AND CHECK
+        // LICENCE — VALIDATION ET VÉRIFICATION
         // ──────────────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Submits a license access code entered by the user on the AccessCodePage for initial validation.
-        /// If valid, the code is stored in local storage and used for subsequent CheckLicenseAsync calls.
-        /// Endpoint: POST api/access/validate  (body: { code })
-        /// </summary>
-        /// <param name="code">The access code string typed by the user.</param>
-        /// <returns>True if the server accepts the code as valid; false otherwise.</returns>
+        // Soumet un code d'accès de licence saisi par l'utilisateur sur AccessCodePage pour validation initiale.
+        // Si valide, le code est stocké en localStorage et utilisé pour les appels CheckLicenseAsync suivants.
+        // Endpoint : POST api/access/validate  (body: { code })
+        // code : la chaîne de code d'accès saisie par l'utilisateur.
+        // Retourne true si le serveur accepte le code comme valide ; false sinon.
         public async Task<bool> ValidateAccessCodeAsync(string code)
         {
             try
             {
-                // Send the code as a JSON object with a single "code" property
+                // Envoie le code comme objet JSON avec une seule propriété "code"
                 var response = await _httpClient.PostAsJsonAsync("api/access/validate", new { code });
                 return response.IsSuccessStatusCode;
             }
@@ -266,14 +239,13 @@ namespace Obrigenie.Services
             }
         }
 
-        /// <summary>
-        /// Validates that a previously accepted license code is still active on the server.
-        /// Called on every app startup (in MainLayout) to enforce real-time license revocation:
-        /// if an admin revokes a license, the user is redirected to the access-code page on next load.
-        /// Endpoint: GET api/access/check?code={code}
-        /// </summary>
-        /// <param name="code">The license code stored in local storage.</param>
-        /// <returns>True if the license is still active; false when revoked or not found.</returns>
+        // Valide qu'un code de licence précédemment accepté est toujours actif sur le serveur.
+        // Appelé à chaque démarrage de l'application (dans MainLayout) pour appliquer la révocation
+        // de licence en temps réel : si un admin révoque une licence, l'utilisateur est redirigé
+        // vers la page de code d'accès au prochain chargement.
+        // Endpoint : GET api/access/check?code={code}
+        // code : le code de licence stocké en localStorage.
+        // Retourne true si la licence est toujours active ; false si révoquée ou introuvable.
         public async Task<bool> CheckLicenseAsync(string code)
         {
             try
@@ -283,7 +255,7 @@ namespace Obrigenie.Services
 
                 if (!response.IsSuccessStatusCode) return false;
 
-                // The server returns { "valid": true/false } as the response body
+                // Le serveur retourne { "valid": true/false } comme corps de réponse
                 var result = await response.Content.ReadFromJsonAsync<LicenseCheckResult>();
                 return result?.Valid == true;
             }
@@ -294,15 +266,13 @@ namespace Obrigenie.Services
         }
 
         // ──────────────────────────────────────────────────────────────────
-        // ADMIN — LICENSE MANAGEMENT
+        // ADMIN — GESTION DES LICENCES
         // ──────────────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Retrieves the full list of all license records for display in the admin page.
-        /// Only accessible to users with the ADMIN role (enforced server-side).
-        /// Endpoint: GET api/admin/licenses
-        /// </summary>
-        /// <returns>A list of all <see cref="LicenseDto"/> records, or an empty list on error.</returns>
+        // Récupère la liste complète de tous les enregistrements de licences pour affichage dans la page admin.
+        // Accessible uniquement aux utilisateurs ayant le rôle ADMIN (appliqué côté serveur).
+        // Endpoint : GET api/admin/licenses
+        // Retourne une liste de tous les enregistrements LicenseDto, ou une liste vide en cas d'erreur.
         public async Task<List<LicenseDto>> GetLicensesAsync()
         {
             try
@@ -315,18 +285,14 @@ namespace Obrigenie.Services
             }
         }
 
-        /// <summary>
-        /// Creates a new license with an optional label, expiry date, and custom code.
-        /// If no custom code is provided, the server generates one automatically.
-        /// Endpoint: POST api/admin/licenses  (body: { code, label, expiresAt })
-        /// </summary>
-        /// <param name="label">An optional human-readable label (e.g., "PROF-DUPONT").</param>
-        /// <param name="expiresAt">An optional expiry date after which the license becomes inactive.</param>
-        /// <param name="code">An optional custom code string; null lets the server auto-generate.</param>
-        /// <returns>
-        /// (LicenseDto, null) on success;
-        /// (null, errorMessage) when creation fails, including the server's error message if available.
-        /// </returns>
+        // Crée une nouvelle licence avec un libellé optionnel, une date d'expiration et un code personnalisé.
+        // Si aucun code personnalisé n'est fourni, le serveur en génère un automatiquement.
+        // Endpoint : POST api/admin/licenses  (body: { code, label, expiresAt })
+        // label : un libellé lisible optionnel (ex. : "PROF-DUPONT").
+        // expiresAt : une date d'expiration optionnelle après laquelle la licence devient inactive.
+        // code : une chaîne de code personnalisée optionnelle ; null laisse le serveur générer automatiquement.
+        // Retourne (LicenseDto, null) en cas de succès ;
+        // (null, messageErreur) si la création échoue, avec le message d'erreur du serveur si disponible.
         public async Task<(LicenseDto? License, string? Error)> CreateLicenseAsync(
             string? label, DateTime? expiresAt, string? code = null)
         {
@@ -338,7 +304,7 @@ namespace Obrigenie.Services
                 if (response.IsSuccessStatusCode)
                     return (await response.Content.ReadFromJsonAsync<LicenseDto>(), null);
 
-                // Attempt to extract the structured error message from the JSON response body
+                // Tente d'extraire le message d'erreur structuré depuis le corps JSON de la réponse
                 try
                 {
                     var err = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
@@ -347,7 +313,7 @@ namespace Obrigenie.Services
                 }
                 catch
                 {
-                    // If the body cannot be parsed as JSON, fall back to the status code
+                    // Si le corps ne peut pas être parsé en JSON, repli sur le code de statut
                     return (null, $"Error {(int)response.StatusCode}");
                 }
             }
@@ -357,17 +323,15 @@ namespace Obrigenie.Services
             }
         }
 
-        /// <summary>
-        /// Revokes an active license, preventing any user assigned to that code from accessing the app.
-        /// Endpoint: PUT api/admin/licenses/{id}/revoke  (no body)
-        /// </summary>
-        /// <param name="id">The unique identifier of the license to revoke.</param>
-        /// <returns>True if the server accepted the revocation; false on failure.</returns>
+        // Révoque une licence active, empêchant tout utilisateur assigné à ce code d'accéder à l'application.
+        // Endpoint : PUT api/admin/licenses/{id}/revoke  (sans body)
+        // id : l'identifiant unique de la licence à révoquer.
+        // Retourne true si le serveur a accepté la révocation ; false en cas d'échec.
         public async Task<bool> RevokeLicenseAsync(int id)
         {
             try
             {
-                // PUT with a null body — the route itself identifies the action and target
+                // PUT avec un body null — la route elle-même identifie l'action et la cible
                 var response = await _httpClient.PutAsync($"api/admin/licenses/{id}/revoke", null);
                 return response.IsSuccessStatusCode;
             }
@@ -377,12 +341,10 @@ namespace Obrigenie.Services
             }
         }
 
-        /// <summary>
-        /// Re-activates a previously revoked license.
-        /// Endpoint: PUT api/admin/licenses/{id}/reactivate  (no body)
-        /// </summary>
-        /// <param name="id">The unique identifier of the license to reactivate.</param>
-        /// <returns>True if the reactivation was accepted; false on failure.</returns>
+        // Réactive une licence précédemment révoquée.
+        // Endpoint : PUT api/admin/licenses/{id}/reactivate  (sans body)
+        // id : l'identifiant unique de la licence à réactiver.
+        // Retourne true si la réactivation a été acceptée ; false en cas d'échec.
         public async Task<bool> ReactivateLicenseAsync(int id)
         {
             try
@@ -396,12 +358,10 @@ namespace Obrigenie.Services
             }
         }
 
-        /// <summary>
-        /// Permanently deletes a license record from the database.
-        /// Endpoint: DELETE api/admin/licenses/{id}
-        /// </summary>
-        /// <param name="id">The unique identifier of the license to delete.</param>
-        /// <returns>True if the deletion was accepted; false on failure.</returns>
+        // Supprime définitivement un enregistrement de licence de la base de données.
+        // Endpoint : DELETE api/admin/licenses/{id}
+        // id : l'identifiant unique de la licence à supprimer.
+        // Retourne true si la suppression a été acceptée ; false en cas d'échec.
         public async Task<bool> DeleteLicenseAsync(int id)
         {
             try
@@ -416,19 +376,15 @@ namespace Obrigenie.Services
         }
 
         // ──────────────────────────────────────────────────────────────────
-        // ADMIN — SCHOOL CALENDAR SCRAPER
+        // ADMIN — SCRAPER DU CALENDRIER SCOLAIRE
         // ──────────────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Triggers the server-side scraper that fetches the latest school-year holiday dates
-        /// from the official enseignement.be website and updates the database.
-        /// This operation may take several seconds; the UI disables the button while it runs.
-        /// Endpoint: GET api/update-scolaire
-        /// </summary>
-        /// <returns>
-        /// (true, successMessage) when the scraper completes without error;
-        /// (false, errorDescription) when the scraper fails or a network error occurs.
-        /// </returns>
+        // Déclenche le scraper côté serveur qui récupère les dernières dates de vacances scolaires
+        // depuis le site officiel enseignement.be et met à jour la base de données.
+        // Cette opération peut prendre plusieurs secondes ; l'interface désactive le bouton pendant son exécution.
+        // Endpoint : GET api/update-scolaire
+        // Retourne (true, messageSucces) lorsque le scraper se termine sans erreur ;
+        // (false, descriptionErreur) lorsque le scraper échoue ou en cas d'erreur réseau.
         public async Task<(bool Success, string Message)> TriggerScraperAsync()
         {
             try
@@ -447,15 +403,13 @@ namespace Obrigenie.Services
         }
 
         // ──────────────────────────────────────────────────────────────────
-        // HEALTH CHECK
+        // VÉRIFICATION DE SANTÉ
         // ──────────────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Performs a lightweight health-check ping to the server to determine whether the
-        /// backend is reachable. The result drives the online/offline badge in MainLayout.
-        /// Endpoint: GET api/health
-        /// </summary>
-        /// <returns>True if the server responds with a 2xx status; false otherwise.</returns>
+        // Effectue un ping de vérification de santé léger vers le serveur pour déterminer si le
+        // backend est accessible. Le résultat pilote le badge en ligne/hors ligne dans MainLayout.
+        // Endpoint : GET api/health
+        // Retourne true si le serveur répond avec un statut 2xx ; false sinon.
         public async Task<bool> CheckHealthAsync()
         {
             try
@@ -470,176 +424,196 @@ namespace Obrigenie.Services
         }
 
         // ──────────────────────────────────────────────────────────────────
-        // REFERENCE DATA — CASCADING DROPDOWNS (TestPage)
+        // DONNÉES DE RÉFÉRENCE — LISTES DÉROULANTES EN CASCADE (TestPage)
         // ──────────────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Retrieves the master list of all courses (cours) available in the reference database.
-        /// Used to populate the first dropdown in the cascading-selection test page.
-        /// Endpoint: GET api/ref/cours
-        /// Throws HttpRequestException if the server returns a non-success status code.
-        /// </summary>
-        /// <returns>A list of <see cref="CoursDto"/> items.</returns>
-        public async Task<List<CoursDto>> GetCoursAsync()
+        // Construit un HttpRequestMessage avec l'en-tête Authorization Bearer défini depuis localStorage.
+        // Utilisé par les endpoints de référence comme solution de repli pour s'assurer que le jeton
+        // est toujours attaché, que AuthHeaderHandler ait déjà renseigné l'en-tête ou non.
+        // method : la méthode HTTP (GET, POST, etc.)
+        // url : l'URL relative de l'endpoint API.
+        private async Task<HttpRequestMessage> BuildAuthRequest(HttpMethod method, string url)
         {
-            // Throws on non-2xx so callers can display the real error (404 = endpoint missing, 401 = auth)
-            var response = await _httpClient.GetAsync("api/ref/cours");
+            var request = new HttpRequestMessage(method, url);
+            // Lit le jeton JWT stocké et l'attache comme en-tête Authorization Bearer
+            var token = await _auth.GetTokenAsync();
+            if (!string.IsNullOrEmpty(token))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            return request;
+        }
+
+        // Récupère la liste principale de toutes les catégories de matières depuis la base de données de référence.
+        // Utilisé pour peupler la première liste déroulante (niveau supérieur) de la page de sélection en cascade.
+        // Endpoint : GET api/ref/categories
+        // Lève HttpRequestException si le serveur retourne un code de statut non-succès.
+        // Retourne une liste de CategorieDto triée par ordre d'affichage.
+        public async Task<List<CategorieDto>> GetCategoriesAsync()
+        {
+            var request = await BuildAuthRequest(HttpMethod.Get, "api/ref/categories");
+            var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<List<CategorieDto>>() ?? new();
+        }
+
+        // Récupère tous les cours (matières) appartenant à une catégorie spécifique.
+        // Utilisé pour peupler la deuxième liste déroulante après qu'une catégorie a été sélectionnée.
+        // Endpoint : GET api/ref/cours/{idCat}
+        // Lève HttpRequestException si le serveur retourne un code de statut non-succès.
+        // idCat : la clé primaire de la catégorie sélectionnée.
+        // Retourne une liste de CoursDto.
+        public async Task<List<CoursDto>> GetCoursAsync(int idCat)
+        {
+            var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/cours/{idCat}");
+            var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadFromJsonAsync<List<CoursDto>>() ?? new();
         }
 
-        /// <summary>
-        /// Retrieves the levels (niveaux) available for a specific course code.
-        /// Called when the user selects a course in the first dropdown on the test page.
-        /// Endpoint: GET api/ref/niveaux/{codeCours}
-        /// Throws HttpRequestException if the server returns a non-success status code.
-        /// </summary>
-        /// <param name="codeCours">The course code (e.g., "LM", "SC") to filter levels by.</param>
-        /// <returns>A list of <see cref="NiveauDto"/> items.</returns>
+        // Récupère les niveaux disponibles pour un code de cours spécifique.
+        // Appelé lorsque l'utilisateur sélectionne un cours dans la première liste déroulante de la page de test.
+        // Endpoint : GET api/ref/niveaux/{codeCours}
+        // Lève HttpRequestException si le serveur retourne un code de statut non-succès.
+        // codeCours : le code de cours (ex. : "LM", "SC") pour filtrer les niveaux.
+        // Retourne une liste de NiveauDto.
         public async Task<List<NiveauDto>> GetNiveauxAsync(string codeCours)
         {
-            var response = await _httpClient.GetAsync($"api/ref/niveaux/{codeCours}");
+            var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/niveaux/{codeCours}");
+            var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadFromJsonAsync<List<NiveauDto>>() ?? new();
         }
 
-        /// <summary>
-        /// Retrieves the domains (domaines) available for a specific course and level combination.
-        /// Called when the user selects a level in the second dropdown on the test page.
-        /// Endpoint: GET api/ref/domaines/{codeCours}/{codeNiveau}
-        /// Throws HttpRequestException if the server returns a non-success status code.
-        /// </summary>
-        /// <param name="codeCours">The course code used to filter domains.</param>
-        /// <param name="codeNiveau">The level code used together with the course to filter domains.</param>
-        /// <returns>A list of <see cref="DomaineDto"/> items.</returns>
+        // Récupère les domaines disponibles pour une combinaison cours et niveau spécifique.
+        // Appelé lorsque l'utilisateur sélectionne un niveau dans la deuxième liste déroulante de la page de test.
+        // Endpoint : GET api/ref/domaines/{codeCours}/{codeNiveau}
+        // Lève HttpRequestException si le serveur retourne un code de statut non-succès.
+        // codeCours : le code de cours utilisé pour filtrer les domaines.
+        // codeNiveau : le code de niveau utilisé conjointement avec le cours pour filtrer les domaines.
+        // Retourne une liste de DomaineDto.
         public async Task<List<DomaineDto>> GetDomainesAsync(string codeCours, string codeNiveau)
         {
-            var response = await _httpClient.GetAsync($"api/ref/domaines/{codeCours}/{codeNiveau}");
+            var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/domaines/{codeCours}/{codeNiveau}");
+            var response = await _httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadFromJsonAsync<List<DomaineDto>>() ?? new();
         }
     }
 
     // ──────────────────────────────────────────────────────────────────────
-    // SUPPORTING DTOs AND RESULT TYPES
+    // DTO DE SUPPORT ET TYPES DE RÉSULTAT
     // ──────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Represents the JSON body returned by the GET api/access/check endpoint.
-    /// Contains a single boolean property indicating whether the license code is still active.
-    /// </summary>
+    // Représente le corps JSON retourné par l'endpoint GET api/access/check.
+    // Contient une seule propriété booléenne indiquant si le code de licence est toujours actif.
     public class LicenseCheckResult
     {
-        /// <summary>
-        /// True when the license code is valid and has not been revoked or expired.
-        /// </summary>
+        // True lorsque le code de licence est valide et n'a pas été révoqué ou expiré.
         [JsonPropertyName("valid")]
         public bool Valid { get; set; }
     }
 
-    /// <summary>
-    /// Data Transfer Object that represents a license record returned by the admin API.
-    /// All property names are explicitly mapped to their camelCase JSON counterparts
-    /// so that .NET's PascalCase defaults do not cause deserialisation mismatches.
-    /// </summary>
+    // Objet de transfert de données représentant un enregistrement de licence retourné par l'API admin.
+    // Tous les noms de propriétés sont explicitement mappés à leurs équivalents JSON en camelCase
+    // pour éviter les erreurs de désérialisation dues aux conventions PascalCase par défaut de .NET.
     public class LicenseDto
     {
-        /// <summary>The server-assigned unique identifier for this license.</summary>
+        // Identifiant unique assigné par le serveur pour cette licence.
         [JsonPropertyName("id")]
         public int Id { get; set; }
 
-        /// <summary>The unique access code string for this license (e.g., "ABCDE-23456").</summary>
+        // Chaîne de code d'accès unique pour cette licence (ex. : "ABCDE-23456").
         [JsonPropertyName("code")]
         public string Code { get; set; } = string.Empty;
 
-        /// <summary>An optional human-readable label assigned by the admin (e.g., "PROF-DUPONT").</summary>
+        // Libellé lisible optionnel assigné par l'admin (ex. : "PROF-DUPONT").
         [JsonPropertyName("label")]
         public string? Label { get; set; }
 
-        /// <summary>True when the license is currently active and grants access to the application.</summary>
+        // True lorsque la licence est actuellement active et accorde l'accès à l'application.
         [JsonPropertyName("isActive")]
         public bool IsActive { get; set; }
 
-        /// <summary>
-        /// A user-friendly status string (e.g., "Active", "Révoqué", "Expiré") derived server-side.
-        /// Used to display a coloured badge in the license list.
-        /// </summary>
+        // Chaîne de statut conviviale (ex. : "Active", "Révoqué", "Expiré") dérivée côté serveur.
+        // Utilisée pour afficher un badge coloré dans la liste des licences.
         [JsonPropertyName("status")]
         public string Status { get; set; } = string.Empty;
 
-        /// <summary>
-        /// The email address of the user who has been assigned this license, or null if not yet assigned.
-        /// </summary>
+        // L'adresse email de l'utilisateur auquel cette licence a été assignée, ou null si pas encore assignée.
         [JsonPropertyName("assignedEmail")]
         public string? AssignedEmail { get; set; }
 
-        /// <summary>The UTC timestamp when this license was created.</summary>
+        // L'horodatage UTC de création de cette licence.
         [JsonPropertyName("createdAt")]
         public DateTime CreatedAt { get; set; }
 
-        /// <summary>
-        /// The optional UTC datetime after which this license automatically becomes inactive.
-        /// Null means the license does not expire.
-        /// </summary>
+        // La date/heure UTC optionnelle après laquelle cette licence devient automatiquement inactive.
+        // Null signifie que la licence n'expire pas.
         [JsonPropertyName("expiresAt")]
         public DateTime? ExpiresAt { get; set; }
 
-        /// <summary>
-        /// The UTC timestamp when the license was first used/assigned to a user account.
-        /// Null when the license has never been redeemed.
-        /// </summary>
+        // L'horodatage UTC de la première utilisation/assignation de la licence à un compte utilisateur.
+        // Null lorsque la licence n'a jamais été activée.
         [JsonPropertyName("assignedAt")]
         public DateTime? AssignedAt { get; set; }
     }
 
-    /// <summary>
-    /// Data Transfer Object representing a course entry from the reference database.
-    /// Used to populate the cascading course dropdown on the test page.
-    /// </summary>
+    // Objet de transfert de données représentant une catégorie de matière de la table categorie_cours.
+    // Utilisé pour peupler la liste déroulante de catégorie de premier niveau sur la page de test.
+    public class CategorieDto
+    {
+        // Identifiant unique assigné par le serveur pour cette catégorie.
+        [JsonPropertyName("idCat")]
+        public int IdCat { get; set; }
+
+        // Nom d'affichage de la catégorie (ex. : "Sciences et techniques").
+        [JsonPropertyName("nomCat")]
+        public string NomCat { get; set; } = string.Empty;
+
+        // Ordre de tri contrôlant la séquence dans la liste déroulante.
+        [JsonPropertyName("ordre")]
+        public int Ordre { get; set; }
+    }
+
+    // Objet de transfert de données représentant un cours de la base de données de référence.
+    // Utilisé pour peupler la liste déroulante de cours en cascade sur la page de test.
     public class CoursDto
     {
-        /// <summary>The short course code used as the unique key (e.g., "LM", "SC", "MA").</summary>
+        // Code court du cours utilisé comme clé unique (ex. : "LM", "SC", "MA").
         [JsonPropertyName("codeCours")]
         public string CodeCours { get; set; } = string.Empty;
 
-        /// <summary>The full display name of the course (e.g., "Langues Modernes").</summary>
+        // Nom complet d'affichage du cours (ex. : "Langues Modernes").
         [JsonPropertyName("nomCours")]
         public string NomCours { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Optional CSS color string used to display this course in the agenda view.
-        /// May be null when no color has been configured.
-        /// </summary>
+        // Chaîne de couleur CSS optionnelle utilisée pour afficher ce cours dans la vue agenda.
+        // Peut être null si aucune couleur n'a été configurée.
         [JsonPropertyName("couleurAgenda")]
         public string? CouleurAgenda { get; set; }
     }
 
-    /// <summary>
-    /// Data Transfer Object representing an educational level within a course.
-    /// Used to populate the second dropdown after a course has been selected.
-    /// </summary>
+    // Objet de transfert de données représentant un niveau scolaire au sein d'un cours.
+    // Utilisé pour peupler la deuxième liste déroulante après qu'un cours a été sélectionné.
     public class NiveauDto
     {
-        /// <summary>The short code identifying this level (e.g., "1A", "2B").</summary>
+        // Code court identifiant ce niveau (ex. : "1A", "2B").
         [JsonPropertyName("codeNiveau")]
         public string CodeNiveau { get; set; } = string.Empty;
 
-        /// <summary>The human-readable name of the level (e.g., "Première Année").</summary>
+        // Nom lisible du niveau (ex. : "Première Année").
         [JsonPropertyName("nomNiveau")]
         public string NomNiveau { get; set; } = string.Empty;
     }
 
-    /// <summary>
-    /// Data Transfer Object representing a pedagogical domain within a course and level.
-    /// Used to populate the third dropdown after both a course and a level have been selected.
-    /// </summary>
+    // Objet de transfert de données représentant un domaine pédagogique au sein d'un cours et d'un niveau.
+    // Utilisé pour peupler la troisième liste déroulante après qu'un cours et un niveau ont été sélectionnés.
     public class DomaineDto
     {
-        /// <summary>The server-assigned unique identifier for this domain.</summary>
+        // Identifiant unique assigné par le serveur pour ce domaine.
         [JsonPropertyName("idDom")]
         public int IdDom { get; set; }
 
-        /// <summary>The display name of the domain (e.g., "Compréhension écrite").</summary>
+        // Nom d'affichage du domaine (ex. : "Compréhension écrite").
         [JsonPropertyName("nom")]
         public string Nom { get; set; } = string.Empty;
     }

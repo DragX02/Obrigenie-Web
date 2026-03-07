@@ -1,49 +1,33 @@
 namespace Obrigenie.Models
 {
-    /// <summary>
-    /// Represents a time-stamped note written by the user for a specific day and hour range.
-    /// Notes are displayed in the single-day time grid and as small indicators in week/month views.
-    /// They are persisted on the server and loaded via ApiService.
-    /// </summary>
+    // Représente une note horodatée écrite par l'utilisateur pour un jour et une plage horaire spécifiques.
+    // Les notes sont affichées dans la grille horaire d'un seul jour et sous forme de petits indicateurs dans les vues semaine/mois.
+    // Elles sont persistées sur le serveur et chargées via ApiService.
     public class Note
     {
-        /// <summary>
-        /// The server-assigned unique identifier for this note.
-        /// A value of 0 indicates a new note that has not yet been saved.
-        /// </summary>
+        // L'identifiant unique attribué par le serveur pour cette note.
+        // Une valeur de 0 indique une nouvelle note qui n'a pas encore été enregistrée.
         public int Id { get; set; }
 
-        /// <summary>
-        /// The calendar date this note belongs to.
-        /// Stored as UTC midnight to avoid timezone-shift issues during JSON serialisation.
-        /// </summary>
+        // La date du calendrier à laquelle appartient cette note.
+        // Stockée en UTC à minuit pour éviter les problèmes de décalage de fuseau horaire lors de la sérialisation JSON.
         public DateTime Date { get; set; }
 
-        /// <summary>
-        /// The starting hour of the note (24-hour format, 0–23).
-        /// Determines which time-grid row the note is placed in when viewed in single-day mode.
-        /// </summary>
+        // L'heure de début de la note (format 24h, 0-23).
+        // Détermine dans quelle rangée de la grille horaire la note est placée lorsqu'elle est vue en mode d'un seul jour.
         public int Hour { get; set; }
 
-        /// <summary>
-        /// The ending hour of the note (exclusive upper bound, 24-hour format, 1–24).
-        /// A value of 0 means the end hour has not been set; the UI then treats it as Hour + 1.
-        /// </summary>
+        // L'heure de fin de la note (borne supérieure exclusive, format 24h, 1-24).
+        // Une valeur de 0 signifie que l'heure de fin n'a pas été définie ; l'interface la traite alors comme Heure + 1.
         public int EndHour { get; set; }
 
-        /// <summary>
-        /// The text content of the note. Maximum 2000 characters (enforced by the UI textarea).
-        /// </summary>
+        // Le contenu textuel de la note. Maximum 2000 caractères (appliqué par la zone de texte de l'interface).
         public string Content { get; set; } = string.Empty;
 
-        /// <summary>
-        /// The UTC timestamp when this note was first created on the server.
-        /// </summary>
+        // L'horodatage UTC de la première création de cette note sur le serveur.
         public DateTime CreatedAt { get; set; }
 
-        /// <summary>
-        /// The UTC timestamp of the most recent modification to this note on the server.
-        /// </summary>
+        // L'horodatage UTC de la modification la plus récente de cette note sur le serveur.
         public DateTime ModifiedAt { get; set; }
     }
 }
