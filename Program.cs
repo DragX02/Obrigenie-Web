@@ -43,7 +43,8 @@ builder.Services.AddScoped<AuthHeaderHandler>();
 //                          request made with this client carries the JWT token.
 builder.Services.AddHttpClient("API", client =>
 {
-    client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress);
+    var apiUrl = builder.Configuration["ApiBaseUrl"] ?? builder.HostEnvironment.BaseAddress;
+    client.BaseAddress = new Uri(apiUrl.EndsWith('/') ? apiUrl : apiUrl + "/");
     client.Timeout = TimeSpan.FromSeconds(15);
 }).AddHttpMessageHandler<AuthHeaderHandler>();
 
