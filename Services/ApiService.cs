@@ -451,7 +451,8 @@ namespace Obrigenie.Services
         {
             var request = await BuildAuthRequest(HttpMethod.Get, "api/ref/categories");
             var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/categories a retourné {(int)response.StatusCode} {response.StatusCode}.");
             return await response.Content.ReadFromJsonAsync<List<CategorieDto>>() ?? new();
         }
 
@@ -465,7 +466,8 @@ namespace Obrigenie.Services
         {
             var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/cours/{idCat}");
             var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/cours/{idCat} a retourné {(int)response.StatusCode} {response.StatusCode}.");
             return await response.Content.ReadFromJsonAsync<List<CoursDto>>() ?? new();
         }
 
@@ -479,7 +481,8 @@ namespace Obrigenie.Services
         {
             var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/niveaux/{codeCours}");
             var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/niveaux/{codeCours} a retourné {(int)response.StatusCode} {response.StatusCode}.");
             return await response.Content.ReadFromJsonAsync<List<NiveauDto>>() ?? new();
         }
 
@@ -494,7 +497,8 @@ namespace Obrigenie.Services
         {
             var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/domaines/{codeCours}/{codeNiveau}");
             var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/domaines/{codeCours}/{codeNiveau} a retourné {(int)response.StatusCode} {response.StatusCode}.");
             return await response.Content.ReadFromJsonAsync<List<DomaineDto>>() ?? new();
         }
     }
