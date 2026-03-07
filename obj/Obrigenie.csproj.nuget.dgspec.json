@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "G:\\csharpcallender\\Obrigenie\\Obrigenie.csproj": {}
+    "O:\\c#\\Obrigenie-Web\\Obrigenie.csproj": {}
   },
   "projects": {
-    "G:\\csharpcallender\\Obrigenie\\Obrigenie.csproj": {
+    "O:\\c#\\Obrigenie-Web\\Obrigenie.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "G:\\csharpcallender\\Obrigenie\\Obrigenie.csproj",
+        "projectUniqueName": "O:\\c#\\Obrigenie-Web\\Obrigenie.csproj",
         "projectName": "Obrigenie",
-        "projectPath": "G:\\csharpcallender\\Obrigenie\\Obrigenie.csproj",
-        "packagesPath": "C:\\Users\\olbre\\.nuget\\packages\\",
-        "outputPath": "G:\\csharpcallender\\Obrigenie\\obj\\",
+        "projectPath": "O:\\c#\\Obrigenie-Web\\Obrigenie.csproj",
+        "packagesPath": "C:\\Users\\Dragx\\.nuget\\packages\\",
+        "outputPath": "O:\\c#\\Obrigenie-Web\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\olbre\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\Dragx\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -71,13 +71,13 @@
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",
               "target": "Package",
-              "version": "[8.0.23, )",
+              "version": "[8.0.20, )",
               "autoReferenced": true
             },
             "Microsoft.NET.Sdk.WebAssembly.Pack": {
               "suppressParent": "All",
               "target": "Package",
-              "version": "[9.0.12, )",
+              "version": "[9.0.9, )",
               "autoReferenced": true
             }
           },
@@ -103,7 +103,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.310/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.305/PortableRuntimeIdentifierGraph.json"
         }
       },
       "runtimes": {
