@@ -471,6 +471,116 @@ namespace Obrigenie.Services
         }
 
         // ──────────────────────────────────────────────────────────────────
+        // DONNÉES ADMIN — GESTION DES TABLES PÉDAGOGIQUES
+        // ──────────────────────────────────────────────────────────────────
+
+        // Envoie un GET authentifié et désérialise la liste retournée.
+        // Retourne une liste vide en cas d'erreur réseau ou de statut non-succès.
+        private async Task<List<T>> AdminGetListAsync<T>(string url)
+        {
+            try
+            {
+                var req = await BuildAuthRequest(HttpMethod.Get, url);
+                var res = await _httpClient.SendAsync(req);
+                if (!res.IsSuccessStatusCode) return new();
+                return await res.Content.ReadFromJsonAsync<List<T>>() ?? new();
+            }
+            catch { return new(); }
+        }
+
+        // Envoie un POST authentifié avec un body JSON sérialisé.
+        // Retourne (true, null) en cas de succès, (false, messageErreur) sinon.
+        private async Task<(bool Ok, string? Err)> AdminPostAsync<T>(string url, T body)
+        {
+            try
+            {
+                var req = await BuildAuthRequest(HttpMethod.Post, url);
+                req.Content = JsonContent.Create(body);
+                var res = await _httpClient.SendAsync(req);
+                if (res.IsSuccessStatusCode) return (true, null);
+                try
+                {
+                    var json = await res.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                    return (false, json.GetProperty("message").GetString() ?? $"Erreur {(int)res.StatusCode}");
+                }
+                catch { return (false, $"Erreur {(int)res.StatusCode}"); }
+            }
+            catch (Exception ex) { return (false, ex.Message); }
+        }
+
+        // Envoie un DELETE authentifié sur l'URL donnée.
+        // Retourne (true, null) en cas de succès, (false, messageErreur) sinon.
+        private async Task<(bool Ok, string? Err)> AdminDeleteAsync(string url)
+        {
+            try
+            {
+                var req = await BuildAuthRequest(HttpMethod.Delete, url);
+                var res = await _httpClient.SendAsync(req);
+                if (res.IsSuccessStatusCode) return (true, null);
+                try
+                {
+                    var json = await res.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                    return (false, json.GetProperty("message").GetString() ?? $"Erreur {(int)res.StatusCode}");
+                }
+                catch { return (false, $"Erreur {(int)res.StatusCode}"); }
+            }
+            catch (Exception ex) { return (false, ex.Message); }
+        }
+
+        // Catégories
+        public Task<List<CategorieAdminDto>>      GetAdminCategoriesAsync()                   => AdminGetListAsync<CategorieAdminDto>("api/admin-data/categories");
+        public Task<(bool Ok, string? Err)>       CreateAdminCategorieAsync(object dto)        => AdminPostAsync("api/admin-data/categories", dto);
+        public Task<(bool Ok, string? Err)>       DeleteAdminCategorieAsync(int id)            => AdminDeleteAsync($"api/admin-data/categories/{id}");
+
+        // Cours
+        public Task<List<CoursAdminDto>>          GetAdminCoursAsync()                        => AdminGetListAsync<CoursAdminDto>("api/admin-data/cours");
+        public Task<(bool Ok, string? Err)>       CreateAdminCoursAsync(object dto)            => AdminPostAsync("api/admin-data/cours", dto);
+        public Task<(bool Ok, string? Err)>       DeleteAdminCoursAsync(int id)               => AdminDeleteAsync($"api/admin-data/cours/{id}");
+
+        // Niveaux
+        public Task<List<NiveauAdminDto>>         GetAdminNiveauxAsync()                      => AdminGetListAsync<NiveauAdminDto>("api/admin-data/niveaux");
+        public Task<(bool Ok, string? Err)>       CreateAdminNiveauAsync(object dto)           => AdminPostAsync("api/admin-data/niveaux", dto);
+        public Task<(bool Ok, string? Err)>       DeleteAdminNiveauAsync(int id)              => AdminDeleteAsync($"api/admin-data/niveaux/{id}");
+
+        // Professeurs (lecture seule)
+        public Task<List<ProfesseurAdminDto>>     GetAdminProfesseursAsync()                  => AdminGetListAsync<ProfesseurAdminDto>("api/admin-data/professeurs");
+
+        // Liaisons Cours-Niveau
+        public Task<List<CoursNiveauAdminDto>>    GetAdminCoursNiveauxAsync()                 => AdminGetListAsync<CoursNiveauAdminDto>("api/admin-data/cours-niveaux");
+        public Task<(bool Ok, string? Err)>       CreateAdminCoursNiveauAsync(object dto)      => AdminPostAsync("api/admin-data/cours-niveaux", dto);
+        public Task<(bool Ok, string? Err)>       DeleteAdminCoursNiveauAsync(int id)         => AdminDeleteAsync($"api/admin-data/cours-niveaux/{id}");
+
+        // Domaines
+        public Task<List<DomaineAdminDto>>        GetAdminDomainesAsync()                     => AdminGetListAsync<DomaineAdminDto>("api/admin-data/domaines");
+        public Task<(bool Ok, string? Err)>       CreateAdminDomaineAsync(object dto)          => AdminPostAsync("api/admin-data/domaines", dto);
+        public Task<(bool Ok, string? Err)>       DeleteAdminDomaineAsync(int id)             => AdminDeleteAsync($"api/admin-data/domaines/{id}");
+
+        // Compétences
+        public Task<List<CompetenceAdminDto>>     GetAdminCompetencesAsync()                  => AdminGetListAsync<CompetenceAdminDto>("api/admin-data/competences");
+        public Task<(bool Ok, string? Err)>       CreateAdminCompetenceAsync(object dto)       => AdminPostAsync("api/admin-data/competences", dto);
+        public Task<(bool Ok, string? Err)>       DeleteAdminCompetenceAsync(int id)          => AdminDeleteAsync($"api/admin-data/competences/{id}");
+
+        // Aptitudes
+        public Task<List<AptitudeAdminDto>>       GetAdminAptitudesAsync()                    => AdminGetListAsync<AptitudeAdminDto>("api/admin-data/aptitudes");
+        public Task<(bool Ok, string? Err)>       CreateAdminAptitudeAsync(object dto)         => AdminPostAsync("api/admin-data/aptitudes", dto);
+        public Task<(bool Ok, string? Err)>       DeleteAdminAptitudeAsync(int id)            => AdminDeleteAsync($"api/admin-data/aptitudes/{id}");
+
+        // Noms de visées
+        public Task<List<NomViseeAdminDto>>       GetAdminNomViseesAsync()                    => AdminGetListAsync<NomViseeAdminDto>("api/admin-data/nom-visees");
+        public Task<(bool Ok, string? Err)>       CreateAdminNomViseeAsync(object dto)         => AdminPostAsync("api/admin-data/nom-visees", dto);
+        public Task<(bool Ok, string? Err)>       DeleteAdminNomViseeAsync(int id)            => AdminDeleteAsync($"api/admin-data/nom-visees/{id}");
+
+        // Visées à maîtriser
+        public Task<List<ViseesMaitriserAdminDto>> GetAdminViseesMaitriserAsync()              => AdminGetListAsync<ViseesMaitriserAdminDto>("api/admin-data/visees-maitriser");
+        public Task<(bool Ok, string? Err)>        CreateAdminViseesMaitriserAsync(object dto) => AdminPostAsync("api/admin-data/visees-maitriser", dto);
+        public Task<(bool Ok, string? Err)>        DeleteAdminViseesMaitriserAsync(int id)     => AdminDeleteAsync($"api/admin-data/visees-maitriser/{id}");
+
+        // Sous-domaines
+        public Task<List<SousDomaineAdminDto>>    GetAdminSousDomainesAsync()                 => AdminGetListAsync<SousDomaineAdminDto>("api/admin-data/sous-domaines");
+        public Task<(bool Ok, string? Err)>       CreateAdminSousDomaineAsync(object dto)      => AdminPostAsync("api/admin-data/sous-domaines", dto);
+        public Task<(bool Ok, string? Err)>       DeleteAdminSousDomaineAsync(int id)         => AdminDeleteAsync($"api/admin-data/sous-domaines/{id}");
+
+        // ──────────────────────────────────────────────────────────────────
         // DONNÉES DE RÉFÉRENCE — LISTES DÉROULANTES EN CASCADE (TestPage)
         // ──────────────────────────────────────────────────────────────────
 
@@ -667,5 +777,107 @@ namespace Obrigenie.Services
         // Nom d'affichage du domaine (ex. : "Compréhension écrite").
         [JsonPropertyName("nom")]
         public string Nom { get; set; } = string.Empty;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // DTOs ADMIN — PAGE DE GESTION DES DONNÉES PÉDAGOGIQUES
+    // ──────────────────────────────────────────────────────────────────────
+
+    // DTO représentant une catégorie de cours pour la page admin données
+    public class CategorieAdminDto
+    {
+        [JsonPropertyName("idCat")]  public int    IdCat  { get; set; }
+        [JsonPropertyName("nomCat")] public string NomCat { get; set; } = "";
+        [JsonPropertyName("ordre")]  public int    Ordre  { get; set; }
+    }
+
+    // DTO représentant un cours pour la page admin données
+    public class CoursAdminDto
+    {
+        [JsonPropertyName("idCours")]       public int     IdCours       { get; set; }
+        [JsonPropertyName("nomCours")]      public string  NomCours      { get; set; } = "";
+        [JsonPropertyName("codeCours")]     public string  CodeCours     { get; set; } = "";
+        [JsonPropertyName("prefixCours")]   public string  PrefixCours   { get; set; } = "";
+        [JsonPropertyName("couleurAgenda")] public string  CouleurAgenda { get; set; } = "";
+        [JsonPropertyName("idCatFk")]       public int?    IdCatFk       { get; set; }
+        [JsonPropertyName("nomCat")]        public string? NomCat        { get; set; }
+    }
+
+    // DTO représentant un niveau d'enseignement pour la page admin données
+    public class NiveauAdminDto
+    {
+        [JsonPropertyName("idNiveau")]   public int    IdNiveau   { get; set; }
+        [JsonPropertyName("codeNiveau")] public string CodeNiveau { get; set; } = "";
+        [JsonPropertyName("nomNiveau")]  public string NomNiveau  { get; set; } = "";
+        [JsonPropertyName("ordre")]      public int?   Ordre      { get; set; }
+    }
+
+    // DTO représentant un utilisateur (professeur) pour les sélecteurs admin
+    public class ProfesseurAdminDto
+    {
+        [JsonPropertyName("idUser")] public int     IdUser { get; set; }
+        [JsonPropertyName("email")]  public string  Email  { get; set; } = "";
+        [JsonPropertyName("nom")]    public string? Nom    { get; set; }
+        [JsonPropertyName("prenom")] public string? Prenom { get; set; }
+    }
+
+    // DTO représentant une liaison cours-niveau-professeur pour la page admin données
+    public class CoursNiveauAdminDto
+    {
+        [JsonPropertyName("idCoursNiveau")] public int     IdCoursNiveau { get; set; }
+        [JsonPropertyName("idCoursFk")]     public int     IdCoursFk     { get; set; }
+        [JsonPropertyName("nomCours")]      public string  NomCours      { get; set; } = "";
+        [JsonPropertyName("idNiveauFk")]    public int     IdNiveauFk    { get; set; }
+        [JsonPropertyName("nomNiveau")]     public string  NomNiveau     { get; set; } = "";
+        [JsonPropertyName("idProfFk")]      public int     IdProfFk      { get; set; }
+        [JsonPropertyName("emailProf")]     public string  EmailProf     { get; set; } = "";
+        [JsonPropertyName("nomProf")]       public string? NomProf       { get; set; }
+    }
+
+    // DTO représentant un domaine pédagogique pour la page admin données
+    public class DomaineAdminDto
+    {
+        [JsonPropertyName("idDom")]          public int    IdDom          { get; set; }
+        [JsonPropertyName("nom")]            public string Nom            { get; set; } = "";
+        [JsonPropertyName("idCoursNiveauFk")] public int   IdCoursNiveauFk { get; set; }
+        [JsonPropertyName("nomCours")]       public string NomCours       { get; set; } = "";
+        [JsonPropertyName("nomNiveau")]      public string NomNiveau      { get; set; } = "";
+    }
+
+    // DTO représentant une compétence pour la page admin données
+    public class CompetenceAdminDto
+    {
+        [JsonPropertyName("idCompetence")]   public int    IdCompetence   { get; set; }
+        [JsonPropertyName("nomCompetence")]  public string NomCompetence  { get; set; } = "";
+    }
+
+    // DTO représentant une aptitude pour la page admin données
+    public class AptitudeAdminDto
+    {
+        [JsonPropertyName("idAptitude")]  public int    IdAptitude  { get; set; }
+        [JsonPropertyName("nomAptitude")] public string NomAptitude { get; set; } = "";
+    }
+
+    // DTO représentant un nom de visée pour la page admin données
+    public class NomViseeAdminDto
+    {
+        [JsonPropertyName("idNomVisee")]  public int    IdNomVisee  { get; set; }
+        [JsonPropertyName("nomVisee1")]   public string NomVisee1   { get; set; } = "";
+    }
+
+    // DTO représentant une visée à maîtriser pour la page admin données
+    public class ViseesMaitriserAdminDto
+    {
+        [JsonPropertyName("idViseesMaitriser")]  public int    IdViseesMaitriser  { get; set; }
+        [JsonPropertyName("nomViseesMaitriser")] public string NomViseesMaitriser { get; set; } = "";
+    }
+
+    // DTO représentant un sous-domaine pour la page admin données
+    public class SousDomaineAdminDto
+    {
+        [JsonPropertyName("idSousDomaine")] public int    IdSousDomaine { get; set; }
+        [JsonPropertyName("nomComp")]       public string NomComp       { get; set; } = "";
+        [JsonPropertyName("idDomFk")]       public int    IdDomFk       { get; set; }
+        [JsonPropertyName("nomDom")]        public string NomDom        { get; set; } = "";
     }
 }

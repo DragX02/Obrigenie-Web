@@ -1,0 +1,722 @@
+@* Page d'administration des données pédagogiques.
+   Accessible uniquement aux administrateurs (vérification via isAdmin dans MainLayout).
+   Permet de créer, lister et supprimer les enregistrements des tables de référence :
+   catégories, cours, niveaux, liaisons cours-niveau, domaines, compétences, aptitudes,
+   noms de visées, visées à maîtriser et sous-domaines. *@
+
+@page "/admin-data"
+@inject ApiService Api
+@inject NavigationManager Nav
+@inject AuthService Auth
+
+<PageTitle>Gestion des données</PageTitle>
+
+@if (!isAdmin)
+{
+    <div class="alert alert-danger mt-4">Accès réservé aux administrateurs.</div>
+}
+else if (isLoading)
+{
+    <div class="text-center mt-5"><span class="spinner-border"></span></div>
+}
+else
+{
+    <div class="container-fluid py-3">
+        <h2 class="mb-3">Gestion des données pédagogiques</h2>
+
+        @* Barre d'onglets *@
+        <ul class="nav nav-tabs flex-wrap mb-3">
+            @foreach (var t in tabs)
+            {
+                <li class="nav-item">
+                    <button class="nav-link @(activeTab == t ? "active" : "")"
+                            @onclick="() => activeTab = t">@t</button>
+                </li>
+            }
+        </ul>
+
+        @* Message de retour global *@
+        @if (!string.IsNullOrEmpty(feedback))
+        {
+            <div class="alert @(feedbackOk ? "alert-success" : "alert-danger") alert-dismissible">
+                @feedback
+                <button type="button" class="btn-close" @onclick="() => feedback = null"></button>
+            </div>
+        }
+
+        @* ── CATÉGORIES ───────────────────────────────────────────── *@
+        @if (activeTab == "Catégories")
+        {
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">Nouvelle catégorie</div>
+                        <div class="card-body">
+                            <input class="form-control mb-2" placeholder="Nom" @bind="newCatNom" />
+                            <input class="form-control mb-2" type="number" placeholder="Ordre" @bind="newCatOrdre" />
+                            <button class="btn btn-primary w-100" @onclick="CreateCategorie">Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>ID</th><th>Nom</th><th>Ordre</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var c in categories)
+                            {
+                                <tr>
+                                    <td>@c.IdCat</td>
+                                    <td>@c.NomCat</td>
+                                    <td>@c.Ordre</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteCategorie(c.IdCat)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @* ── COURS ────────────────────────────────────────────────── *@
+        @if (activeTab == "Cours")
+        {
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">Nouveau cours</div>
+                        <div class="card-body">
+                            <input class="form-control mb-2" placeholder="Nom du cours" @bind="newCoursNom" />
+                            <input class="form-control mb-2" placeholder="Code (ex: LM)" @bind="newCoursCode" />
+                            <input class="form-control mb-2" placeholder="Préfixe" @bind="newCoursPrefix" />
+                            <input class="form-control mb-2" type="color" @bind="newCoursCouleur" title="Couleur agenda" />
+                            <select class="form-select mb-2" @bind="newCoursIdCat">
+                                <option value="0">-- Catégorie --</option>
+                                @foreach (var c in categories)
+                                {
+                                    <option value="@c.IdCat">@c.NomCat</option>
+                                }
+                            </select>
+                            <button class="btn btn-primary w-100" @onclick="CreateCours">Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>ID</th><th>Nom</th><th>Code</th><th>Couleur</th><th>Catégorie</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var c in coursList)
+                            {
+                                <tr>
+                                    <td>@c.IdCours</td>
+                                    <td>@c.NomCours</td>
+                                    <td><code>@c.CodeCours</code></td>
+                                    <td><span style="display:inline-block;width:20px;height:20px;background:@c.CouleurAgenda;border-radius:3px"></span></td>
+                                    <td>@(c.NomCat ?? "—")</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteCours(c.IdCours)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @* ── NIVEAUX ─────────────────────────────────────────────── *@
+        @if (activeTab == "Niveaux")
+        {
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">Nouveau niveau</div>
+                        <div class="card-body">
+                            <input class="form-control mb-2" placeholder="Code (ex: 1A)" @bind="newNivCode" />
+                            <input class="form-control mb-2" placeholder="Nom (ex: Première année)" @bind="newNivNom" />
+                            <input class="form-control mb-2" type="number" placeholder="Ordre" @bind="newNivOrdre" />
+                            <button class="btn btn-primary w-100" @onclick="CreateNiveau">Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>ID</th><th>Code</th><th>Nom</th><th>Ordre</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var n in niveaux)
+                            {
+                                <tr>
+                                    <td>@n.IdNiveau</td>
+                                    <td><code>@n.CodeNiveau</code></td>
+                                    <td>@n.NomNiveau</td>
+                                    <td>@n.Ordre</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteNiveau(n.IdNiveau)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @* ── LIAISONS COURS-NIVEAU ───────────────────────────────── *@
+        @if (activeTab == "Liaisons")
+        {
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">Nouvelle liaison</div>
+                        <div class="card-body">
+                            <select class="form-select mb-2" @bind="newCnIdCours">
+                                <option value="0">-- Cours --</option>
+                                @foreach (var c in coursList)
+                                {
+                                    <option value="@c.IdCours">@c.NomCours</option>
+                                }
+                            </select>
+                            <select class="form-select mb-2" @bind="newCnIdNiveau">
+                                <option value="0">-- Niveau --</option>
+                                @foreach (var n in niveaux)
+                                {
+                                    <option value="@n.IdNiveau">@n.NomNiveau</option>
+                                }
+                            </select>
+                            <select class="form-select mb-2" @bind="newCnIdProf">
+                                <option value="0">-- Professeur --</option>
+                                @foreach (var p in professeurs)
+                                {
+                                    <option value="@p.IdUser">@(p.Prenom + " " + p.Nom) (@p.Email)</option>
+                                }
+                            </select>
+                            <button class="btn btn-primary w-100" @onclick="CreateCoursNiveau">Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>ID</th><th>Cours</th><th>Niveau</th><th>Professeur</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var cn in coursNiveaux)
+                            {
+                                <tr>
+                                    <td>@cn.IdCoursNiveau</td>
+                                    <td>@cn.NomCours</td>
+                                    <td>@cn.NomNiveau</td>
+                                    <td>@(cn.NomProf?.Trim() + " (" + cn.EmailProf + ")")</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteCoursNiveau(cn.IdCoursNiveau)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @* ── DOMAINES ────────────────────────────────────────────── *@
+        @if (activeTab == "Domaines")
+        {
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">Nouveau domaine</div>
+                        <div class="card-body">
+                            <input class="form-control mb-2" placeholder="Nom du domaine" @bind="newDomNom" />
+                            <select class="form-select mb-2" @bind="newDomIdCn">
+                                <option value="0">-- Liaison cours-niveau --</option>
+                                @foreach (var cn in coursNiveaux)
+                                {
+                                    <option value="@cn.IdCoursNiveau">@cn.NomCours — @cn.NomNiveau</option>
+                                }
+                            </select>
+                            <button class="btn btn-primary w-100" @onclick="CreateDomaine">Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>ID</th><th>Nom</th><th>Cours</th><th>Niveau</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var d in domaines)
+                            {
+                                <tr>
+                                    <td>@d.IdDom</td>
+                                    <td>@d.Nom</td>
+                                    <td>@d.NomCours</td>
+                                    <td>@d.NomNiveau</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteDomaine(d.IdDom)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @* ── SOUS-DOMAINES ───────────────────────────────────────── *@
+        @if (activeTab == "Sous-domaines")
+        {
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">Nouveau sous-domaine</div>
+                        <div class="card-body">
+                            <input class="form-control mb-2" placeholder="Nom" @bind="newSdNom" />
+                            <select class="form-select mb-2" @bind="newSdIdDom">
+                                <option value="0">-- Domaine --</option>
+                                @foreach (var d in domaines)
+                                {
+                                    <option value="@d.IdDom">@d.Nom (@d.NomCours / @d.NomNiveau)</option>
+                                }
+                            </select>
+                            <button class="btn btn-primary w-100" @onclick="CreateSousDomaine">Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>ID</th><th>Nom</th><th>Domaine</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var s in sousDomaines)
+                            {
+                                <tr>
+                                    <td>@s.IdSousDomaine</td>
+                                    <td>@s.NomComp</td>
+                                    <td>@s.NomDom</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteSousDomaine(s.IdSousDomaine)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @* ── COMPÉTENCES ─────────────────────────────────────────── *@
+        @if (activeTab == "Compétences")
+        {
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">Nouvelle compétence</div>
+                        <div class="card-body">
+                            <input class="form-control mb-2" placeholder="Nom de la compétence" @bind="newCompNom" />
+                            <button class="btn btn-primary w-100" @onclick="CreateCompetence">Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>ID</th><th>Nom</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var c in competences)
+                            {
+                                <tr>
+                                    <td>@c.IdCompetence</td>
+                                    <td>@c.NomCompetence</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteCompetence(c.IdCompetence)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @* ── APTITUDES ───────────────────────────────────────────── *@
+        @if (activeTab == "Aptitudes")
+        {
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">Nouvelle aptitude</div>
+                        <div class="card-body">
+                            <input class="form-control mb-2" placeholder="Nom de l'aptitude" @bind="newAptNom" />
+                            <button class="btn btn-primary w-100" @onclick="CreateAptitude">Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>ID</th><th>Nom</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var a in aptitudes)
+                            {
+                                <tr>
+                                    <td>@a.IdAptitude</td>
+                                    <td>@a.NomAptitude</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAptitude(a.IdAptitude)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @* ── NOMS DE VISÉES ──────────────────────────────────────── *@
+        @if (activeTab == "Noms visées")
+        {
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">Nouveau nom de visée</div>
+                        <div class="card-body">
+                            <input class="form-control mb-2" placeholder="Intitulé" @bind="newNvNom" />
+                            <button class="btn btn-primary w-100" @onclick="CreateNomVisee">Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>ID</th><th>Intitulé</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var n in nomVisees)
+                            {
+                                <tr>
+                                    <td>@n.IdNomVisee</td>
+                                    <td>@n.NomVisee1</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteNomVisee(n.IdNomVisee)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @* ── VISÉES À MAÎTRISER ──────────────────────────────────── *@
+        @if (activeTab == "Visées à maîtriser")
+        {
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">Nouvelle visée à maîtriser</div>
+                        <div class="card-body">
+                            <textarea class="form-control mb-2" rows="3" placeholder="Description" @bind="newVmNom"></textarea>
+                            <button class="btn btn-primary w-100" @onclick="CreateViseesMaitriser">Ajouter</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>ID</th><th>Description</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var v in viseesMaitriser)
+                            {
+                                <tr>
+                                    <td>@v.IdViseesMaitriser</td>
+                                    <td>@v.NomViseesMaitriser</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteViseesMaitriser(v.IdViseesMaitriser)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+    </div>
+}
+
+@code {
+    // Indique si la page est encore en train de charger les données initiales
+    private bool isLoading = true;
+
+    // Indique si l'utilisateur connecté est administrateur
+    private bool isAdmin = false;
+
+    // Onglet actuellement sélectionné
+    private string activeTab = "Catégories";
+
+    // Liste des noms d'onglets dans l'ordre d'affichage
+    private readonly string[] tabs =
+    {
+        "Catégories", "Cours", "Niveaux", "Liaisons",
+        "Domaines", "Sous-domaines",
+        "Compétences", "Aptitudes",
+        "Noms visées", "Visées à maîtriser"
+    };
+
+    // Message de retour affiché après une action (succès ou erreur)
+    private string? feedback;
+
+    // True si le message de retour représente un succès, false pour une erreur
+    private bool feedbackOk;
+
+    // ── Données chargées depuis l'API ─────────────────────────────────────
+    private List<CategorieAdminDto>      categories     = new();
+    private List<CoursAdminDto>          coursList      = new();
+    private List<NiveauAdminDto>         niveaux        = new();
+    private List<ProfesseurAdminDto>     professeurs    = new();
+    private List<CoursNiveauAdminDto>    coursNiveaux   = new();
+    private List<DomaineAdminDto>        domaines       = new();
+    private List<SousDomaineAdminDto>    sousDomaines   = new();
+    private List<CompetenceAdminDto>     competences    = new();
+    private List<AptitudeAdminDto>       aptitudes      = new();
+    private List<NomViseeAdminDto>       nomVisees      = new();
+    private List<ViseesMaitriserAdminDto> viseesMaitriser = new();
+
+    // ── Champs de saisie — Catégorie ─────────────────────────────────────
+    private string newCatNom   = "";
+    private int    newCatOrdre = 0;
+
+    // ── Champs de saisie — Cours ─────────────────────────────────────────
+    private string newCoursNom     = "";
+    private string newCoursCode    = "";
+    private string newCoursPrefix  = "";
+    private string newCoursCouleur = "#3B82F6";
+    private int    newCoursIdCat   = 0;
+
+    // ── Champs de saisie — Niveau ────────────────────────────────────────
+    private string newNivCode  = "";
+    private string newNivNom   = "";
+    private int    newNivOrdre = 0;
+
+    // ── Champs de saisie — Cours-Niveau ──────────────────────────────────
+    private int newCnIdCours  = 0;
+    private int newCnIdNiveau = 0;
+    private int newCnIdProf   = 0;
+
+    // ── Champs de saisie — Domaine ────────────────────────────────────────
+    private string newDomNom  = "";
+    private int    newDomIdCn = 0;
+
+    // ── Champs de saisie — Sous-domaine ──────────────────────────────────
+    private string newSdNom   = "";
+    private int    newSdIdDom = 0;
+
+    // ── Champs de saisie — Compétence ────────────────────────────────────
+    private string newCompNom = "";
+
+    // ── Champs de saisie — Aptitude ──────────────────────────────────────
+    private string newAptNom = "";
+
+    // ── Champs de saisie — Nom visée ─────────────────────────────────────
+    private string newNvNom = "";
+
+    // ── Champs de saisie — Visée à maîtriser ─────────────────────────────
+    private string newVmNom = "";
+
+    // Charge toutes les listes au démarrage de la page après vérification du rôle admin.
+    protected override async Task OnInitializedAsync()
+    {
+        isAdmin = (await Auth.GetRoleAsync()) == "ADMIN";
+        if (!isAdmin) { isLoading = false; return; }
+
+        // Chargement en parallèle de tous les jeux de données
+        await Task.WhenAll(
+            LoadCategories(), LoadCours(), LoadNiveaux(), LoadProfesseurs(),
+            LoadCoursNiveaux(), LoadDomaines(), LoadSousDomaines(),
+            LoadCompetences(), LoadAptitudes(), LoadNomVisees(), LoadViseesMaitriser()
+        );
+        isLoading = false;
+    }
+
+    // Affiche un message de retour pendant 3 secondes puis l'efface automatiquement.
+    // ok : true pour succès (vert), false pour erreur (rouge)
+    // msg : texte du message à afficher
+    private async Task ShowFeedback(bool ok, string msg)
+    {
+        feedbackOk = ok;
+        feedback   = msg;
+        StateHasChanged();
+        await Task.Delay(3000);
+        feedback = null;
+        StateHasChanged();
+    }
+
+    // ── Chargements ──────────────────────────────────────────────────────
+    private async Task LoadCategories()    => categories      = await Api.GetAdminCategoriesAsync();
+    private async Task LoadCours()         => coursList       = await Api.GetAdminCoursAsync();
+    private async Task LoadNiveaux()       => niveaux         = await Api.GetAdminNiveauxAsync();
+    private async Task LoadProfesseurs()   => professeurs     = await Api.GetAdminProfesseursAsync();
+    private async Task LoadCoursNiveaux()  => coursNiveaux    = await Api.GetAdminCoursNiveauxAsync();
+    private async Task LoadDomaines()      => domaines        = await Api.GetAdminDomainesAsync();
+    private async Task LoadSousDomaines()  => sousDomaines    = await Api.GetAdminSousDomainesAsync();
+    private async Task LoadCompetences()   => competences     = await Api.GetAdminCompetencesAsync();
+    private async Task LoadAptitudes()     => aptitudes       = await Api.GetAdminAptitudesAsync();
+    private async Task LoadNomVisees()     => nomVisees       = await Api.GetAdminNomViseesAsync();
+    private async Task LoadViseesMaitriser() => viseesMaitriser = await Api.GetAdminViseesMaitriserAsync();
+
+    // ── Actions — Catégories ─────────────────────────────────────────────
+
+    // Crée une nouvelle catégorie et recharge la liste
+    private async Task CreateCategorie()
+    {
+        var (ok, err) = await Api.CreateAdminCategorieAsync(new { nomCat = newCatNom, ordre = newCatOrdre });
+        if (ok) { newCatNom = ""; newCatOrdre = 0; await LoadCategories(); }
+        await ShowFeedback(ok, ok ? "Catégorie ajoutée." : err ?? "Erreur");
+    }
+
+    // Supprime une catégorie par son identifiant et recharge la liste
+    private async Task DeleteCategorie(int id)
+    {
+        var (ok, err) = await Api.DeleteAdminCategorieAsync(id);
+        if (ok) await LoadCategories();
+        await ShowFeedback(ok, ok ? "Catégorie supprimée." : err ?? "Erreur");
+    }
+
+    // ── Actions — Cours ──────────────────────────────────────────────────
+
+    // Crée un nouveau cours et recharge la liste
+    private async Task CreateCours()
+    {
+        var (ok, err) = await Api.CreateAdminCoursAsync(new
+        {
+            nomCours = newCoursNom, codeCours = newCoursCode,
+            prefixCours = newCoursPrefix, couleurAgenda = newCoursCouleur,
+            idCatFk = newCoursIdCat == 0 ? (int?)null : newCoursIdCat
+        });
+        if (ok) { newCoursNom = ""; newCoursCode = ""; newCoursPrefix = ""; await LoadCours(); }
+        await ShowFeedback(ok, ok ? "Cours ajouté." : err ?? "Erreur");
+    }
+
+    // Supprime un cours par son identifiant et recharge la liste
+    private async Task DeleteCours(int id)
+    {
+        var (ok, err) = await Api.DeleteAdminCoursAsync(id);
+        if (ok) await LoadCours();
+        await ShowFeedback(ok, ok ? "Cours supprimé." : err ?? "Erreur");
+    }
+
+    // ── Actions — Niveaux ────────────────────────────────────────────────
+
+    // Crée un nouveau niveau et recharge la liste
+    private async Task CreateNiveau()
+    {
+        var (ok, err) = await Api.CreateAdminNiveauAsync(new { codeNiveau = newNivCode, nomNiveau = newNivNom, ordre = newNivOrdre });
+        if (ok) { newNivCode = ""; newNivNom = ""; newNivOrdre = 0; await LoadNiveaux(); }
+        await ShowFeedback(ok, ok ? "Niveau ajouté." : err ?? "Erreur");
+    }
+
+    // Supprime un niveau par son identifiant et recharge la liste
+    private async Task DeleteNiveau(int id)
+    {
+        var (ok, err) = await Api.DeleteAdminNiveauAsync(id);
+        if (ok) await LoadNiveaux();
+        await ShowFeedback(ok, ok ? "Niveau supprimé." : err ?? "Erreur");
+    }
+
+    // ── Actions — Cours-Niveau ───────────────────────────────────────────
+
+    // Crée une liaison cours-niveau-professeur et recharge la liste
+    private async Task CreateCoursNiveau()
+    {
+        var (ok, err) = await Api.CreateAdminCoursNiveauAsync(new { idCoursFk = newCnIdCours, idNiveauFk = newCnIdNiveau, idProfFk = newCnIdProf });
+        if (ok) { newCnIdCours = 0; newCnIdNiveau = 0; newCnIdProf = 0; await LoadCoursNiveaux(); }
+        await ShowFeedback(ok, ok ? "Liaison ajoutée." : err ?? "Erreur");
+    }
+
+    // Supprime une liaison cours-niveau et recharge la liste
+    private async Task DeleteCoursNiveau(int id)
+    {
+        var (ok, err) = await Api.DeleteAdminCoursNiveauAsync(id);
+        if (ok) await LoadCoursNiveaux();
+        await ShowFeedback(ok, ok ? "Liaison supprimée." : err ?? "Erreur");
+    }
+
+    // ── Actions — Domaines ───────────────────────────────────────────────
+
+    // Crée un nouveau domaine et recharge la liste
+    private async Task CreateDomaine()
+    {
+        var (ok, err) = await Api.CreateAdminDomaineAsync(new { nom = newDomNom, idCoursNiveauFk = newDomIdCn });
+        if (ok) { newDomNom = ""; newDomIdCn = 0; await LoadDomaines(); }
+        await ShowFeedback(ok, ok ? "Domaine ajouté." : err ?? "Erreur");
+    }
+
+    // Supprime un domaine par son identifiant et recharge la liste
+    private async Task DeleteDomaine(int id)
+    {
+        var (ok, err) = await Api.DeleteAdminDomaineAsync(id);
+        if (ok) await LoadDomaines();
+        await ShowFeedback(ok, ok ? "Domaine supprimé." : err ?? "Erreur");
+    }
+
+    // ── Actions — Sous-domaines ──────────────────────────────────────────
+
+    // Crée un nouveau sous-domaine et recharge la liste
+    private async Task CreateSousDomaine()
+    {
+        var (ok, err) = await Api.CreateAdminSousDomaineAsync(new { nomComp = newSdNom, idDomFk = newSdIdDom });
+        if (ok) { newSdNom = ""; newSdIdDom = 0; await LoadSousDomaines(); }
+        await ShowFeedback(ok, ok ? "Sous-domaine ajouté." : err ?? "Erreur");
+    }
+
+    // Supprime un sous-domaine par son identifiant et recharge la liste
+    private async Task DeleteSousDomaine(int id)
+    {
+        var (ok, err) = await Api.DeleteAdminSousDomaineAsync(id);
+        if (ok) await LoadSousDomaines();
+        await ShowFeedback(ok, ok ? "Sous-domaine supprimé." : err ?? "Erreur");
+    }
+
+    // ── Actions — Compétences ────────────────────────────────────────────
+
+    // Crée une nouvelle compétence et recharge la liste
+    private async Task CreateCompetence()
+    {
+        var (ok, err) = await Api.CreateAdminCompetenceAsync(new { nom = newCompNom });
+        if (ok) { newCompNom = ""; await LoadCompetences(); }
+        await ShowFeedback(ok, ok ? "Compétence ajoutée." : err ?? "Erreur");
+    }
+
+    // Supprime une compétence par son identifiant et recharge la liste
+    private async Task DeleteCompetence(int id)
+    {
+        var (ok, err) = await Api.DeleteAdminCompetenceAsync(id);
+        if (ok) await LoadCompetences();
+        await ShowFeedback(ok, ok ? "Compétence supprimée." : err ?? "Erreur");
+    }
+
+    // ── Actions — Aptitudes ──────────────────────────────────────────────
+
+    // Crée une nouvelle aptitude et recharge la liste
+    private async Task CreateAptitude()
+    {
+        var (ok, err) = await Api.CreateAdminAptitudeAsync(new { nom = newAptNom });
+        if (ok) { newAptNom = ""; await LoadAptitudes(); }
+        await ShowFeedback(ok, ok ? "Aptitude ajoutée." : err ?? "Erreur");
+    }
+
+    // Supprime une aptitude par son identifiant et recharge la liste
+    private async Task DeleteAptitude(int id)
+    {
+        var (ok, err) = await Api.DeleteAdminAptitudeAsync(id);
+        if (ok) await LoadAptitudes();
+        await ShowFeedback(ok, ok ? "Aptitude supprimée." : err ?? "Erreur");
+    }
+
+    // ── Actions — Noms visées ────────────────────────────────────────────
+
+    // Crée un nouveau nom de visée et recharge la liste
+    private async Task CreateNomVisee()
+    {
+        var (ok, err) = await Api.CreateAdminNomViseeAsync(new { nom = newNvNom });
+        if (ok) { newNvNom = ""; await LoadNomVisees(); }
+        await ShowFeedback(ok, ok ? "Nom de visée ajouté." : err ?? "Erreur");
+    }
+
+    // Supprime un nom de visée par son identifiant et recharge la liste
+    private async Task DeleteNomVisee(int id)
+    {
+        var (ok, err) = await Api.DeleteAdminNomViseeAsync(id);
+        if (ok) await LoadNomVisees();
+        await ShowFeedback(ok, ok ? "Nom de visée supprimé." : err ?? "Erreur");
+    }
+
+    // ── Actions — Visées à maîtriser ─────────────────────────────────────
+
+    // Crée une nouvelle visée à maîtriser et recharge la liste
+    private async Task CreateViseesMaitriser()
+    {
+        var (ok, err) = await Api.CreateAdminViseesMaitriserAsync(new { nom = newVmNom });
+        if (ok) { newVmNom = ""; await LoadViseesMaitriser(); }
+        await ShowFeedback(ok, ok ? "Visée à maîtriser ajoutée." : err ?? "Erreur");
+    }
+
+    // Supprime une visée à maîtriser par son identifiant et recharge la liste
+    private async Task DeleteViseesMaitriser(int id)
+    {
+        var (ok, err) = await Api.DeleteAdminViseesMaitriserAsync(id);
+        if (ok) await LoadViseesMaitriser();
+        await ShowFeedback(ok, ok ? "Visée à maîtriser supprimée." : err ?? "Erreur");
+    }
+}

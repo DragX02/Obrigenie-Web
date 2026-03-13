@@ -32,6 +32,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWNjZXNzQ29kZVBhZ2UucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
+[G:/csharpcallender/Obrigenie/Pages/AdminDataPage.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5EYXRhUGFnZS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [G:/csharpcallender/Obrigenie/Pages/AdminPage.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5QYWdlLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
