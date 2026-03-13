@@ -27,6 +27,21 @@
         <a class="dismiss">🗙</a>
     </div>
     <script src="_framework/blazor.webassembly.js"></script>
+    <script>
+        // Crée une URL blob à partir d'un tableau d'octets reçu depuis Blazor.
+        // Utilisé par ReferentielPage pour afficher un PDF dans un iframe
+        // sans exposer le token JWT dans l'URL de la requête.
+        window.creerUrlBlob = function (octets, typeMime) {
+            const blob = new Blob([new Uint8Array(octets)], { type: typeMime });
+            return URL.createObjectURL(blob);
+        };
+
+        // Libère une URL blob précédemment créée pour éviter les fuites mémoire.
+        // À appeler lorsqu'un nouveau PDF est chargé ou que la page est déchargée.
+        window.libererUrlBlob = function (url) {
+            if (url) URL.revokeObjectURL(url);
+        };
+    </script>
 </body>
 
 </html>

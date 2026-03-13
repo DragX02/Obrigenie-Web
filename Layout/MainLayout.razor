@@ -78,6 +78,11 @@
                     <span class="flyout-icon">📅</span> Calendar
                 </a>
 
+                @* Lien vers le lecteur de référentiels PDF, visible pour tous les utilisateurs connectés *@
+                <a href="/referentiel" class="flyout-item" @onclick="CloseFlyout">
+                    <span class="flyout-icon">📄</span> Référentiels
+                </a>
+
                 @* Admin-only links: license management and the cascade-selection test page *@
                 @if (isAdmin)
                 {

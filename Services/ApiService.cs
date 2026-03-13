@@ -424,6 +424,53 @@ namespace Obrigenie.Services
         }
 
         // ──────────────────────────────────────────────────────────────────
+        // RÉFÉRENTIEL — LECTEUR DE PDF
+        // ──────────────────────────────────────────────────────────────────
+
+        // URL de base de l'API (ex. : "http://localhost:5276/") utilisée par la page
+        // ReferentielPage pour construire les URLs des fichiers PDF à afficher.
+        public string BaseUrl => _httpClient.BaseAddress?.ToString() ?? "";
+
+        // Récupère la liste des noms de fichiers PDF disponibles dans le dossier Referentiel du serveur.
+        // Endpoint : GET api/referentiel
+        // Retourne la liste triée des noms de fichiers, ou une liste vide en cas d'erreur.
+        public async Task<List<string>> GetReferentielListAsync()
+        {
+            try
+            {
+                var request = await BuildAuthRequest(HttpMethod.Get, "api/referentiel");
+                var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode) return new();
+                return await response.Content.ReadFromJsonAsync<List<string>>() ?? new();
+            }
+            catch
+            {
+                return new();
+            }
+        }
+
+        // Télécharge le contenu binaire d'un fichier PDF depuis le serveur.
+        // Le tableau d'octets est ensuite passé au JS via IJSRuntime pour créer une URL blob
+        // et l'afficher dans un iframe sans exposer le token JWT dans l'URL.
+        // Endpoint : GET api/referentiel/{nomFichier}
+        // nomFichier : le nom du fichier PDF à télécharger (ex. : "referentiel-maths.pdf").
+        // Retourne le contenu du fichier en octets, ou null en cas d'erreur.
+        public async Task<byte[]?> GetReferentielPdfAsync(string nomFichier)
+        {
+            try
+            {
+                var request = await BuildAuthRequest(HttpMethod.Get, $"api/referentiel/{Uri.EscapeDataString(nomFichier)}");
+                var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode) return null;
+                return await response.Content.ReadAsByteArrayAsync();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────────
         // DONNÉES DE RÉFÉRENCE — LISTES DÉROULANTES EN CASCADE (TestPage)
         // ──────────────────────────────────────────────────────────────────
 

@@ -1,0 +1,195 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   ReferentielPage.razor — Lecteur de PDF des référentiels pédagogiques.
+
+   Au chargement, la page récupère la liste des PDFs disponibles sur le serveur
+   via api/referentiel. L'utilisateur sélectionne un fichier dans la liste ;
+   le PDF est téléchargé en octets (avec le token JWT) puis affiché dans un
+   iframe via une URL blob créée en JavaScript. L'URL blob est libérée dès
+   qu'un nouveau PDF est chargé ou que la page est détruite.
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@* Route de la page *@
+@page "/referentiel"
+
+@* Injection du service d'authentification pour vérifier la connexion *@
+@inject AuthService Auth
+
+@* Injection du gestionnaire de navigation pour les redirections *@
+@inject NavigationManager Nav
+
+@* Injection du service API pour charger la liste et les octets des PDFs *@
+@inject ApiService Api
+
+@* Injection du runtime JavaScript pour créer et libérer les URLs blob *@
+@inject IJSRuntime JS
+
+@* Implémentation de IAsyncDisposable pour libérer l'URL blob à la destruction *@
+@implements IAsyncDisposable
+
+<div class="container-fluid mt-3 px-3">
+    <h2>📄 Référentiels pédagogiques</h2>
+    <hr />
+
+    @if (chargementListe)
+    {
+        @* Indicateur pendant le chargement de la liste des fichiers *@
+        <p class="text-muted">Chargement de la liste…</p>
+    }
+    else if (!fichiers.Any())
+    {
+        @* Aucun PDF trouvé dans le dossier Referentiel du serveur *@
+        <div class="alert alert-warning">Aucun référentiel disponible pour le moment.</div>
+    }
+    else
+    {
+        <div class="row g-3" style="height: calc(100vh - 140px);">
+
+            @* ── Colonne gauche : liste des PDFs disponibles ───────────────── *@
+            <div class="col-md-3 d-flex flex-column">
+                <h6 class="fw-bold mb-2">Choisir un référentiel :</h6>
+                <div class="list-group overflow-auto flex-grow-1">
+                    @foreach (var fichier in fichiers)
+                    {
+                        @* Chaque bouton charge et affiche le PDF correspondant *@
+                        <button class="list-group-item list-group-item-action @(fichierSelectionne == fichier ? "active" : "")"
+                                @onclick="() => ChargerPdf(fichier)">
+                            @* Affichage du nom formaté : sans extension, tirets → espaces *@
+                            @FormatNom(fichier)
+                        </button>
+                    }
+                </div>
+            </div>
+
+            @* ── Colonne droite : visionneuse PDF ─────────────────────────── *@
+            <div class="col-md-9 d-flex flex-column">
+                @if (chargementPdf)
+                {
+                    @* Indicateur pendant le téléchargement du PDF sélectionné *@
+                    <div class="d-flex align-items-center justify-content-center flex-grow-1">
+                        <div class="spinner-border text-primary me-2" role="status"></div>
+                        <span>Chargement du PDF…</span>
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(erreur))
+                {
+                    @* Message d'erreur si le téléchargement a échoué *@
+                    <div class="alert alert-danger mt-2">@erreur</div>
+                }
+                else if (!string.IsNullOrEmpty(urlBlob))
+                {
+                    @* Iframe affichant le PDF via une URL blob (pas de JWT dans l'URL) *@
+                    <iframe src="@urlBlob"
+                            class="flex-grow-1 border rounded"
+                            style="min-height: 600px;"
+                            title="@fichierSelectionne">
+                    </iframe>
+                }
+                else
+                {
+                    @* État initial : aucun PDF sélectionné *@
+                    <div class="d-flex align-items-center justify-content-center flex-grow-1 text-muted border rounded">
+                        <span>← Sélectionnez un référentiel dans la liste</span>
+                    </div>
+                }
+            </div>
+
+        </div>
+    }
+</div>
+
+@code {
+    // Liste des noms de fichiers PDF retournée par api/referentiel
+    private List<string> fichiers = new();
+
+    // Nom du fichier actuellement sélectionné dans la liste (met le bouton en surbrillance)
+    private string? fichierSelectionne;
+
+    // URL blob créée par JavaScript à partir des octets du PDF téléchargé
+    private string? urlBlob;
+
+    // True pendant le chargement initial de la liste des fichiers
+    private bool chargementListe = true;
+
+    // True pendant le téléchargement du PDF sélectionné
+    private bool chargementPdf = false;
+
+    // Message d'erreur affiché si le téléchargement du PDF échoue
+    private string? erreur;
+
+    // Initialisation : vérifie l'authentification et charge la liste des PDFs
+    protected override async Task OnInitializedAsync()
+    {
+        // Redirection vers /login si l'utilisateur n'est pas authentifié
+        if (!await Auth.IsLoggedInAsync())
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        // Récupère la liste des fichiers disponibles depuis l'API
+        fichiers = await Api.GetReferentielListAsync();
+        chargementListe = false;
+    }
+
+    // Télécharge un PDF depuis l'API et l'affiche dans l'iframe via une URL blob.
+    // fichier : le nom du fichier PDF à charger (ex. : "referentiel-maths.pdf")
+    private async Task ChargerPdf(string fichier)
+    {
+        // Ne recharge pas si le même fichier est déjà affiché
+        if (fichierSelectionne == fichier) return;
+
+        fichierSelectionne = fichier;
+        chargementPdf = true;
+        erreur = null;
+
+        // Libère l'URL blob précédente pour éviter les fuites mémoire
+        await LiberUrlBlob();
+
+        StateHasChanged();
+
+        // Télécharge le contenu binaire du PDF via le client HTTP authentifié
+        var octets = await Api.GetReferentielPdfAsync(fichier);
+
+        if (octets == null || octets.Length == 0)
+        {
+            erreur = $"Impossible de charger « {FormatNom(fichier)} ».";
+        }
+        else
+        {
+            // Crée une URL blob côté navigateur à partir des octets reçus
+            urlBlob = await JS.InvokeAsync<string>("creerUrlBlob", octets, "application/pdf");
+        }
+
+        chargementPdf = false;
+    }
+
+    // Formate le nom du fichier pour l'affichage dans la liste :
+    // supprime l'extension .pdf, remplace les tirets par des espaces
+    // et met la première lettre en majuscule.
+    private static string FormatNom(string? nomFichier)
+    {
+        if (string.IsNullOrEmpty(nomFichier)) return "";
+        // Supprime l'extension
+        var sans = Path.GetFileNameWithoutExtension(nomFichier);
+        // Remplace les tirets par des espaces
+        var lisible = sans.Replace('-', ' ').Trim();
+        // Première lettre en majuscule
+        return char.ToUpper(lisible[0]) + lisible[1..];
+    }
+
+    // Libère l'URL blob courante via JavaScript pour libérer la mémoire du navigateur
+    private async Task LiberUrlBlob()
+    {
+        if (!string.IsNullOrEmpty(urlBlob))
+        {
+            await JS.InvokeVoidAsync("libererUrlBlob", urlBlob);
+            urlBlob = null;
+        }
+    }
+
+    // Libère l'URL blob lors de la destruction du composant (navigation vers une autre page)
+    public async ValueTask DisposeAsync()
+    {
+        await LiberUrlBlob();
+    }
+}
