@@ -497,7 +497,8 @@ else
 
                             @* Étape 8 (optionnelle) : visée à maîtriser → crée le lien automatiquement *@
                             <label class="form-label fw-bold">8. Visée à maîtriser <span class="text-muted">(optionnel)</span></label>
-                            <select class="form-select mb-2" @bind="vVmId">
+                            <select class="form-select mb-2" value="@vVmId"
+                                    @onchange="e => { vVmId = int.TryParse(e.Value?.ToString(), out var v) ? v : 0; if (vVmId == 0) vAptIds = new(); }">
                                 <option value="0">-- Aucune --</option>
                                 @foreach (var vm in viseesMaitriser)
                                 {
@@ -505,15 +506,21 @@ else
                                 }
                             </select>
 
-                            @* Étape 9 (optionnelle) : aptitude → crée l'entrée appartenir si une VM est sélectionnée *@
-                            <label class="form-label fw-bold">9. Aptitude <span class="text-muted">(optionnel)</span></label>
-                            <select class="form-select mb-3" @bind="vAptId" disabled="@(vVmId == 0)">
-                                <option value="0">-- Aucune --</option>
+                            @* Étape 9 (optionnelle) : aptitudes → crée une entrée appartenir par aptitude cochée *@
+                            <label class="form-label fw-bold">9. Aptitudes <span class="text-muted">(optionnel — plusieurs possibles)</span></label>
+                            <div class="mb-3 @(vVmId == 0 ? "opacity-50 pe-none" : "")">
                                 @foreach (var a in aptitudes)
                                 {
-                                    <option value="@a.IdAptitude">@a.NomAptitude</option>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox"
+                                               id="apt_@a.IdAptitude"
+                                               checked="@vAptIds.Contains(a.IdAptitude)"
+                                               disabled="@(vVmId == 0)"
+                                               @onchange="e => ToggleAptitude(a.IdAptitude, (bool)(e.Value ?? false))" />
+                                        <label class="form-check-label" for="apt_@a.IdAptitude">@a.NomAptitude</label>
+                                    </div>
                                 }
-                            </select>
+                            </div>
 
                             <button class="btn btn-primary w-100" @onclick="CreateVisee"
                                     disabled="@(vDomaineId == 0 || vNomViseeId == 0 || vCompId == 0)">
@@ -722,8 +729,8 @@ else
     private int vNomViseeId = 0;
     private int vCompId     = 0;
     // Liaisons optionnelles créées en même temps que la visée
-    private int vVmId  = 0; // visée à maîtriser (étape 8)
-    private int vAptId = 0; // aptitude pour appartenir (étape 9)
+    private int          vVmId   = 0;       // visée à maîtriser (étape 8)
+    private HashSet<int> vAptIds = new();   // aptitudes sélectionnées pour appartenir (étape 9)
 
     // ── Champs de saisie — Liaison visée ↔ visée à maîtriser ─────────────
     private int lienIdVisee = 0;
@@ -858,6 +865,13 @@ else
         vSousDomId = 0;
     }
 
+    // Coche ou décoche une aptitude dans la sélection multiple (étape 9)
+    private void ToggleAptitude(int id, bool isChecked)
+    {
+        if (isChecked) vAptIds.Add(id);
+        else           vAptIds.Remove(id);
+    }
+
     // ── Actions — Visées ─────────────────────────────────────────────────
 
     // Crée une nouvelle visée via la sélection en cascade et recharge la liste.
@@ -886,15 +900,18 @@ else
             await Api.CreateAdminLienViseeMaitriseAsync(new { idVisee = newId, idViseesMaitriser = vVmId });
             await LoadLiensViseeMaitrise();
 
-            // Crée l'entrée appartenir si une aptitude est aussi sélectionnée
-            if (vAptId != 0)
+            // Crée une entrée appartenir par aptitude cochée
+            if (vAptIds.Count > 0)
             {
-                await Api.CreateAdminAppartenirAsync(new
+                foreach (var aptId in vAptIds)
                 {
-                    idViseesMaitriserFk = vVmId,
-                    idAptitudeFk        = (int?)vAptId,
-                    idCompetenceFk      = vCompId
-                });
+                    await Api.CreateAdminAppartenirAsync(new
+                    {
+                        idViseesMaitriserFk = vVmId,
+                        idAptitudeFk        = (int?)aptId,
+                        idCompetenceFk      = vCompId
+                    });
+                }
                 await LoadAppartenirs();
             }
         }
@@ -905,7 +922,7 @@ else
         // Réinitialise tous les sélecteurs
         vCatId = 0; vCoursId = 0; vCnId = 0;
         vDomaineId = 0; vSousDomId = 0; vNomViseeId = 0; vCompId = 0;
-        vVmId = 0; vAptId = 0;
+        vVmId = 0; vAptIds = new();
 
         await ShowFeedback(true, avecLiaisons ? "Visée créée + liaisons automatiques." : "Visée créée.");
     }
