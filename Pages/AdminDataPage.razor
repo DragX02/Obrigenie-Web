@@ -24,16 +24,21 @@ else
     <div class="container-fluid py-3">
         <h2 class="mb-3">Gestion des données pédagogiques</h2>
 
-        @* Barre d'onglets *@
-        <ul class="nav nav-tabs flex-wrap mb-3">
-            @foreach (var t in tabs)
-            {
-                <li class="nav-item">
-                    <button class="nav-link @(activeTab == t ? "active" : "")"
-                            @onclick="() => activeTab = t">@t</button>
-                </li>
-            }
-        </ul>
+        @* Barre d'onglets + champ de recherche *@
+        <div class="d-flex flex-wrap align-items-start gap-2 mb-3">
+            <ul class="nav nav-tabs flex-wrap flex-grow-1 mb-0">
+                @foreach (var t in tabs)
+                {
+                    <li class="nav-item">
+                        <button class="nav-link @(activeTab == t ? "active" : "")"
+                                @onclick="() => SetTab(t)">@t</button>
+                    </li>
+                }
+            </ul>
+            <input class="form-control" style="max-width:240px"
+                   placeholder="🔍 Rechercher…"
+                   @bind="searchQuery" @bind:event="oninput" />
+        </div>
 
         @* Message de retour global *@
         @if (!string.IsNullOrEmpty(feedback))
@@ -62,7 +67,7 @@ else
                     <table class="table table-sm table-hover">
                         <thead><tr><th>ID</th><th>Nom</th><th>Ordre</th><th></th></tr></thead>
                         <tbody>
-                            @foreach (var c in categories)
+                            @foreach (var c in categories.Where(x => MatchSearch(x.NomCat)))
                             {
                                 <tr>
                                     <td>@c.IdCat</td>
@@ -104,7 +109,7 @@ else
                     <table class="table table-sm table-hover">
                         <thead><tr><th>ID</th><th>Nom</th><th>Code</th><th>Couleur</th><th>Catégorie</th><th></th></tr></thead>
                         <tbody>
-                            @foreach (var c in coursList)
+                            @foreach (var c in coursList.Where(x => MatchSearch(x.NomCours, x.CodeCours, x.NomCat)))
                             {
                                 <tr>
                                     <td>@c.IdCours</td>
@@ -139,7 +144,7 @@ else
                     <table class="table table-sm table-hover">
                         <thead><tr><th>ID</th><th>Code</th><th>Nom</th><th></th></tr></thead>
                         <tbody>
-                            @foreach (var n in niveaux)
+                            @foreach (var n in niveaux.Where(x => MatchSearch(x.CodeNiveau, x.NomNiveau)))
                             {
                                 <tr>
                                     <td>@n.IdNiveau</td>
@@ -191,7 +196,7 @@ else
                     <table class="table table-sm table-hover">
                         <thead><tr><th>ID</th><th>Cours</th><th>Niveau</th><th>Professeur</th><th></th></tr></thead>
                         <tbody>
-                            @foreach (var cn in coursNiveaux)
+                            @foreach (var cn in coursNiveaux.Where(x => MatchSearch(x.NomCours, x.NomNiveau, x.NomProf, x.EmailProf)))
                             {
                                 <tr>
                                     <td>@cn.IdCoursNiveau</td>
@@ -231,7 +236,7 @@ else
                     <table class="table table-sm table-hover">
                         <thead><tr><th>ID</th><th>Nom</th><th>Cours</th><th>Niveau</th><th></th></tr></thead>
                         <tbody>
-                            @foreach (var d in domaines)
+                            @foreach (var d in domaines.Where(x => MatchSearch(x.Nom, x.NomCours, x.NomNiveau)))
                             {
                                 <tr>
                                     <td>@d.IdDom</td>
@@ -271,7 +276,7 @@ else
                     <table class="table table-sm table-hover">
                         <thead><tr><th>ID</th><th>Nom</th><th>Domaine</th><th></th></tr></thead>
                         <tbody>
-                            @foreach (var s in sousDomaines)
+                            @foreach (var s in sousDomaines.Where(x => MatchSearch(x.NomComp, x.NomDom)))
                             {
                                 <tr>
                                     <td>@s.IdSousDomaine</td>
@@ -303,7 +308,7 @@ else
                     <table class="table table-sm table-hover">
                         <thead><tr><th>ID</th><th>Nom</th><th></th></tr></thead>
                         <tbody>
-                            @foreach (var c in competences)
+                            @foreach (var c in competences.Where(x => MatchSearch(x.NomCompetence)))
                             {
                                 <tr>
                                     <td>@c.IdCompetence</td>
@@ -334,7 +339,7 @@ else
                     <table class="table table-sm table-hover">
                         <thead><tr><th>ID</th><th>Nom</th><th></th></tr></thead>
                         <tbody>
-                            @foreach (var a in aptitudes)
+                            @foreach (var a in aptitudes.Where(x => MatchSearch(x.NomAptitude)))
                             {
                                 <tr>
                                     <td>@a.IdAptitude</td>
@@ -365,7 +370,7 @@ else
                     <table class="table table-sm table-hover">
                         <thead><tr><th>ID</th><th>Intitulé</th><th></th></tr></thead>
                         <tbody>
-                            @foreach (var n in nomVisees)
+                            @foreach (var n in nomVisees.Where(x => MatchSearch(x.NomVisee1)))
                             {
                                 <tr>
                                     <td>@n.IdNomVisee</td>
@@ -396,7 +401,7 @@ else
                     <table class="table table-sm table-hover">
                         <thead><tr><th>ID</th><th>Description</th><th></th></tr></thead>
                         <tbody>
-                            @foreach (var v in viseesMaitriser)
+                            @foreach (var v in viseesMaitriser.Where(x => MatchSearch(x.NomViseesMaitriser)))
                             {
                                 <tr>
                                     <td>@v.IdViseesMaitriser</td>
@@ -523,7 +528,7 @@ else
                             <tr><th>ID</th><th>Type</th><th>Cours</th><th>Domaine</th><th>S-Dom</th><th>Compétence</th><th></th></tr>
                         </thead>
                         <tbody>
-                            @foreach (var v in visees)
+                            @foreach (var v in visees.Where(x => MatchSearch(x.NomViseeType, x.NomCours, x.NomNiveau, x.NomDomaine, x.NomSousDomaine, x.NomCompetence)))
                             {
                                 <tr>
                                     <td>@v.IdVisee</td>
@@ -578,7 +583,7 @@ else
                             <tr><th>Visée</th><th>Visée à maîtriser</th><th></th></tr>
                         </thead>
                         <tbody>
-                            @foreach (var l in liensViseeMaitrise)
+                            @foreach (var l in liensViseeMaitrise.Where(x => MatchSearch(x.ContexteVisee, x.NomViseesMaitriser)))
                             {
                                 <tr>
                                     <td>[@l.IdVisee] @l.ContexteVisee</td>
@@ -637,7 +642,7 @@ else
                             <tr><th>Visée à maîtriser</th><th>Aptitude</th><th>Compétence</th><th></th></tr>
                         </thead>
                         <tbody>
-                            @foreach (var a in appartenirs)
+                            @foreach (var a in appartenirs.Where(x => MatchSearch(x.NomVm, x.NomAptitude, x.NomComp)))
                             {
                                 <tr>
                                     <td>@a.NomVm</td>
@@ -664,6 +669,17 @@ else
 
     // Onglet actuellement sélectionné
     private string activeTab = "Catégories";
+
+    // Texte de recherche — filtre les lignes du tableau de l'onglet actif
+    private string searchQuery = "";
+
+    // Change l'onglet et efface la recherche en cours
+    private void SetTab(string tab) { activeTab = tab; searchQuery = ""; }
+
+    // Retourne true si searchQuery est vide ou si au moins une des valeurs le contient (insensible à la casse)
+    private bool MatchSearch(params string?[] values)
+        => string.IsNullOrWhiteSpace(searchQuery)
+           || values.Any(v => v?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) == true);
 
     // Liste des noms d'onglets dans l'ordre d'affichage
     private readonly string[] tabs =
