@@ -1,7 +1,7 @@
 {
   "mainAssemblyName": "Obrigenie",
   "resources": {
-    "hash": "sha256-GJQ3qNM1ZF6L43KlFSXqRIq7FNhTe0whvo55YHAw+5g=",
+    "hash": "sha256-MlyDj3NVDucb6ji9znK+OX8SwcsfwoCW0CmOkZ9RmDY=",
     "jsModuleNative": {
       "dotnet.native.js": "sha256-NljIbpK/1KCj0+knpX8U77Rbl5kTtfFIuFjK7AuczEw="
     },
@@ -214,15 +214,16 @@
       "mscorlib.wasm": "sha256-oV7k+vcNqj7FS6Y/lMtdhVlq3myDH55/wVxmO4QPrw4=",
       "netstandard.wasm": "sha256-XMXMB0WW//vbNNgQiFAqYo7IJ2C4yQX590aoAbOtTB4=",
       "System.Private.CoreLib.wasm": "sha256-tuhzUgbFn7ji3yhMSxyBLHAps9h0RsFnq+8pUoizHiw=",
-      "Obrigenie.wasm": "sha256-22G1siZThOSGdQTVGF8olJBSVp3giWkp103y+B/DnsM="
+      "Obrigenie.wasm": "sha256-u1VJBABX923uF9XJMA8kRmEUpmaMfBvxWRYpnEV0C2I="
     },
     "pdb": {
-      "Obrigenie.pdb": "sha256-FSKJjEXShK93fVOx4JJSdnxvYKDJB4TeE99MX/wcWsQ="
+      "Obrigenie.pdb": "sha256-sIapftVKcoPmLURfDnAGD3EP3ggE9NaiyLbP9/KLe9I="
     }
   },
   "cacheBootResources": true,
   "debugLevel": -1,
   "appsettings": [
+    "../appsettings.Development.json",
     "../appsettings.json"
   ],
   "globalizationMode": "sharded",
