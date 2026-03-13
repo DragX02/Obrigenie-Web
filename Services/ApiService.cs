@@ -709,6 +709,17 @@ namespace Obrigenie.Services
                 throw new HttpRequestException($"api/ref/visees-maitriser/{idVisee} a retourné {(int)response.StatusCode} {response.StatusCode}.");
             return await response.Content.ReadFromJsonAsync<List<ViseesMaitriserRefDto>>() ?? new();
         }
+
+        // Retourne les entrées appartenir_visee_aptitude d'une visée à maîtriser.
+        // Endpoint : GET api/ref/appartenir/{idVm}
+        public async Task<List<AppartenirRefDto>> GetAppartenirRefAsync(int idVm)
+        {
+            var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/appartenir/{idVm}");
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/appartenir/{idVm} a retourné {(int)response.StatusCode} {response.StatusCode}.");
+            return await response.Content.ReadFromJsonAsync<List<AppartenirRefDto>>() ?? new();
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -849,6 +860,17 @@ namespace Obrigenie.Services
     {
         [JsonPropertyName("idViseesMaitriser")]  public int    IdViseesMaitriser  { get; set; }
         [JsonPropertyName("nomViseesMaitriser")] public string NomViseesMaitriser { get; set; } = string.Empty;
+    }
+
+    // DTO appartenir_visee_aptitude pour la sélection en cascade (ref)
+    // Représente une aptitude + compétence liées à une visée à maîtriser
+    public class AppartenirRefDto
+    {
+        [JsonPropertyName("idAppartenirViseeAptitude")] public int     IdAppartenirViseeAptitude { get; set; }
+        [JsonPropertyName("idAptitude")]                public int?    IdAptitude                { get; set; }
+        [JsonPropertyName("nomAptitude")]               public string? NomAptitude               { get; set; }
+        [JsonPropertyName("idCompetenceFk")]            public int     IdCompetenceFk            { get; set; }
+        [JsonPropertyName("nomCompetence")]             public string  NomCompetence             { get; set; } = string.Empty;
     }
 
     // ──────────────────────────────────────────────────────────────────────

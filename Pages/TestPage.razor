@@ -152,13 +152,33 @@ else
                 {
                     <div class="mb-3">
                         <label class="form-label fw-bold">7. Visée à maîtriser</label>
-                        <select class="form-select" value="@selectedIdVm" @onchange="e => selectedIdVm = int.TryParse(e.Value?.ToString(), out var v) ? v : 0">
+                        <select class="form-select" value="@selectedIdVm" @onchange="OnVmChanged">
                             <option value="0">-- Select --</option>
                             @foreach (var vm in listeViseesMaitriser)
                             {
                                 <option value="@vm.IdViseesMaitriser">@vm.NomViseesMaitriser</option>
                             }
                         </select>
+                    </div>
+                }
+
+                @* Étape 8 : aptitudes liées à la VM (parler / écouter / lire / écrire…) *@
+                @if (selectedIdVm > 0 && listeAppartenir.Count > 0)
+                {
+                    <div class="mb-3 p-3 border rounded">
+                        <label class="form-label fw-bold">8. Aptitudes liées <span class="text-muted">(sélectionne celles qui s'appliquent)</span></label>
+                        @foreach (var a in listeAppartenir)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       id="rapt_@a.IdAppartenirViseeAptitude"
+                                       checked="@selectedAppartenirIds.Contains(a.IdAppartenirViseeAptitude)"
+                                       @onchange="e => ToggleAppartenir(a.IdAppartenirViseeAptitude, (bool)(e.Value ?? false))" />
+                                <label class="form-check-label" for="rapt_@a.IdAppartenirViseeAptitude">
+                                    @(a.NomAptitude ?? "—") <span class="text-muted small">(@a.NomCompetence)</span>
+                                </label>
+                            </div>
+                        }
                     </div>
                 }
 
@@ -230,7 +250,8 @@ else
     private int    selectedIdDomaine  = 0;
     private int    selectedIdSousD    = 0;  // sous-domaine (0 = aucun)
     private int    selectedIdVisee    = 0;
-    private int    selectedIdVm       = 0;  // visée à maîtriser
+    private int          selectedIdVm          = 0;   // visée à maîtriser
+    private HashSet<int> selectedAppartenirIds = new(); // aptitudes cochées (étape 8)
 
     // ── Listes chargées depuis l'API ──────────────────────────────────────
     private List<CategorieDto>          listeCategories      = new();
@@ -240,6 +261,7 @@ else
     private List<SousDomaineRefDto>     listeSousDomaines    = new();
     private List<ViseeRefDto>           listeVisees          = new();
     private List<ViseesMaitriserRefDto> listeViseesMaitriser = new();
+    private List<AppartenirRefDto>      listeAppartenir      = new();
 
     // ── Gestionnaires ─────────────────────────────────────────────────────
 
@@ -297,9 +319,27 @@ else
         selectedIdVisee = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
         selectedIdVm    = 0;
         listeViseesMaitriser.Clear();
+        listeAppartenir.Clear();
+        selectedAppartenirIds = new();
         if (selectedIdVisee > 0)
             try { listeViseesMaitriser = await Api.GetViseesMaitriserRefAsync(selectedIdVisee); }
             catch (Exception ex) { loadError = ex.Message; }
+    }
+
+    private async Task OnVmChanged(ChangeEventArgs e)
+    {
+        selectedIdVm = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        listeAppartenir.Clear();
+        selectedAppartenirIds = new();
+        if (selectedIdVm > 0)
+            try { listeAppartenir = await Api.GetAppartenirRefAsync(selectedIdVm); }
+            catch (Exception ex) { loadError = ex.Message; }
+    }
+
+    private void ToggleAppartenir(int id, bool isChecked)
+    {
+        if (isChecked) selectedAppartenirIds.Add(id);
+        else           selectedAppartenirIds.Remove(id);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
@@ -313,6 +353,7 @@ else
         if (level <= 4) { selectedIdSousD = 0; listeSousDomaines.Clear(); selectedIdVisee = 0; listeVisees.Clear(); }
         if (level <= 5) { selectedIdVisee = 0; listeVisees.Clear(); }
         selectedIdVm = 0; listeViseesMaitriser.Clear();
+        listeAppartenir.Clear(); selectedAppartenirIds = new();
     }
 
     private async Task ChargerDomaines()
