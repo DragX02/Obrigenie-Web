@@ -19,6 +19,7 @@
 
 @* Injection d'AuthService pour lire le rôle de l'utilisateur depuis le JWT à l'initialisation *@
 @inject AuthService Auth
+@inject NavigationManager Nav
 
 @* Injection d'ApiService pour charger les listes de données de référence depuis l'API *@
 @inject ApiService Api
@@ -187,6 +188,14 @@ else
     // Les non-admins voient le message d'accès refusé et aucune donnée n'est récupérée.
     protected override async Task OnInitializedAsync()
     {
+        // Redirection si le token est absent ou expiré — évite les 401 silencieux
+        if (await Auth.IsTokenExpiredAsync())
+        {
+            await Auth.RemoveTokenAsync();
+            Nav.NavigateTo("/login");
+            return;
+        }
+
         var role = await Auth.GetRoleAsync();
         isAdmin = role == "ADMIN";
 

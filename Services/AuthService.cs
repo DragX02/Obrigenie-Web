@@ -68,13 +68,41 @@ namespace Obrigenie.Services
             await _localStorage.RemoveItemAsync(EmailKey);
         }
 
-        // Vérifie si l'utilisateur est actuellement authentifié en contrôlant qu'un jeton JWT
-        // non vide existe dans le stockage local. Ne valide pas la signature ou l'expiration du jeton.
-        public async Task<bool> IsLoggedInAsync()
+        // Vérifie si le jeton JWT stocké est expiré en lisant la claim "exp" (epoch Unix).
+        // Retourne true si le jeton est absent, malformé ou si sa date d'expiration est dépassée.
+        public async Task<bool> IsTokenExpiredAsync()
         {
             var token = await GetTokenAsync();
-            // Une chaîne de jeton non nulle et non vide est considérée comme preuve d'une session connectée
-            return !string.IsNullOrEmpty(token);
+            if (string.IsNullOrEmpty(token)) return true;
+
+            try
+            {
+                var parts = token.Split('.');
+                if (parts.Length != 3) return true;
+
+                var payload = parts[1];
+                payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+                var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                // La claim "exp" est un timestamp Unix (secondes depuis epoch)
+                if (doc.RootElement.TryGetProperty("exp", out var expProp))
+                {
+                    var exp = expProp.GetInt64();
+                    var expiry = DateTimeOffset.FromUnixTimeSeconds(exp);
+                    return expiry <= DateTimeOffset.UtcNow;
+                }
+            }
+            catch { }
+
+            return true;
+        }
+
+        // Vérifie si l'utilisateur est actuellement authentifié en contrôlant qu'un jeton JWT
+        // non vide et non expiré existe dans le stockage local.
+        public async Task<bool> IsLoggedInAsync()
+        {
+            return !await IsTokenExpiredAsync();
         }
 
         // Décode la charge utile JWT côté client pour extraire la revendication de rôle de l'utilisateur.

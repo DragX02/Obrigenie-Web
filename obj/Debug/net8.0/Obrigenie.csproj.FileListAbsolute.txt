@@ -1055,6 +1055,6 @@ G:\csharpcallender\Obrigenie\obj\Debug\net8.0\compressed\0mnmolpb3o-tjcz0u77k5.g
 G:\csharpcallender\Obrigenie\obj\Debug\net8.0\compressed\wnv1fuzd41-tptq2av103.gz
 G:\csharpcallender\Obrigenie\obj\Debug\net8.0\compressed\j3l193x5w0-lfu7j35m59.gz
 G:\csharpcallender\Obrigenie\obj\Debug\net8.0\compressed\u61bb84si9-oyz0vx2fzb.gz
-G:\csharpcallender\Obrigenie\obj\Debug\net8.0\compressed\n6gacfcgqv-cwhiaqm7we.gz
-G:\csharpcallender\Obrigenie\obj\Debug\net8.0\compressed\nmyhc19k6p-30f6365304.gz
-G:\csharpcallender\Obrigenie\obj\Debug\net8.0\compressed\2qqhl3vxv9-t2lru73wol.gz
+G:\csharpcallender\Obrigenie\obj\Debug\net8.0\compressed\n6gacfcgqv-kdbllmzxmg.gz
+G:\csharpcallender\Obrigenie\obj\Debug\net8.0\compressed\nmyhc19k6p-orftrgcibk.gz
+G:\csharpcallender\Obrigenie\obj\Debug\net8.0\compressed\2qqhl3vxv9-9rrzs2bprf.gz

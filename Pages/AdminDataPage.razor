@@ -131,14 +131,13 @@ else
                         <div class="card-body">
                             <input class="form-control mb-2" placeholder="Code (ex: 1A)" @bind="newNivCode" />
                             <input class="form-control mb-2" placeholder="Nom (ex: Première année)" @bind="newNivNom" />
-                            <input class="form-control mb-2" type="number" placeholder="Ordre" @bind="newNivOrdre" />
                             <button class="btn btn-primary w-100" @onclick="CreateNiveau">Ajouter</button>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-8">
                     <table class="table table-sm table-hover">
-                        <thead><tr><th>ID</th><th>Code</th><th>Nom</th><th>Ordre</th><th></th></tr></thead>
+                        <thead><tr><th>ID</th><th>Code</th><th>Nom</th><th></th></tr></thead>
                         <tbody>
                             @foreach (var n in niveaux)
                             {
@@ -146,7 +145,6 @@ else
                                     <td>@n.IdNiveau</td>
                                     <td><code>@n.CodeNiveau</code></td>
                                     <td>@n.NomNiveau</td>
-                                    <td>@n.Ordre</td>
                                     <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteNiveau(n.IdNiveau)">✕</button></td>
                                 </tr>
                             }
@@ -764,6 +762,14 @@ else
     // Charge toutes les listes au démarrage de la page après vérification du rôle admin.
     protected override async Task OnInitializedAsync()
     {
+        // Redirection si le token est absent ou expiré
+        if (await Auth.IsTokenExpiredAsync())
+        {
+            await Auth.RemoveTokenAsync();
+            Nav.NavigateTo("/login");
+            return;
+        }
+
         isAdmin = (await Auth.GetRoleAsync()) == "ADMIN";
         if (!isAdmin) { isLoading = false; return; }
 
@@ -983,8 +989,8 @@ else
     // Crée un nouveau niveau et recharge la liste
     private async Task CreateNiveau()
     {
-        var (ok, err) = await Api.CreateAdminNiveauAsync(new { codeNiveau = newNivCode, nomNiveau = newNivNom, ordre = newNivOrdre });
-        if (ok) { newNivCode = ""; newNivNom = ""; newNivOrdre = 0; await LoadNiveaux(); }
+        var (ok, err) = await Api.CreateAdminNiveauAsync(new { codeNiveau = newNivCode, nomNiveau = newNivNom });
+        if (ok) { newNivCode = ""; newNivNom = ""; await LoadNiveaux(); }
         await ShowFeedback(ok, ok ? "Niveau ajouté." : err ?? "Erreur");
     }
 
