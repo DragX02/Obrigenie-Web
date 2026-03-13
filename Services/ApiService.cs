@@ -580,6 +580,21 @@ namespace Obrigenie.Services
         public Task<(bool Ok, string? Err)>       CreateAdminSousDomaineAsync(object dto)      => AdminPostAsync("api/admin-data/sous-domaines", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminSousDomaineAsync(int id)         => AdminDeleteAsync($"api/admin-data/sous-domaines/{id}");
 
+        // Visées
+        public Task<List<ViseeAdminDto>>          GetAdminViseesAsync()                       => AdminGetListAsync<ViseeAdminDto>("api/admin-data/visees");
+        public Task<(bool Ok, string? Err)>       CreateAdminViseeAsync(object dto)            => AdminPostAsync("api/admin-data/visees", dto);
+        public Task<(bool Ok, string? Err)>       DeleteAdminViseeAsync(int id)               => AdminDeleteAsync($"api/admin-data/visees/{id}");
+
+        // Liaisons visée ↔ visée à maîtriser
+        public Task<List<LienViseeMaitriseAdminDto>> GetAdminLiensViseeMaitriseAsync()         => AdminGetListAsync<LienViseeMaitriseAdminDto>("api/admin-data/lien-visee-maitrise");
+        public Task<(bool Ok, string? Err)>          CreateAdminLienViseeMaitriseAsync(object dto) => AdminPostAsync("api/admin-data/lien-visee-maitrise", dto);
+        public Task<(bool Ok, string? Err)>          DeleteAdminLienViseeMaitriseAsync(int idVisee, int idVm) => AdminDeleteAsync($"api/admin-data/lien-visee-maitrise/{idVisee}/{idVm}");
+
+        // Liaisons visée_maitriser ↔ aptitude ↔ compétence
+        public Task<List<AppartenirAdminDto>>     GetAdminAppartenirAsync()                   => AdminGetListAsync<AppartenirAdminDto>("api/admin-data/appartenir-visee-aptitude");
+        public Task<(bool Ok, string? Err)>       CreateAdminAppartenirAsync(object dto)       => AdminPostAsync("api/admin-data/appartenir-visee-aptitude", dto);
+        public Task<(bool Ok, string? Err)>       DeleteAdminAppartenirAsync(int id)          => AdminDeleteAsync($"api/admin-data/appartenir-visee-aptitude/{id}");
+
         // ──────────────────────────────────────────────────────────────────
         // DONNÉES DE RÉFÉRENCE — LISTES DÉROULANTES EN CASCADE (TestPage)
         // ──────────────────────────────────────────────────────────────────
@@ -879,5 +894,42 @@ namespace Obrigenie.Services
         [JsonPropertyName("nomComp")]       public string NomComp       { get; set; } = "";
         [JsonPropertyName("idDomFk")]       public int    IdDomFk       { get; set; }
         [JsonPropertyName("nomDom")]        public string NomDom        { get; set; } = "";
+    }
+
+    // DTO représentant une visée (objectif d'apprentissage) avec son contexte complet
+    public class ViseeAdminDto
+    {
+        [JsonPropertyName("idVisee")]        public int     IdVisee        { get; set; }
+        [JsonPropertyName("idNomViseeFk")]   public int     IdNomViseeFk   { get; set; }
+        [JsonPropertyName("nomViseeType")]   public string  NomViseeType   { get; set; } = "";
+        [JsonPropertyName("idDomaineFk")]    public int     IdDomaineFk    { get; set; }
+        [JsonPropertyName("nomDomaine")]     public string  NomDomaine     { get; set; } = "";
+        [JsonPropertyName("idSousDomaineFk")] public int?  IdSousDomaineFk { get; set; }
+        [JsonPropertyName("nomSousDomaine")] public string? NomSousDomaine { get; set; }
+        [JsonPropertyName("idCompFk")]       public int     IdCompFk       { get; set; }
+        [JsonPropertyName("nomCompetence")]  public string  NomCompetence  { get; set; } = "";
+        [JsonPropertyName("nomCours")]       public string  NomCours       { get; set; } = "";
+        [JsonPropertyName("nomNiveau")]      public string  NomNiveau      { get; set; } = "";
+    }
+
+    // DTO représentant un lien entre une visée et une visée à maîtriser
+    public class LienViseeMaitriseAdminDto
+    {
+        [JsonPropertyName("idVisee")]            public int    IdVisee            { get; set; }
+        [JsonPropertyName("contexteVisee")]      public string ContexteVisee      { get; set; } = "";
+        [JsonPropertyName("idViseesMaitriser")]  public int    IdViseesMaitriser  { get; set; }
+        [JsonPropertyName("nomViseesMaitriser")] public string NomViseesMaitriser { get; set; } = "";
+    }
+
+    // DTO représentant une liaison visée_maitriser ↔ aptitude ↔ compétence
+    public class AppartenirAdminDto
+    {
+        [JsonPropertyName("idAppartenirViseeAptitude")] public int     IdAppartenirViseeAptitude { get; set; }
+        [JsonPropertyName("idViseesMaitriserFk")]       public int     IdViseesMaitriserFk       { get; set; }
+        [JsonPropertyName("nomVm")]                     public string  NomVm                     { get; set; } = "";
+        [JsonPropertyName("idAptitudeFk")]              public int?    IdAptitudeFk              { get; set; }
+        [JsonPropertyName("nomAptitude")]               public string? NomAptitude               { get; set; }
+        [JsonPropertyName("idCompetenceFk")]            public int     IdCompetenceFk            { get; set; }
+        [JsonPropertyName("nomComp")]                   public string  NomComp                   { get; set; } = "";
     }
 }

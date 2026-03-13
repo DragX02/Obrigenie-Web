@@ -412,6 +412,248 @@ else
             </div>
         }
 
+        @* ── VISÉES (objectifs d'apprentissage) avec sélecteurs en cascade ── *@
+        @if (activeTab == "Visées")
+        {
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <div class="card">
+                        <div class="card-header">Nouvelle visée — sélection en cascade</div>
+                        <div class="card-body">
+                            @* Étape 1 : catégorie → filtre les cours *@
+                            <label class="form-label fw-bold">1. Catégorie</label>
+                            <select class="form-select mb-2" @onchange="OnViseeCatChanged">
+                                <option value="0">-- Catégorie --</option>
+                                @foreach (var c in categories)
+                                {
+                                    <option value="@c.IdCat">@c.NomCat</option>
+                                }
+                            </select>
+
+                            @* Étape 2 : cours (filtré par catégorie) → filtre les liaisons cours-niveau *@
+                            <label class="form-label fw-bold">2. Cours</label>
+                            <select class="form-select mb-2" @onchange="OnViseeCourChanged" disabled="@(vCatId == 0)">
+                                <option value="0">-- Cours --</option>
+                                @foreach (var c in coursList.Where(x => x.IdCatFk == vCatId))
+                                {
+                                    <option value="@c.IdCours">@c.NomCours</option>
+                                }
+                            </select>
+
+                            @* Étape 3 : liaison cours-niveau (filtré par cours) → filtre les domaines *@
+                            <label class="form-label fw-bold">3. Niveau</label>
+                            <select class="form-select mb-2" @onchange="OnViseeCnChanged" disabled="@(vCoursId == 0)">
+                                <option value="0">-- Niveau --</option>
+                                @foreach (var cn in coursNiveaux.Where(x => x.IdCoursFk == vCoursId))
+                                {
+                                    <option value="@cn.IdCoursNiveau">@cn.NomNiveau</option>
+                                }
+                            </select>
+
+                            @* Étape 4 : domaine (filtré par liaison) → filtre les sous-domaines *@
+                            <label class="form-label fw-bold">4. Domaine</label>
+                            <select class="form-select mb-2" @onchange="OnViseeDomaineChanged" disabled="@(vCnId == 0)">
+                                <option value="0">-- Domaine --</option>
+                                @foreach (var d in domaines.Where(x => x.IdCoursNiveauFk == vCnId))
+                                {
+                                    <option value="@d.IdDom">@d.Nom</option>
+                                }
+                            </select>
+
+                            @* Étape 5 (optionnelle) : sous-domaine *@
+                            <label class="form-label fw-bold">5. Sous-domaine <span class="text-muted">(optionnel)</span></label>
+                            <select class="form-select mb-2" @bind="vSousDomId" disabled="@(vDomaineId == 0)">
+                                <option value="0">-- Aucun --</option>
+                                @foreach (var s in sousDomaines.Where(x => x.IdDomFk == vDomaineId))
+                                {
+                                    <option value="@s.IdSousDomaine">@s.NomComp</option>
+                                }
+                            </select>
+
+                            @* Étape 6 : nom de visée (type d'objectif) *@
+                            <label class="form-label fw-bold">6. Type de visée</label>
+                            <select class="form-select mb-2" @bind="vNomViseeId">
+                                <option value="0">-- Type --</option>
+                                @foreach (var n in nomVisees)
+                                {
+                                    <option value="@n.IdNomVisee">@n.NomVisee1</option>
+                                }
+                            </select>
+
+                            @* Étape 7 : compétence liée à la visée *@
+                            <label class="form-label fw-bold">7. Compétence</label>
+                            <select class="form-select mb-2" @bind="vCompId">
+                                <option value="0">-- Compétence --</option>
+                                @foreach (var c in competences)
+                                {
+                                    <option value="@c.IdCompetence">@c.NomCompetence</option>
+                                }
+                            </select>
+
+                            <hr class="my-2" />
+
+                            @* Étape 8 (optionnelle) : visée à maîtriser → crée le lien automatiquement *@
+                            <label class="form-label fw-bold">8. Visée à maîtriser <span class="text-muted">(optionnel)</span></label>
+                            <select class="form-select mb-2" @bind="vVmId">
+                                <option value="0">-- Aucune --</option>
+                                @foreach (var vm in viseesMaitriser)
+                                {
+                                    <option value="@vm.IdViseesMaitriser">@vm.NomViseesMaitriser</option>
+                                }
+                            </select>
+
+                            @* Étape 9 (optionnelle) : aptitude → crée l'entrée appartenir si une VM est sélectionnée *@
+                            <label class="form-label fw-bold">9. Aptitude <span class="text-muted">(optionnel)</span></label>
+                            <select class="form-select mb-3" @bind="vAptId" disabled="@(vVmId == 0)">
+                                <option value="0">-- Aucune --</option>
+                                @foreach (var a in aptitudes)
+                                {
+                                    <option value="@a.IdAptitude">@a.NomAptitude</option>
+                                }
+                            </select>
+
+                            <button class="btn btn-primary w-100" @onclick="CreateVisee"
+                                    disabled="@(vDomaineId == 0 || vNomViseeId == 0 || vCompId == 0)">
+                                Créer la visée
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr><th>ID</th><th>Type</th><th>Cours</th><th>Domaine</th><th>S-Dom</th><th>Compétence</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var v in visees)
+                            {
+                                <tr>
+                                    <td>@v.IdVisee</td>
+                                    <td>@v.NomViseeType</td>
+                                    <td>@v.NomCours / @v.NomNiveau</td>
+                                    <td>@v.NomDomaine</td>
+                                    <td>@(v.NomSousDomaine ?? "—")</td>
+                                    <td>@v.NomCompetence</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteVisee(v.IdVisee)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @* ── LIAISONS VISÉE ↔ VISÉE À MAÎTRISER ─────────────────── *@
+        @if (activeTab == "Liens V→M")
+        {
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <div class="card">
+                        <div class="card-header">Lier une visée à une visée à maîtriser</div>
+                        <div class="card-body">
+                            <label class="form-label fw-bold">Visée</label>
+                            <select class="form-select mb-2" @bind="lienIdVisee">
+                                <option value="0">-- Visée --</option>
+                                @foreach (var v in visees)
+                                {
+                                    <option value="@v.IdVisee">[@v.IdVisee] @v.NomViseeType — @v.NomCours / @v.NomDomaine</option>
+                                }
+                            </select>
+                            <label class="form-label fw-bold">Visée à maîtriser</label>
+                            <select class="form-select mb-3" @bind="lienIdVm">
+                                <option value="0">-- Visée à maîtriser --</option>
+                                @foreach (var vm in viseesMaitriser)
+                                {
+                                    <option value="@vm.IdViseesMaitriser">[@vm.IdViseesMaitriser] @vm.NomViseesMaitriser</option>
+                                }
+                            </select>
+                            <button class="btn btn-primary w-100" @onclick="CreateLienViseeMaitrise"
+                                    disabled="@(lienIdVisee == 0 || lienIdVm == 0)">
+                                Créer le lien
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr><th>Visée</th><th>Visée à maîtriser</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var l in liensViseeMaitrise)
+                            {
+                                <tr>
+                                    <td>[@l.IdVisee] @l.ContexteVisee</td>
+                                    <td>[@l.IdViseesMaitriser] @l.NomViseesMaitriser</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteLienViseeMaitrise(l.IdVisee, l.IdViseesMaitriser)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        @* ── LIAISONS VISÉE_MAITRISER ↔ APTITUDE ↔ COMPÉTENCE ────── *@
+        @if (activeTab == "Aptit.→VM")
+        {
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <div class="card">
+                        <div class="card-header">Lier visée à maîtriser ↔ aptitude ↔ compétence</div>
+                        <div class="card-body">
+                            <label class="form-label fw-bold">Visée à maîtriser</label>
+                            <select class="form-select mb-2" @bind="aptVmId">
+                                <option value="0">-- Visée à maîtriser --</option>
+                                @foreach (var vm in viseesMaitriser)
+                                {
+                                    <option value="@vm.IdViseesMaitriser">@vm.NomViseesMaitriser</option>
+                                }
+                            </select>
+                            <label class="form-label fw-bold">Aptitude <span class="text-muted">(optionnel)</span></label>
+                            <select class="form-select mb-2" @bind="aptAptId">
+                                <option value="0">-- Aucune --</option>
+                                @foreach (var a in aptitudes)
+                                {
+                                    <option value="@a.IdAptitude">@a.NomAptitude</option>
+                                }
+                            </select>
+                            <label class="form-label fw-bold">Compétence</label>
+                            <select class="form-select mb-3" @bind="aptCompId">
+                                <option value="0">-- Compétence --</option>
+                                @foreach (var c in competences)
+                                {
+                                    <option value="@c.IdCompetence">@c.NomCompetence</option>
+                                }
+                            </select>
+                            <button class="btn btn-primary w-100" @onclick="CreateAppartenir"
+                                    disabled="@(aptVmId == 0 || aptCompId == 0)">
+                                Créer la liaison
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-7">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr><th>Visée à maîtriser</th><th>Aptitude</th><th>Compétence</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var a in appartenirs)
+                            {
+                                <tr>
+                                    <td>@a.NomVm</td>
+                                    <td>@(a.NomAptitude ?? "—")</td>
+                                    <td>@a.NomComp</td>
+                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAppartenir(a.IdAppartenirViseeAptitude)">✕</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
     </div>
 }
 
@@ -431,7 +673,8 @@ else
         "Catégories", "Cours", "Niveaux", "Liaisons",
         "Domaines", "Sous-domaines",
         "Compétences", "Aptitudes",
-        "Noms visées", "Visées à maîtriser"
+        "Noms visées", "Visées à maîtriser",
+        "Visées", "Liens V→M", "Aptit.→VM"
     };
 
     // Message de retour affiché après une action (succès ou erreur)
@@ -452,6 +695,30 @@ else
     private List<AptitudeAdminDto>       aptitudes      = new();
     private List<NomViseeAdminDto>       nomVisees      = new();
     private List<ViseesMaitriserAdminDto> viseesMaitriser = new();
+    private List<ViseeAdminDto>          visees          = new();
+    private List<LienViseeMaitriseAdminDto> liensViseeMaitrise = new();
+    private List<AppartenirAdminDto>     appartenirs     = new();
+
+    // ── Sélecteurs en cascade pour la création d'une visée ───────────────
+    private int vCatId      = 0;
+    private int vCoursId    = 0;
+    private int vCnId       = 0;
+    private int vDomaineId  = 0;
+    private int vSousDomId  = 0;
+    private int vNomViseeId = 0;
+    private int vCompId     = 0;
+    // Liaisons optionnelles créées en même temps que la visée
+    private int vVmId  = 0; // visée à maîtriser (étape 8)
+    private int vAptId = 0; // aptitude pour appartenir (étape 9)
+
+    // ── Champs de saisie — Liaison visée ↔ visée à maîtriser ─────────────
+    private int lienIdVisee = 0;
+    private int lienIdVm    = 0;
+
+    // ── Champs de saisie — Appartenir visée_maitriser ↔ aptitude/compétence
+    private int aptVmId   = 0;
+    private int aptAptId  = 0;
+    private int aptCompId = 0;
 
     // ── Champs de saisie — Catégorie ─────────────────────────────────────
     private string newCatNom   = "";
@@ -504,7 +771,8 @@ else
         await Task.WhenAll(
             LoadCategories(), LoadCours(), LoadNiveaux(), LoadProfesseurs(),
             LoadCoursNiveaux(), LoadDomaines(), LoadSousDomaines(),
-            LoadCompetences(), LoadAptitudes(), LoadNomVisees(), LoadViseesMaitriser()
+            LoadCompetences(), LoadAptitudes(), LoadNomVisees(), LoadViseesMaitriser(),
+            LoadVisees(), LoadLiensViseeMaitrise(), LoadAppartenirs()
         );
         isLoading = false;
     }
@@ -534,6 +802,140 @@ else
     private async Task LoadAptitudes()     => aptitudes       = await Api.GetAdminAptitudesAsync();
     private async Task LoadNomVisees()     => nomVisees       = await Api.GetAdminNomViseesAsync();
     private async Task LoadViseesMaitriser() => viseesMaitriser = await Api.GetAdminViseesMaitriserAsync();
+    private async Task LoadVisees()           => visees          = await Api.GetAdminViseesAsync();
+    private async Task LoadLiensViseeMaitrise() => liensViseeMaitrise = await Api.GetAdminLiensViseeMaitriseAsync();
+    private async Task LoadAppartenirs()      => appartenirs     = await Api.GetAdminAppartenirAsync();
+
+    // ── Événements en cascade — Visées ───────────────────────────────────
+
+    // Catégorie sélectionnée → réinitialise tous les sélecteurs en aval
+    private void OnViseeCatChanged(ChangeEventArgs e)
+    {
+        vCatId     = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        vCoursId   = 0; vCnId = 0; vDomaineId = 0; vSousDomId = 0;
+    }
+
+    // Cours sélectionné → réinitialise les sélecteurs en aval du cours
+    private void OnViseeCourChanged(ChangeEventArgs e)
+    {
+        vCoursId  = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        vCnId = 0; vDomaineId = 0; vSousDomId = 0;
+    }
+
+    // Niveau (liaison cours-niveau) sélectionné → réinitialise domaine et sous-domaine
+    private void OnViseeCnChanged(ChangeEventArgs e)
+    {
+        vCnId      = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        vDomaineId = 0; vSousDomId = 0;
+    }
+
+    // Domaine sélectionné → réinitialise le sous-domaine
+    private void OnViseeDomaineChanged(ChangeEventArgs e)
+    {
+        vDomaineId = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        vSousDomId = 0;
+    }
+
+    // ── Actions — Visées ─────────────────────────────────────────────────
+
+    // Crée une nouvelle visée via la sélection en cascade et recharge la liste.
+    // Si une visée à maîtriser (étape 8) est sélectionnée, crée aussi le lien automatiquement.
+    // Si une aptitude (étape 9) est sélectionnée en plus, crée aussi l'entrée appartenir.
+    private async Task CreateVisee()
+    {
+        var (ok, err) = await Api.CreateAdminViseeAsync(new
+        {
+            idCoursNiveauFk = vCnId,
+            idDomaineFk     = vDomaineId,
+            idSousDomaineFk = vSousDomId == 0 ? (int?)null : vSousDomId,
+            idNomViseeFk    = vNomViseeId,
+            idCompFk        = vCompId
+        });
+
+        if (!ok) { await ShowFeedback(false, err ?? "Erreur"); return; }
+
+        // Récupère l'id de la visée fraîchement créée (dernier élément après rechargement)
+        await LoadVisees();
+        var newId = visees.Count > 0 ? visees[^1].IdVisee : 0;
+
+        // Crée le lien visée ↔ visée à maîtriser si sélectionnée
+        if (vVmId != 0 && newId != 0)
+        {
+            await Api.CreateAdminLienViseeMaitriseAsync(new { idVisee = newId, idViseesMaitriser = vVmId });
+            await LoadLiensViseeMaitrise();
+
+            // Crée l'entrée appartenir si une aptitude est aussi sélectionnée
+            if (vAptId != 0)
+            {
+                await Api.CreateAdminAppartenirAsync(new
+                {
+                    idViseesMaitriserFk = vVmId,
+                    idAptitudeFk        = (int?)vAptId,
+                    idCompetenceFk      = vCompId
+                });
+                await LoadAppartenirs();
+            }
+        }
+
+        // Sauvegarde avant reset pour le message de confirmation
+        bool avecLiaisons = vVmId != 0;
+
+        // Réinitialise tous les sélecteurs
+        vCatId = 0; vCoursId = 0; vCnId = 0;
+        vDomaineId = 0; vSousDomId = 0; vNomViseeId = 0; vCompId = 0;
+        vVmId = 0; vAptId = 0;
+
+        await ShowFeedback(true, avecLiaisons ? "Visée créée + liaisons automatiques." : "Visée créée.");
+    }
+
+    // Supprime une visée par son identifiant et recharge la liste
+    private async Task DeleteVisee(int id)
+    {
+        var (ok, err) = await Api.DeleteAdminViseeAsync(id);
+        if (ok) await LoadVisees();
+        await ShowFeedback(ok, ok ? "Visée supprimée." : err ?? "Erreur");
+    }
+
+    // ── Actions — Liaisons visée ↔ visée à maîtriser ─────────────────────
+
+    // Crée un lien many-to-many visée ↔ visée à maîtriser et recharge la liste
+    private async Task CreateLienViseeMaitrise()
+    {
+        var (ok, err) = await Api.CreateAdminLienViseeMaitriseAsync(new { idVisee = lienIdVisee, idViseesMaitriser = lienIdVm });
+        if (ok) { lienIdVisee = 0; lienIdVm = 0; await LoadLiensViseeMaitrise(); }
+        await ShowFeedback(ok, ok ? "Lien créé." : err ?? "Erreur");
+    }
+
+    // Supprime un lien visée ↔ visée à maîtriser et recharge la liste
+    private async Task DeleteLienViseeMaitrise(int idVisee, int idVm)
+    {
+        var (ok, err) = await Api.DeleteAdminLienViseeMaitriseAsync(idVisee, idVm);
+        if (ok) await LoadLiensViseeMaitrise();
+        await ShowFeedback(ok, ok ? "Lien supprimé." : err ?? "Erreur");
+    }
+
+    // ── Actions — Appartenir (visée_maitriser ↔ aptitude ↔ compétence) ───
+
+    // Crée une liaison appartenir et recharge la liste
+    private async Task CreateAppartenir()
+    {
+        var (ok, err) = await Api.CreateAdminAppartenirAsync(new
+        {
+            idViseesMaitriserFk = aptVmId,
+            idAptitudeFk        = aptAptId == 0 ? (int?)null : aptAptId,
+            idCompetenceFk      = aptCompId
+        });
+        if (ok) { aptVmId = 0; aptAptId = 0; aptCompId = 0; await LoadAppartenirs(); }
+        await ShowFeedback(ok, ok ? "Liaison créée." : err ?? "Erreur");
+    }
+
+    // Supprime une liaison appartenir par son identifiant et recharge la liste
+    private async Task DeleteAppartenir(int id)
+    {
+        var (ok, err) = await Api.DeleteAdminAppartenirAsync(id);
+        if (ok) await LoadAppartenirs();
+        await ShowFeedback(ok, ok ? "Liaison supprimée." : err ?? "Erreur");
+    }
 
     // ── Actions — Catégories ─────────────────────────────────────────────
 
