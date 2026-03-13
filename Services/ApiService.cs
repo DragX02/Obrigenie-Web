@@ -673,6 +673,42 @@ namespace Obrigenie.Services
                 throw new HttpRequestException($"api/ref/domaines/{codeCours}/{codeNiveau} a retourné {(int)response.StatusCode} {response.StatusCode}.");
             return await response.Content.ReadFromJsonAsync<List<DomaineDto>>() ?? new();
         }
+
+        // Retourne les sous-domaines d'un domaine donné.
+        // Endpoint : GET api/ref/sous-domaines/{idDomaine}
+        public async Task<List<SousDomaineRefDto>> GetSousDomainesRefAsync(int idDomaine)
+        {
+            var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/sous-domaines/{idDomaine}");
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/sous-domaines/{idDomaine} a retourné {(int)response.StatusCode} {response.StatusCode}.");
+            return await response.Content.ReadFromJsonAsync<List<SousDomaineRefDto>>() ?? new();
+        }
+
+        // Retourne les visées d'un domaine, filtrées optionnellement par sous-domaine.
+        // Endpoint : GET api/ref/visees/{idDomaine}?sousDomaine={idSousDomaine}
+        public async Task<List<ViseeRefDto>> GetViseesRefAsync(int idDomaine, int? idSousDomaine = null)
+        {
+            var url = $"api/ref/visees/{idDomaine}";
+            if (idSousDomaine.HasValue && idSousDomaine.Value > 0)
+                url += $"?sousDomaine={idSousDomaine.Value}";
+            var request = await BuildAuthRequest(HttpMethod.Get, url);
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"{url} a retourné {(int)response.StatusCode} {response.StatusCode}.");
+            return await response.Content.ReadFromJsonAsync<List<ViseeRefDto>>() ?? new();
+        }
+
+        // Retourne les visées à maîtriser liées à une visée donnée.
+        // Endpoint : GET api/ref/visees-maitriser/{idVisee}
+        public async Task<List<ViseesMaitriserRefDto>> GetViseesMaitriserRefAsync(int idVisee)
+        {
+            var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/visees-maitriser/{idVisee}");
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/visees-maitriser/{idVisee} a retourné {(int)response.StatusCode} {response.StatusCode}.");
+            return await response.Content.ReadFromJsonAsync<List<ViseesMaitriserRefDto>>() ?? new();
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -792,6 +828,27 @@ namespace Obrigenie.Services
         // Nom d'affichage du domaine (ex. : "Compréhension écrite").
         [JsonPropertyName("nom")]
         public string Nom { get; set; } = string.Empty;
+    }
+
+    // DTO sous-domaine pour la sélection en cascade (ref)
+    public class SousDomaineRefDto
+    {
+        [JsonPropertyName("idSousDomaine")] public int    IdSousDomaine { get; set; }
+        [JsonPropertyName("nomComp")]       public string NomComp       { get; set; } = string.Empty;
+    }
+
+    // DTO visée pour la sélection en cascade (ref)
+    public class ViseeRefDto
+    {
+        [JsonPropertyName("idVisee")] public int    IdVisee { get; set; }
+        [JsonPropertyName("label")]   public string Label   { get; set; } = string.Empty;
+    }
+
+    // DTO visée à maîtriser pour la sélection en cascade (ref)
+    public class ViseesMaitriserRefDto
+    {
+        [JsonPropertyName("idViseesMaitriser")]  public int    IdViseesMaitriser  { get; set; }
+        [JsonPropertyName("nomViseesMaitriser")] public string NomViseesMaitriser { get; set; } = string.Empty;
     }
 
     // ──────────────────────────────────────────────────────────────────────

@@ -1,39 +1,31 @@
 @* ─────────────────────────────────────────────────────────────────────────────
    TestPage.razor — Page de test de sélection en cascade réservée aux admins.
 
-   Cette page démontre et teste le flux de sélection en cascade à quatre niveaux
-   utilisé dans l'API de données de référence :
-     1. Catégorie  (catégorie de matière de premier niveau, ex. : "Sciences et techniques")
-     2. Cours      (cours au sein de la catégorie sélectionnée)
-     3. Niveau     (niveau scolaire, filtré par le cours sélectionné)
-     4. Domaine    (domaine pédagogique, filtré par le cours + le niveau sélectionnés)..
+   Flux de sélection en cascade à 7 niveaux :
+     1. Catégorie
+     2. Cours
+     3. Niveau
+     4. Domaine
+     5. Sous-domaine (optionnel)
+     6. Visée (filtrée par domaine + sous-domaine)
+     7. Visée à maîtriser (filtrée par visée)
 
-   Une sous-sélection de langue optionnelle apparaît lorsque le cours "LM" (Langues Modernes)
-   est choisi. Une carte récapitulative affiche les sélections courantes en temps réel.
-
-   L'accès est réservé aux utilisateurs ADMIN — les non-admins voient un message "Accès refusé".
+   Une sous-sélection de langue optionnelle apparaît lorsque le cours "LM" est choisi.
+   L'accès est réservé aux utilisateurs ADMIN.
    ───────────────────────────────────────────────────────────────────────────── *@
 
-@* Route : accessible à /test ; affiché dans la navigation flyout admin *@
 @page "/test"
-
-@* Injection d'AuthService pour lire le rôle de l'utilisateur depuis le JWT à l'initialisation *@
 @inject AuthService Auth
 @inject NavigationManager Nav
-
-@* Injection d'ApiService pour charger les listes de données de référence depuis l'API *@
 @inject ApiService Api
 
 <PageTitle>Cascade Test</PageTitle>
 
-@* ── Garde d'accès ─────────────────────────────────────────────────────────── *@
 @if (!isAdmin)
 {
-    @* Les non-admins voient uniquement ce message ; aucune donnée de référence n'est chargée ni affichée *@
     <div style="padding:2rem;text-align:center;color:var(--text-muted)">Access denied.</div>
 }
 
-@* ── Bandeau d'erreur API (affiché uniquement si le chargement des données de référence échoue) ───── *@
 @if (loadError != null)
 {
     <div class="alert alert-danger m-3">
@@ -51,13 +43,10 @@ else
         <hr />
 
         <div class="row">
-            @* ── Colonne gauche : listes déroulantes en cascade ──────────────────────────── *@
+            @* ── Colonne gauche : listes déroulantes en cascade ── *@
             <div class="col-md-6">
 
-                @* ── Étape 1 : sélection de la catégorie ────────────────────────────────────
-                   Charge la liste categorie_cours de premier niveau à l'initialisation.
-                   Sélectionner une catégorie déclenche le chargement de la liste de cours.
-                ── *@
+                @* Étape 1 : catégorie *@
                 <div class="mb-3">
                     <label class="form-label fw-bold">1. Choose a Category:</label>
                     <select class="form-select" value="@selectedIdCat" @onchange="OnCategorieChanged">
@@ -69,10 +58,7 @@ else
                     </select>
                 </div>
 
-                @* ── Étape 2 : sélection du cours ───────────────────────────────────
-                   Affiché uniquement après qu'une catégorie a été sélectionnée.
-                   La liste est peuplée par OnCategorieChanged appelant GetCoursAsync(idCat).
-                ── *@
+                @* Étape 2 : cours *@
                 @if (selectedIdCat > 0)
                 {
                     <div class="mb-3">
@@ -87,10 +73,7 @@ else
                     </div>
                 }
 
-                @* ── Étape 3 : sélection du niveau ────────────────────────────────────
-                   Affiché uniquement après qu'un cours a été sélectionné.
-                   La liste est peuplée par OnCoursChanged appelant GetNiveauxAsync.
-                ── *@
+                @* Étape 3 : niveau *@
                 @if (!string.IsNullOrEmpty(selectedCours))
                 {
                     <div class="mb-3">
@@ -105,10 +88,7 @@ else
                     </div>
                 }
 
-                @* ── Sous-sélection de langue (cours LM uniquement) ──────────────────
-                   Lorsque l'utilisateur sélectionne le cours "LM" (Langues Modernes),
-                   une liste déroulante supplémentaire permet de préciser la langue.
-                ── *@
+                @* Sous-sélection langue (LM uniquement) *@
                 @if (selectedCours == "LM")
                 {
                     <div class="mb-3 p-3 bg-light border rounded">
@@ -122,19 +102,61 @@ else
                     </div>
                 }
 
-                @* ── Étape 4 : sélection du domaine ───────────────────────────────────
-                   Affiché uniquement après qu'un cours et un niveau ont été sélectionnés.
-                   La liste est peuplée par MettreAJourDomaines appelant GetDomainesAsync.
-                ── *@
+                @* Étape 4 : domaine *@
                 @if (!string.IsNullOrEmpty(selectedCours) && !string.IsNullOrEmpty(selectedNiveau))
                 {
                     <div class="mb-3">
                         <label class="form-label fw-bold">4. Choose a Domain:</label>
-                        <select class="form-select" @bind="selectedDomaine">
-                            <option value="">-- Select a domain --</option>
-                            @foreach (var domaine in domainesFiltres)
+                        <select class="form-select" value="@selectedIdDomaine" @onchange="OnDomaineChanged">
+                            <option value="0">-- Select a domain --</option>
+                            @foreach (var d in domainesFiltres)
                             {
-                                <option value="@domaine.Nom">@domaine.Nom</option>
+                                <option value="@d.IdDom">@d.Nom</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @* Étape 5 : sous-domaine (optionnel) *@
+                @if (selectedIdDomaine > 0)
+                {
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">5. Sous-domaine <span class="text-muted">(optionnel)</span></label>
+                        <select class="form-select" value="@selectedIdSousD" @onchange="OnSousDChanged">
+                            <option value="0">-- Aucun --</option>
+                            @foreach (var s in listeSousDomaines)
+                            {
+                                <option value="@s.IdSousDomaine">@s.NomComp</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @* Étape 6 : visée *@
+                @if (selectedIdDomaine > 0)
+                {
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">6. Visée</label>
+                        <select class="form-select" value="@selectedIdVisee" @onchange="OnViseeChanged">
+                            <option value="0">-- Select a visée --</option>
+                            @foreach (var v in listeVisees)
+                            {
+                                <option value="@v.IdVisee">@v.Label</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @* Étape 7 : visée à maîtriser *@
+                @if (selectedIdVisee > 0)
+                {
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">7. Visée à maîtriser</label>
+                        <select class="form-select" value="@selectedIdVm" @onchange="e => selectedIdVm = int.TryParse(e.Value?.ToString(), out var v) ? v : 0">
+                            <option value="0">-- Select --</option>
+                            @foreach (var vm in listeViseesMaitriser)
+                            {
+                                <option value="@vm.IdViseesMaitriser">@vm.NomViseesMaitriser</option>
                             }
                         </select>
                     </div>
@@ -142,29 +164,23 @@ else
 
             </div>
 
-            @* ── Colonne droite : récapitulatif des sélections en temps réel ─────────────────────── *@
+            @* ── Colonne droite : récapitulatif ── *@
             <div class="col-md-6">
                 <div class="card bg-dark text-light mt-4">
                     <div class="card-body">
                         <h5 class="card-title">Your selection summary:</h5>
                         <ul>
-                            @* Catégorie : affiche le nom ou un espace réservé *@
                             <li><strong>Category:</strong> @(selectedIdCat == 0 ? "..." : (listeCategories.FirstOrDefault(c => c.IdCat == selectedIdCat)?.NomCat ?? "..."))</li>
-
-                            @* Cours : affiche le code ou un espace réservé *@
-                            <li><strong>Course:</strong>  @(string.IsNullOrEmpty(selectedCours)   ? "..." : selectedCours)</li>
-
-                            @* Niveau : affiche le code ou un espace réservé *@
-                            <li><strong>Level:</strong>   @(string.IsNullOrEmpty(selectedNiveau)  ? "..." : selectedNiveau)</li>
-
-                            @* Ligne langue : affichée uniquement lorsque le cours LM est sélectionné *@
+                            <li><strong>Course:</strong>   @(string.IsNullOrEmpty(selectedCours)   ? "..." : selectedCours)</li>
+                            <li><strong>Level:</strong>    @(string.IsNullOrEmpty(selectedNiveau)  ? "..." : selectedNiveau)</li>
                             @if (selectedCours == "LM")
                             {
                                 <li class="text-warning"><strong>Language:</strong> @(string.IsNullOrEmpty(selectedLangue) ? "..." : selectedLangue)</li>
                             }
-
-                            @* Domaine : affiche le nom ou un espace réservé *@
-                            <li><strong>Domain:</strong>  @(string.IsNullOrEmpty(selectedDomaine) ? "..." : selectedDomaine)</li>
+                            <li><strong>Domain:</strong>   @(selectedIdDomaine == 0 ? "..." : (domainesFiltres.FirstOrDefault(d => d.IdDom == selectedIdDomaine)?.Nom ?? "..."))</li>
+                            <li><strong>Sous-dom.:</strong> @(selectedIdSousD == 0 ? "—" : (listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp ?? "..."))</li>
+                            <li><strong>Visée:</strong>    @(selectedIdVisee == 0 ? "..." : (listeVisees.FirstOrDefault(v => v.IdVisee == selectedIdVisee)?.Label ?? "..."))</li>
+                            <li><strong>VM:</strong>       @(selectedIdVm == 0 ? "..." : (listeViseesMaitriser.FirstOrDefault(vm => vm.IdViseesMaitriser == selectedIdVm)?.NomViseesMaitriser ?? "..."))</li>
                         </ul>
                     </div>
                 </div>
@@ -174,21 +190,12 @@ else
 }
 
 @code {
-    // True lorsque le JWT de l'utilisateur contient le rôle ADMIN
-    private bool isAdmin = false;
-
-    // Contient le message d'erreur du dernier appel API échoué ; null si tout va bien
+    private bool    isAdmin    = false;
     private string? loadError;
-
-    // Les 20 premiers caractères du jeton JWT stocké, utilisés pour confirmer la présence du jeton dans localStorage
     private string? tokenDebug;
 
-    // Méthode de cycle de vie appelée au premier rendu.
-    // Décode le rôle de l'utilisateur ; si ADMIN, charge la liste des catégories depuis l'API.
-    // Les non-admins voient le message d'accès refusé et aucune donnée n'est récupérée.
     protected override async Task OnInitializedAsync()
     {
-        // Redirection si le token est absent ou expiré — évite les 401 silencieux
         if (await Auth.IsTokenExpiredAsync())
         {
             await Auth.RemoveTokenAsync();
@@ -215,119 +222,113 @@ else
         }
     }
 
-    // ── Sélections courantes ───────────────────────────────────────────────────
+    // ── Sélections courantes ───────────────────────────────────────────────
+    private int    selectedIdCat      = 0;
+    private string selectedCours      = "";
+    private string selectedNiveau     = "";
+    private string selectedLangue     = "";
+    private int    selectedIdDomaine  = 0;
+    private int    selectedIdSousD    = 0;  // sous-domaine (0 = aucun)
+    private int    selectedIdVisee    = 0;
+    private int    selectedIdVm       = 0;  // visée à maîtriser
 
-    // L'identifiant de la catégorie actuellement sélectionnée (0 = rien de sélectionné)
-    private int selectedIdCat = 0;
+    // ── Listes chargées depuis l'API ──────────────────────────────────────
+    private List<CategorieDto>          listeCategories      = new();
+    private List<CoursDto>              listeCours           = new();
+    private List<NiveauDto>             listeNiveaux         = new();
+    private List<DomaineDto>            domainesFiltres      = new();
+    private List<SousDomaineRefDto>     listeSousDomaines    = new();
+    private List<ViseeRefDto>           listeVisees          = new();
+    private List<ViseesMaitriserRefDto> listeViseesMaitriser = new();
 
-    // Le code du cours actuellement sélectionné (ex. : "LM", "SC")
-    private string selectedCours   = "";
+    // ── Gestionnaires ─────────────────────────────────────────────────────
 
-    // Le code du niveau scolaire actuellement sélectionné
-    private string selectedNiveau  = "";
-
-    // Le nom de la langue actuellement sélectionnée (cours LM uniquement)
-    private string selectedLangue  = "";
-
-    // Le nom du domaine actuellement sélectionné
-    private string selectedDomaine = "";
-
-    // ── Listes de données chargées depuis l'API ──────────────────────────────
-
-    // Catégories de premier niveau ; peuplées à l'initialisation
-    private List<CategorieDto> listeCategories = new();
-
-    // Cours pour la catégorie sélectionnée ; peuplés après la sélection de catégorie
-    private List<CoursDto>   listeCours      = new();
-
-    // Niveaux pour le cours sélectionné ; peuplés après la sélection de cours
-    private List<NiveauDto>  listeNiveaux    = new();
-
-    // Domaines correspondant au cours et au niveau sélectionnés ; peuplés après la sélection de niveau
-    private List<DomaineDto> domainesFiltres = new();
-
-    // ── Gestionnaires d'événements ────────────────────────────────────────────
-
-    // Appelé lorsque l'utilisateur change la liste déroulante de catégorie.
-    // Réinitialise toutes les sélections en aval et récupère la liste de cours pour la nouvelle catégorie.
     private async Task OnCategorieChanged(ChangeEventArgs e)
     {
-        selectedIdCat   = int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
-        selectedCours   = "";
-        selectedNiveau  = "";
-        selectedLangue  = "";
-        selectedDomaine = "";
-        listeCours.Clear();
-        listeNiveaux.Clear();
-        domainesFiltres.Clear();
-
+        selectedIdCat = int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
+        ResetFrom(1);
         if (selectedIdCat > 0)
-        {
-            try
-            {
-                listeCours = await Api.GetCoursAsync(selectedIdCat);
-            }
-            catch (Exception ex)
-            {
-                loadError = ex.Message;
-            }
-        }
+            try { listeCours = await Api.GetCoursAsync(selectedIdCat); }
+            catch (Exception ex) { loadError = ex.Message; }
     }
 
-    // Appelé lorsque l'utilisateur change la liste déroulante de cours.
-    // Réinitialise les sélections en aval et récupère la liste de niveaux pour le nouveau cours.
     private async Task OnCoursChanged(ChangeEventArgs e)
     {
-        selectedCours   = e.Value?.ToString() ?? "";
-        selectedNiveau  = "";
-        selectedLangue  = "";
-        selectedDomaine = "";
-        domainesFiltres.Clear();
-
+        selectedCours = e.Value?.ToString() ?? "";
+        ResetFrom(2);
         if (!string.IsNullOrEmpty(selectedCours))
-        {
-            try
-            {
-                listeNiveaux = await Api.GetNiveauxAsync(selectedCours);
-            }
-            catch (Exception ex)
-            {
-                loadError = ex.Message;
-            }
-        }
+            try { listeNiveaux = await Api.GetNiveauxAsync(selectedCours); }
+            catch (Exception ex) { loadError = ex.Message; }
     }
 
-    // Appelé lorsque l'utilisateur change la liste déroulante de niveau.
-    // Réinitialise la sélection de domaine et déclenche un rafraîchissement de la liste des domaines.
     private async Task OnNiveauChanged(ChangeEventArgs e)
     {
-        selectedNiveau  = e.Value?.ToString() ?? "";
-        selectedDomaine = "";
-        await MettreAJourDomaines();
+        selectedNiveau = e.Value?.ToString() ?? "";
+        ResetFrom(3);
+        await ChargerDomaines();
     }
 
-    // Appelé lorsque l'utilisateur change la liste déroulante de langue (cours LM uniquement).
     private void OnLangueChanged(ChangeEventArgs e)
     {
-        selectedLangue  = e.Value?.ToString() ?? "";
-        selectedDomaine = "";
+        selectedLangue = e.Value?.ToString() ?? "";
     }
 
-    // Récupère la liste des domaines filtrés par le cours et le niveau actuellement sélectionnés.
-    private async Task MettreAJourDomaines()
+    private async Task OnDomaineChanged(ChangeEventArgs e)
+    {
+        selectedIdDomaine = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        ResetFrom(4);
+        if (selectedIdDomaine > 0)
+        {
+            try { listeSousDomaines = await Api.GetSousDomainesRefAsync(selectedIdDomaine); }
+            catch (Exception ex) { loadError = ex.Message; }
+            await ChargerVisees();
+        }
+    }
+
+    private async Task OnSousDChanged(ChangeEventArgs e)
+    {
+        selectedIdSousD = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        ResetFrom(5);
+        await ChargerVisees();
+    }
+
+    private async Task OnViseeChanged(ChangeEventArgs e)
+    {
+        selectedIdVisee = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        selectedIdVm    = 0;
+        listeViseesMaitriser.Clear();
+        if (selectedIdVisee > 0)
+            try { listeViseesMaitriser = await Api.GetViseesMaitriserRefAsync(selectedIdVisee); }
+            catch (Exception ex) { loadError = ex.Message; }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    // Réinitialise toutes les sélections/listes en aval du niveau indiqué (1=cours, 2=niveaux, …)
+    private void ResetFrom(int level)
+    {
+        if (level <= 1) { selectedCours = ""; listeCours.Clear(); }
+        if (level <= 2) { selectedNiveau = ""; listeNiveaux.Clear(); }
+        if (level <= 3) { selectedIdDomaine = 0; domainesFiltres.Clear(); selectedLangue = ""; }
+        if (level <= 4) { selectedIdSousD = 0; listeSousDomaines.Clear(); selectedIdVisee = 0; listeVisees.Clear(); }
+        if (level <= 5) { selectedIdVisee = 0; listeVisees.Clear(); }
+        selectedIdVm = 0; listeViseesMaitriser.Clear();
+    }
+
+    private async Task ChargerDomaines()
     {
         domainesFiltres.Clear();
+        if (string.IsNullOrEmpty(selectedCours) || string.IsNullOrEmpty(selectedNiveau)) return;
+        try { domainesFiltres = await Api.GetDomainesAsync(selectedCours, selectedNiveau); }
+        catch (Exception ex) { loadError = ex.Message; }
+    }
 
-        if (string.IsNullOrEmpty(selectedCours) || string.IsNullOrEmpty(selectedNiveau))
-            return;
-
-        try
-        {
-            domainesFiltres = await Api.GetDomainesAsync(selectedCours, selectedNiveau);
-        }
-        catch (Exception ex)
-        {
-            loadError = ex.Message;
-        }
+    private async Task ChargerVisees()
+    {
+        listeVisees.Clear();
+        selectedIdVisee = 0; listeViseesMaitriser.Clear();
+        if (selectedIdDomaine == 0) return;
+        try { listeVisees = await Api.GetViseesRefAsync(selectedIdDomaine, selectedIdSousD > 0 ? selectedIdSousD : null); }
+        catch (Exception ex) { loadError = ex.Message; }
     }
 }
