@@ -48,12 +48,11 @@
         {
             <div class="confirm-state confirm-success">
                 <span class="confirm-icon">✅</span>
-                <h2>Account confirmed!</h2>
-                <p>Your email address has been verified.<br />You can now log in.</p>
+                <h2>Compte confirmé !</h2>
+                <p>Votre adresse e-mail a été vérifiée.<br />Vous pouvez maintenant vous connecter.</p>
 
-                @* Navigate to the login page when the user clicks the button *@
                 <button class="btn-confirm-login" @onclick='() => Nav.NavigateTo("/login")'>
-                    Log in
+                    Connexion
                 </button>
             </div>
         }
@@ -62,14 +61,12 @@
         {
             <div class="confirm-state confirm-error">
                 <span class="confirm-icon">❌</span>
-                <h2>Invalid link</h2>
+                <h2>Lien invalide</h2>
 
-                @* Dynamic error message: may be updated with the server's response body *@
                 <p>@errorMessage</p>
 
-                @* Allow the user to navigate back and request a new confirmation link *@
                 <button class="btn-confirm-login" @onclick='() => Nav.NavigateTo("/login")'>
-                    Back to login
+                    Retour à la connexion
                 </button>
             </div>
         }
@@ -94,7 +91,7 @@
     @* The error message displayed when confirmation fails.
        Default covers the most common case (invalid or expired link);
        updated with the server's actual message when available. *@
-    private string errorMessage = "This confirmation link is invalid or has expired.";
+    private string errorMessage = "Ce lien de confirmation est invalide ou a expiré.";
 
     /// <summary>
     /// Called once when the page is first rendered.
@@ -106,7 +103,7 @@
         // If no token is present in the URL, the user navigated to the page directly
         if (string.IsNullOrWhiteSpace(Token))
         {
-            errorMessage = "No confirmation token provided.";
+            errorMessage = "Aucun token de confirmation fourni. Lien invalide.";
             isLoading = false;
             return;
         }
@@ -139,8 +136,8 @@
         }
         catch
         {
-            // HttpRequestException or other transport-level error
-            errorMessage = "Unable to reach the server. Please try again later.";
+            // HttpRequestException ou erreur réseau — le serveur est inaccessible
+            errorMessage = "Impossible de contacter le serveur. Veuillez réessayer plus tard.";
         }
         finally
         {

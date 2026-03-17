@@ -33,8 +33,9 @@ public class AuthServiceTests
     /// <returns>A three-part dot-separated JWT string.</returns>
     private static string MakeJwt(string role)
     {
-        // Build a minimal JSON payload containing only the role claim
-        var payloadJson = $"{{\"role\":\"{role}\"}}";
+        // Build a minimal JSON payload with role + a far-future exp (year 2286)
+        // exp is required because IsTokenExpiredAsync returns true when exp is missing
+        var payloadJson = $"{{\"role\":\"{role}\",\"exp\":9999999999}}";
 
         // Base64url-encode the payload (no padding, URL-safe characters)
         var payloadB64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(payloadJson))
