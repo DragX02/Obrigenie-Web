@@ -1,5 +1,11 @@
 is_global = true
+build_property.EnableAotAnalyzer = 
+build_property.EnableSingleFileAnalyzer = 
+build_property.EnableTrimAnalyzer = false
+build_property.IncludeAllContentForSelfExtract = 
 build_property.TargetFramework = net8.0
+build_property.TargetFrameworkIdentifier = .NETCoreApp
+build_property.TargetFrameworkVersion = v8.0
 build_property.TargetPlatformMinVersion = 
 build_property.UsingMicrosoftNETSdkWeb = 
 build_property.ProjectTypeGuids = 
@@ -9,61 +15,61 @@ build_property.EnforceExtendedAnalyzerRules =
 build_property._SupportedPlatformList = browser
 build_property.RootNamespace = Obrigenie
 build_property.RootNamespace = Obrigenie
-build_property.ProjectDir = G:\csharpcallender\Obrigenie\
+build_property.ProjectDir = o:\c#\Obrigenie-Web\
 build_property.EnableComHosting = 
-build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.EnableGeneratedComInterfaceComImportInterop = false
 build_property.RazorLangVersion = 8.0
 build_property.SupportLocalizedComponentNames = 
 build_property.GenerateRazorMetadataSourceChecksumAttributes = 
-build_property.MSBuildProjectDirectory = G:\csharpcallender\Obrigenie
+build_property.MSBuildProjectDirectory = o:\c#\Obrigenie-Web
 build_property._RazorSourceGeneratorDebug = 
 build_property.EffectiveAnalysisLevelStyle = 8.0
 build_property.EnableCodeStyleSeverity = 
 
-[G:/csharpcallender/Obrigenie/App.razor]
+[o:/c\#/Obrigenie-Web/App.razor]
 build_metadata.AdditionalFiles.TargetPath = QXBwLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[G:/csharpcallender/Obrigenie/Layout/MainLayout.razor]
+[o:/c\#/Obrigenie-Web/Layout/MainLayout.razor]
 build_metadata.AdditionalFiles.TargetPath = TGF5b3V0XE1haW5MYXlvdXQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[G:/csharpcallender/Obrigenie/Pages/AccessCodePage.razor]
+[o:/c\#/Obrigenie-Web/Pages/AccessCodePage.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWNjZXNzQ29kZVBhZ2UucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[G:/csharpcallender/Obrigenie/Pages/AdminDataPage.razor]
+[o:/c\#/Obrigenie-Web/Pages/AdminDataPage.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5EYXRhUGFnZS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[G:/csharpcallender/Obrigenie/Pages/AdminPage.razor]
+[o:/c\#/Obrigenie-Web/Pages/AdminPage.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQWRtaW5QYWdlLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[G:/csharpcallender/Obrigenie/Pages/AuthCallback.razor]
+[o:/c\#/Obrigenie-Web/Pages/AuthCallback.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQXV0aENhbGxiYWNrLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[G:/csharpcallender/Obrigenie/Pages/ConfirmEmail.razor]
+[o:/c\#/Obrigenie-Web/Pages/ConfirmEmail.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ29uZmlybUVtYWlsLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[G:/csharpcallender/Obrigenie/Pages/Index.razor]
+[o:/c\#/Obrigenie-Web/Pages/Index.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSW5kZXgucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[G:/csharpcallender/Obrigenie/Pages/Login.razor]
+[o:/c\#/Obrigenie-Web/Pages/Login.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTG9naW4ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[G:/csharpcallender/Obrigenie/Pages/ReferentielPage.razor]
+[o:/c\#/Obrigenie-Web/Pages/ReferentielPage.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUmVmZXJlbnRpZWxQYWdlLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[G:/csharpcallender/Obrigenie/Pages/TestPage.razor]
+[o:/c\#/Obrigenie-Web/Pages/TestPage.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVGVzdFBhZ2UucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[G:/csharpcallender/Obrigenie/_Imports.razor]
+[o:/c\#/Obrigenie-Web/_Imports.razor]
 build_metadata.AdditionalFiles.TargetPath = X0ltcG9ydHMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
