@@ -21,6 +21,7 @@
 
 @* Route : la page d'accueil de l'application *@
 @page "/"
+@implements IDisposable
 
 @* Injection de AuthService pour vérifier si l'utilisateur est authentifié au chargement *@
 @inject AuthService Auth
@@ -34,20 +35,23 @@
 @* Injection de CalendarService pour charger les données de vacances de l'année scolaire *@
 @inject CalendarService CalendarSvc
 
+@* Injection de LanguageService pour les traductions et le re-render lors du changement de langue *@
+@inject LanguageService Lang
+
 @* ── Barre d'outils du mode d'affichage ──────────────────────────────────── *@
 <div class="calendar-container">
     <div class="view-mode-bar">
         @* Chaque bouton reçoit la classe CSS "active" quand son mode correspond au viewMode actuel *@
         <button class="@(viewMode == CalendarViewMode.SingleDay      ? "view-btn active" : "view-btn")"
-                @onclick='() => SetViewMode(CalendarViewMode.SingleDay)'>Day</button>
+                @onclick='() => SetViewMode(CalendarViewMode.SingleDay)'>@Lang.T("cal.view.day")</button>
         <button class="@(viewMode == CalendarViewMode.Week           ? "view-btn active" : "view-btn")"
-                @onclick='() => SetViewMode(CalendarViewMode.Week)'>Week</button>
+                @onclick='() => SetViewMode(CalendarViewMode.Week)'>@Lang.T("cal.view.week")</button>
         <button class="@(viewMode == CalendarViewMode.WeekAndWeekend ? "view-btn active" : "view-btn")"
-                @onclick='() => SetViewMode(CalendarViewMode.WeekAndWeekend)'>Week+</button>
+                @onclick='() => SetViewMode(CalendarViewMode.WeekAndWeekend)'>@Lang.T("cal.view.week+")</button>
         <button class="@(viewMode == CalendarViewMode.Month          ? "view-btn active" : "view-btn")"
-                @onclick='() => SetViewMode(CalendarViewMode.Month)'>Month</button>
+                @onclick='() => SetViewMode(CalendarViewMode.Month)'>@Lang.T("cal.view.month")</button>
         <button class="@(viewMode == CalendarViewMode.SchoolPeriod   ? "view-btn active" : "view-btn")"
-                @onclick='() => SetViewMode(CalendarViewMode.SchoolPeriod)'>Period</button>
+                @onclick='() => SetViewMode(CalendarViewMode.SchoolPeriod)'>@Lang.T("cal.view.period")</button>
     </div>
 
     @* ── En-tête de navigation ─────────────────────────────────────────────── *@
@@ -164,7 +168,7 @@
         @* État de chargement affiché pendant les appels API en parallèle *@
         @if (trimLoading)
         {
-            <div class="trim-loading">Chargement de la période...</div>
+            <div class="trim-loading">@Lang.T("cal.loading")</div>
         }
         else
         {
@@ -176,11 +180,11 @@
                     <div class="trim-col trim-col-fixed">
                         @* Cellule d'angle vide alignée avec la ligne d'en-tête des semaines *@
                         <div class="trim-cell trim-cell-header trim-corner"></div>
-                        <div class="trim-cell trim-cell-day">Mon</div>
-                        <div class="trim-cell trim-cell-day">Tue</div>
-                        <div class="trim-cell trim-cell-day">Wed</div>
-                        <div class="trim-cell trim-cell-day">Thu</div>
-                        <div class="trim-cell trim-cell-day">Fri</div>
+                        <div class="trim-cell trim-cell-day">@Lang.T("cal.day.mon")</div>
+                        <div class="trim-cell trim-cell-day">@Lang.T("cal.day.tue")</div>
+                        <div class="trim-cell trim-cell-day">@Lang.T("cal.day.wed")</div>
+                        <div class="trim-cell trim-cell-day">@Lang.T("cal.day.thu")</div>
+                        <div class="trim-cell trim-cell-day">@Lang.T("cal.day.fri")</div>
                     </div>
 
                     @* Une colonne par semaine scolaire dans la période *@
@@ -540,11 +544,32 @@
     // Redirige vers /login si l'utilisateur n'est pas authentifié.
     // Sinon, charge les données de vacances depuis CalendarService (pour les calculs de période)
     // puis affiche la vue calendrier initiale.
+    // Culture correspondant à la langue active (utilisée pour formater les noms de jours/mois)
+    private System.Globalization.CultureInfo LangCulture => Lang.Current switch
+    {
+        "EN" => new System.Globalization.CultureInfo("en-US"),
+        "NL" => new System.Globalization.CultureInfo("nl-BE"),
+        _    => new System.Globalization.CultureInfo("fr-FR")
+    };
+
+    // Appelée par LanguageService.OnChange : reconstruit les titres et noms de jours dans la nouvelle langue
+    private async void OnLangChanged()
+    {
+        await UpdateCalendarView();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Lang.OnChange -= OnLangChanged;
+
     protected override async Task OnInitializedAsync()
     {
         // Garde : les utilisateurs non authentifiés doivent d'abord se connecter
         var isLoggedIn = await Auth.IsLoggedInAsync();
         if (!isLoggedIn) { Nav.NavigateTo("/login"); return; }
+
+        // Initialise la langue depuis localStorage et s'abonne aux changements
+        await Lang.InitAsync();
+        Lang.OnChange += OnLangChanged;
 
         try
         {
@@ -589,8 +614,8 @@
     // Définit le titre avec la chaîne de date complète et charge les cours et notes du jour actuel.
     private async Task UpdateSingleDayView()
     {
-        // Format : "lundi 01 septembre 2025" (locale française)
-        weekTitle = currentDate.ToString("dddd dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"));
+        // Format : "lundi 01 septembre 2025" — adapté à la langue active
+        weekTitle = currentDate.ToString("dddd dd MMMM yyyy", LangCulture);
 
         // Charge le jour avec ses cours et notes via une séquence API unique
         currentDay = await CreateDayWithDataAsync(currentDate);
@@ -611,7 +636,7 @@
         DateTime monday = currentDate.AddDays(delta);
         DateTime sunday = monday.AddDays(6);
 
-        weekTitle = $"Semaine {monday:dd/MM} – {sunday:dd/MM}";
+        weekTitle = $"{Lang.T("cal.week")} {monday:dd/MM} – {sunday:dd/MM}";
 
         // 5 jours en mode Semaine, 7 en mode WeekAndWeekend
         int daysToShow = viewMode == CalendarViewMode.Week ? 5 : 7;
@@ -632,8 +657,8 @@
     // le premier jour du mois, puis charge les notes pour toute la plage visible.
     private async Task UpdateMonthView()
     {
-        // Format du titre : "OCTOBRE 2025"
-        weekTitle = currentDate.ToString("MMMM yyyy", new System.Globalization.CultureInfo("fr-FR")).ToUpper();
+        // Format du titre : "OCTOBRE 2025" — adapté à la langue active
+        weekTitle = currentDate.ToString("MMMM yyyy", LangCulture).ToUpper();
 
         // Calcule le premier jour du mois affiché
         DateTime first = new DateTime(currentDate.Year, currentDate.Month, 1);
@@ -778,7 +803,7 @@
         return new Day
         {
             Date         = date,
-            DayOfWeek    = date.ToString("dddd", new System.Globalization.CultureInfo("fr-FR")),
+            DayOfWeek    = date.ToString("dddd", LangCulture),
             DayOfMonth   = date.Day.ToString(),
             // Un jour est marqué comme vacances uniquement si des vacances le couvrent ET ce n'est pas un jour de Rentrée
             IsHoliday    = holiday != null && !isRentree,

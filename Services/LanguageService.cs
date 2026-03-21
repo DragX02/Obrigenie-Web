@@ -70,6 +70,21 @@ namespace Obrigenie.Services
             ["account.email"]   = new() { ["FR"] = "Adresse e-mail", ["EN"] = "Email address", ["NL"] = "E-mailadres"  },
             ["account.saved"]   = new() { ["FR"] = "Langue enregistrée", ["EN"] = "Language saved", ["NL"] = "Taal opgeslagen" },
             ["account.back"]    = new() { ["FR"] = "Retour",        ["EN"] = "Back",         ["NL"] = "Terug"          },
+            // Calendrier — boutons de vue
+            ["cal.view.day"]    = new() { ["FR"] = "Jour",           ["EN"] = "Day",          ["NL"] = "Dag"            },
+            ["cal.view.week"]   = new() { ["FR"] = "Semaine",        ["EN"] = "Week",         ["NL"] = "Week"           },
+            ["cal.view.week+"]  = new() { ["FR"] = "Semaine+",       ["EN"] = "Week+",        ["NL"] = "Week+"          },
+            ["cal.view.month"]  = new() { ["FR"] = "Mois",           ["EN"] = "Month",        ["NL"] = "Maand"          },
+            ["cal.view.period"] = new() { ["FR"] = "Trimestre",      ["EN"] = "Period",       ["NL"] = "Periode"        },
+            // Calendrier — titres de navigation
+            ["cal.week"]        = new() { ["FR"] = "Semaine",        ["EN"] = "Week",         ["NL"] = "Week"           },
+            ["cal.loading"]     = new() { ["FR"] = "Chargement de la période...", ["EN"] = "Loading period...", ["NL"] = "Periode laden..." },
+            // Calendrier — abréviations des jours (vue Trimestre)
+            ["cal.day.mon"]     = new() { ["FR"] = "Lun",            ["EN"] = "Mon",          ["NL"] = "Ma"             },
+            ["cal.day.tue"]     = new() { ["FR"] = "Mar",            ["EN"] = "Tue",          ["NL"] = "Di"             },
+            ["cal.day.wed"]     = new() { ["FR"] = "Mer",            ["EN"] = "Wed",          ["NL"] = "Wo"             },
+            ["cal.day.thu"]     = new() { ["FR"] = "Jeu",            ["EN"] = "Thu",          ["NL"] = "Do"             },
+            ["cal.day.fri"]     = new() { ["FR"] = "Ven",            ["EN"] = "Fri",          ["NL"] = "Vr"             },
         };
     }
 }
