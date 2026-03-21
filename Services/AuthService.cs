@@ -81,6 +81,8 @@ namespace Obrigenie.Services
                 if (parts.Length != 3) return true;
 
                 var payload = parts[1];
+                // Convertit le base64url en base64 standard avant décodage
+                payload = payload.Replace('-', '+').Replace('_', '/');
                 payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
                 var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(payload));
 

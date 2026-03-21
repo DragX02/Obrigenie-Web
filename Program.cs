@@ -58,6 +58,10 @@ builder.Services.AddScoped(sp =>
 // Provides strongly typed methods for all REST API operations (auth, courses, notes, licenses).
 builder.Services.AddScoped<ApiService>();
 
+// Register LanguageService as a scoped service.
+// Gère la langue active (FR/EN/NL) et persiste le choix dans localStorage.
+builder.Services.AddScoped<LanguageService>();
+
 // Register CalendarService as a scoped service.
 // Fetches school-year calendar data from the API, caches it in localStorage, and
 // provides an offline fallback when neither the API nor the cache is available.

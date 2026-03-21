@@ -101,7 +101,7 @@ public class ConfirmEmailTests : TestContext
     /// the component renders the success state containing "confirmed".
     /// </summary>
     [Fact]
-    public async Task ConfirmEmail_ValidToken_ShowsSuccess()
+    public void ConfirmEmail_ValidToken_ShowsSuccess()
     {
         // The fake API accepts any request and returns 200 OK
         RegisterHttp(HttpStatusCode.OK);
@@ -111,11 +111,8 @@ public class ConfirmEmailTests : TestContext
 
         var cut = RenderComponent<ConfirmEmail>();
 
-        // Wait for the async OnInitializedAsync to complete
-        await cut.InvokeAsync(() => Task.CompletedTask);
-
-        // The success message must appear in the rendered HTML
-        Assert.Contains("confirmé", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        // Attend que le composant quitte l'état chargement
+        cut.WaitForAssertion(() => Assert.Contains("confirmé", cut.Markup, StringComparison.OrdinalIgnoreCase));
 
         // The error state must not be shown
         Assert.DoesNotContain("invalide", cut.Markup, StringComparison.OrdinalIgnoreCase);
@@ -149,7 +146,7 @@ public class ConfirmEmailTests : TestContext
     /// or an unreachable server), the component renders an error message containing "serveur".
     /// </summary>
     [Fact]
-    public async Task ConfirmEmail_ServerUnreachable_ShowsServerError()
+    public void ConfirmEmail_ServerUnreachable_ShowsServerError()
     {
         // Register the throwing handler directly instead of using RegisterHttp helper
         Services.AddSingleton(new HttpClient(new ThrowingHandler())
@@ -160,10 +157,8 @@ public class ConfirmEmailTests : TestContext
         NavigateTo("/confirm-email?token=some-token");
 
         var cut = RenderComponent<ConfirmEmail>();
-        await cut.InvokeAsync(() => Task.CompletedTask);
 
-        // The error message must mention the server being unreachable
-        Assert.Contains("serveur", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        cut.WaitForAssertion(() => Assert.Contains("serveur", cut.Markup, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -180,8 +175,9 @@ public class ConfirmEmailTests : TestContext
         // Render without a token → component shows the error state
         var cut = RenderComponent<ConfirmEmail>();
 
-        // A login/return button must always be visible (at least in the error state)
-        Assert.Contains("connexion", cut.Markup, StringComparison.OrdinalIgnoreCase);
+        // Attend que le rendu soit stable (async lifecycle en bUnit WASM)
+        cut.WaitForAssertion(() =>
+            Assert.Contains("connexion", cut.Markup, StringComparison.OrdinalIgnoreCase));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
