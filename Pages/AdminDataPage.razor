@@ -562,21 +562,33 @@ else
                         <div class="card-header">Lier une visée à une visée à maîtriser</div>
                         <div class="card-body">
                             <label class="form-label fw-bold">Visée</label>
-                            <select class="form-select mb-2" @bind="lienIdVisee">
+                            <input class="form-control form-control-sm mb-1" placeholder="🔍 Rechercher une visée…"
+                                   @bind="lienSearchV" @bind:event="oninput" />
+                            <select class="form-select mb-3" @bind="lienIdVisee" size="5" style="height:auto;">
                                 <option value="0">-- Visée --</option>
-                                @foreach (var v in visees)
+                                @foreach (var v in visees.Where(v =>
+                                    string.IsNullOrWhiteSpace(lienSearchV) ||
+                                    v.NomViseeType.Contains(lienSearchV, StringComparison.OrdinalIgnoreCase) ||
+                                    v.NomCours.Contains(lienSearchV, StringComparison.OrdinalIgnoreCase) ||
+                                    v.NomDomaine.Contains(lienSearchV, StringComparison.OrdinalIgnoreCase)))
                                 {
                                     <option value="@v.IdVisee">[@v.IdVisee] @v.NomViseeType — @v.NomCours / @v.NomDomaine</option>
                                 }
                             </select>
+
                             <label class="form-label fw-bold">Visée à maîtriser</label>
-                            <select class="form-select mb-3" @bind="lienIdVm">
+                            <input class="form-control form-control-sm mb-1" placeholder="🔍 Rechercher une visée à maîtriser…"
+                                   @bind="lienSearchVm" @bind:event="oninput" />
+                            <select class="form-select mb-3" @bind="lienIdVm" size="5" style="height:auto;">
                                 <option value="0">-- Visée à maîtriser --</option>
-                                @foreach (var vm in viseesMaitriser)
+                                @foreach (var vm in viseesMaitriser.Where(vm =>
+                                    string.IsNullOrWhiteSpace(lienSearchVm) ||
+                                    vm.NomViseesMaitriser.Contains(lienSearchVm, StringComparison.OrdinalIgnoreCase)))
                                 {
                                     <option value="@vm.IdViseesMaitriser">[@vm.IdViseesMaitriser] @vm.NomViseesMaitriser</option>
                                 }
                             </select>
+
                             <button class="btn btn-primary w-100" @onclick="CreateLienViseeMaitrise"
                                     disabled="@(lienIdVisee == 0 || lienIdVm == 0)">
                                 Créer le lien
@@ -733,8 +745,10 @@ else
     private HashSet<int> vAptIds = new();   // aptitudes sélectionnées pour appartenir (étape 9)
 
     // ── Champs de saisie — Liaison visée ↔ visée à maîtriser ─────────────
-    private int lienIdVisee = 0;
-    private int lienIdVm    = 0;
+    private int    lienIdVisee   = 0;
+    private int    lienIdVm      = 0;
+    private string lienSearchV   = "";   // filtre texte pour la liste Visée
+    private string lienSearchVm  = "";   // filtre texte pour la liste Visée à maîtriser
 
     // ── Champs de saisie — Appartenir visée_maitriser ↔ aptitude/compétence
     private int aptVmId   = 0;
