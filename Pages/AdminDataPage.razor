@@ -556,63 +556,114 @@ else
         @* ── LIAISONS VISÉE ↔ VISÉE À MAÎTRISER ─────────────────── *@
         @if (activeTab == "Liens V→M")
         {
+            @* Bouton de création — au-dessus des 3 boxes *@
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <button class="btn btn-primary" @onclick="CreateLiensViseeMaitrise"
+                        disabled="@(lienIdVisee == 0 || lienIdVms.Count == 0)">
+                    ➕ Créer @(lienIdVms.Count == 0 ? "" : lienIdVms.Count + " ") lien@(lienIdVms.Count > 1 ? "s" : "")
+                </button>
+                @if (lienIdVisee > 0)
+                {
+                    <span class="badge bg-secondary">Visée #@lienIdVisee sélectionnée</span>
+                }
+                @if (lienIdVms.Count > 0)
+                {
+                    <span class="badge bg-info text-dark">@lienIdVms.Count VM sélectionnée@(lienIdVms.Count > 1 ? "s" : "")</span>
+                }
+            </div>
+
             <div class="row g-3">
-                <div class="col-md-5">
-                    <div class="card">
-                        <div class="card-header">Lier une visée à une visée à maîtriser</div>
-                        <div class="card-body">
-                            <label class="form-label fw-bold">Visée</label>
-                            <input class="form-control form-control-sm mb-1" placeholder="🔍 Rechercher une visée…"
+
+                @* ── Box 1 : Visées ── *@
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-header fw-bold">Visées</div>
+                        <div class="card-body p-2">
+                            <input class="form-control form-control-sm mb-2"
+                                   placeholder="🔍 Rechercher…"
                                    @bind="lienSearchV" @bind:event="oninput" />
-                            <select class="form-select mb-3" @bind="lienIdVisee" size="5" style="height:auto;">
-                                <option value="0">-- Visée --</option>
+                            <div style="max-height:420px;overflow-y:auto;">
                                 @foreach (var v in visees.Where(v =>
                                     string.IsNullOrWhiteSpace(lienSearchV) ||
                                     v.NomViseeType.Contains(lienSearchV, StringComparison.OrdinalIgnoreCase) ||
                                     v.NomCours.Contains(lienSearchV, StringComparison.OrdinalIgnoreCase) ||
-                                    v.NomDomaine.Contains(lienSearchV, StringComparison.OrdinalIgnoreCase)))
+                                    v.NomDomaine.Contains(lienSearchV, StringComparison.OrdinalIgnoreCase) ||
+                                    v.NomNiveau.Contains(lienSearchV, StringComparison.OrdinalIgnoreCase)))
                                 {
-                                    <option value="@v.IdVisee">[@v.IdVisee] @v.NomViseeType — @v.NomCours / @v.NomDomaine</option>
+                                    var isSelV = lienIdVisee == v.IdVisee;
+                                    <div class="p-2 mb-1 rounded"
+                                         style="cursor:pointer; background:@(isSelV ? "var(--primary)" : "var(--bg-card)"); color:@(isSelV ? "#fff" : "inherit"); border:1px solid var(--border);"
+                                         @onclick="() => { lienIdVisee = isSelV ? 0 : v.IdVisee; }">
+                                        <div class="fw-bold small">@v.NomViseeType</div>
+                                        <div class="text-muted" style="font-size:.75rem;">@v.NomCours · @v.NomNiveau · @v.NomDomaine</div>
+                                    </div>
                                 }
-                            </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                            <label class="form-label fw-bold">Visée à maîtriser</label>
-                            <input class="form-control form-control-sm mb-1" placeholder="🔍 Rechercher une visée à maîtriser…"
+                @* ── Box 2 : Visées à maîtriser (multi-sélection) ── *@
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-header fw-bold">
+                            Visées à maîtriser
+                            @if (lienIdVms.Count > 0)
+                            {
+                                <button class="btn btn-sm btn-outline-secondary float-end" style="font-size:.7rem;padding:1px 6px;"
+                                        @onclick="() => lienIdVms.Clear()">tout désélectionner</button>
+                            }
+                        </div>
+                        <div class="card-body p-2">
+                            <input class="form-control form-control-sm mb-2"
+                                   placeholder="🔍 Rechercher…"
                                    @bind="lienSearchVm" @bind:event="oninput" />
-                            <select class="form-select mb-3" @bind="lienIdVm" size="5" style="height:auto;">
-                                <option value="0">-- Visée à maîtriser --</option>
+                            <div style="max-height:420px;overflow-y:auto;">
                                 @foreach (var vm in viseesMaitriser.Where(vm =>
                                     string.IsNullOrWhiteSpace(lienSearchVm) ||
                                     vm.NomViseesMaitriser.Contains(lienSearchVm, StringComparison.OrdinalIgnoreCase)))
                                 {
-                                    <option value="@vm.IdViseesMaitriser">[@vm.IdViseesMaitriser] @vm.NomViseesMaitriser</option>
+                                    var isSelVm = lienIdVms.Contains(vm.IdViseesMaitriser);
+                                    <div class="p-2 mb-1 rounded"
+                                         style="cursor:pointer; background:@(isSelVm ? "var(--primary)" : "var(--bg-card)"); color:@(isSelVm ? "#fff" : "inherit"); border:1px solid var(--border);"
+                                         @onclick="() => { if (isSelVm) lienIdVms.Remove(vm.IdViseesMaitriser); else lienIdVms.Add(vm.IdViseesMaitriser); }">
+                                        <div class="small">@(isSelVm ? "✔ " : "")@vm.NomViseesMaitriser</div>
+                                    </div>
                                 }
-                            </select>
-
-                            <button class="btn btn-primary w-100" @onclick="CreateLienViseeMaitrise"
-                                    disabled="@(lienIdVisee == 0 || lienIdVm == 0)">
-                                Créer le lien
-                            </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-7">
-                    <table class="table table-sm table-hover">
-                        <thead>
-                            <tr><th>Visée</th><th>Visée à maîtriser</th><th></th></tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var l in liensViseeMaitrise.Where(x => MatchSearch(x.ContexteVisee, x.NomViseesMaitriser)))
-                            {
-                                <tr>
-                                    <td>[@l.IdVisee] @l.ContexteVisee</td>
-                                    <td>[@l.IdViseesMaitriser] @l.NomViseesMaitriser</td>
-                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteLienViseeMaitrise(l.IdVisee, l.IdViseesMaitriser)">✕</button></td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+
+                @* ── Box 3 : Liaisons existantes ── *@
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-header fw-bold">Liaisons existantes</div>
+                        <div class="card-body p-2">
+                            <input class="form-control form-control-sm mb-2"
+                                   placeholder="🔍 Rechercher…"
+                                   @bind="lienSearchLien" @bind:event="oninput" />
+                            <div style="max-height:420px;overflow-y:auto;">
+                                @foreach (var l in liensViseeMaitrise.Where(x =>
+                                    string.IsNullOrWhiteSpace(lienSearchLien) ||
+                                    x.ContexteVisee.Contains(lienSearchLien, StringComparison.OrdinalIgnoreCase) ||
+                                    x.NomViseesMaitriser.Contains(lienSearchLien, StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    <div class="d-flex justify-content-between align-items-start p-2 mb-1 rounded"
+                                         style="border:1px solid var(--border); background:var(--bg-card);">
+                                        <div>
+                                            <div class="small fw-bold">@l.ContexteVisee</div>
+                                            <div class="text-muted" style="font-size:.75rem;">→ @l.NomViseesMaitriser</div>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-danger ms-1" style="flex-shrink:0;"
+                                                @onclick="() => DeleteLienViseeMaitrise(l.IdVisee, l.IdViseesMaitriser)">✕</button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
             </div>
         }
 
@@ -745,10 +796,11 @@ else
     private HashSet<int> vAptIds = new();   // aptitudes sélectionnées pour appartenir (étape 9)
 
     // ── Champs de saisie — Liaison visée ↔ visée à maîtriser ─────────────
-    private int    lienIdVisee   = 0;
-    private int    lienIdVm      = 0;
-    private string lienSearchV   = "";   // filtre texte pour la liste Visée
-    private string lienSearchVm  = "";   // filtre texte pour la liste Visée à maîtriser
+    private int         lienIdVisee   = 0;
+    private HashSet<int> lienIdVms    = new();  // sélection multiple de VM
+    private string      lienSearchV   = "";
+    private string      lienSearchVm  = "";
+    private string      lienSearchLien = "";
 
     // ── Champs de saisie — Appartenir visée_maitriser ↔ aptitude/compétence
     private int aptVmId   = 0;
@@ -950,12 +1002,20 @@ else
 
     // ── Actions — Liaisons visée ↔ visée à maîtriser ─────────────────────
 
-    // Crée un lien many-to-many visée ↔ visée à maîtriser et recharge la liste
-    private async Task CreateLienViseeMaitrise()
+    // Crée un lien par VM sélectionnée (indépendants) puis recharge la liste
+    private async Task CreateLiensViseeMaitrise()
     {
-        var (ok, err) = await Api.CreateAdminLienViseeMaitriseAsync(new { idVisee = lienIdVisee, idViseesMaitriser = lienIdVm });
-        if (ok) { lienIdVisee = 0; lienIdVm = 0; await LoadLiensViseeMaitrise(); }
-        await ShowFeedback(ok, ok ? "Lien créé." : err ?? "Erreur");
+        int created = 0;
+        string? lastErr = null;
+        foreach (var vmId in lienIdVms.ToList())
+        {
+            var (ok, err) = await Api.CreateAdminLienViseeMaitriseAsync(new { idVisee = lienIdVisee, idViseesMaitriser = vmId });
+            if (ok) created++;
+            else lastErr = err;
+        }
+        lienIdVms.Clear();
+        await LoadLiensViseeMaitrise();
+        await ShowFeedback(lastErr == null, lastErr == null ? $"{created} lien(s) créé(s)." : lastErr ?? "Erreur");
     }
 
     // Supprime un lien visée ↔ visée à maîtriser et recharge la liste
