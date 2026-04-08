@@ -195,19 +195,16 @@ else
                     </div>
                 }
 
-                @* Étape 9 : aptitude de la VM (depuis appartenir_visee_aptitude) *@
+                @* Étape 9 : compétence de la VM (depuis appartenir_visee_aptitude, groupée par compétence) *@
                 @if (selectedIdVm > 0 && listeAppartenir.Count > 0)
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">9. Aptitude</label>
-                        <select class="form-select" value="@selectedIdAppartenir" @onchange="OnAppartenirChanged">
-                            <option value="0">-- Select an aptitude --</option>
-                            @foreach (var a in listeAppartenir)
+                        <label class="form-label fw-bold">9. Compétence</label>
+                        <select class="form-select" value="@selectedIdCompetenceVm" @onchange="OnCompetenceVmChanged">
+                            <option value="0">-- Select a compétence --</option>
+                            @foreach (var g in listeAppartenir.GroupBy(a => a.IdCompetenceFk))
                             {
-                                var aptLabel = a.NomAptitude != null
-                                    ? $"{a.NomAptitude} — {a.NomCompetence}"
-                                    : a.NomCompetence;
-                                <option value="@a.IdAppartenirViseeAptitude">@aptLabel</option>
+                                <option value="@g.Key">@g.First().NomCompetence</option>
                             }
                         </select>
                     </div>
@@ -242,10 +239,8 @@ else
                             <li><strong>VM:</strong>        @(selectedIdVm == 0 ? "..." : (listeViseesMaitriser.FirstOrDefault(vm => vm.IdViseesMaitriser == selectedIdVm)?.NomViseesMaitriser ?? "..."))</li>
                             @if (selectedIdVm > 0 && listeAppartenir.Count > 0)
                             {
-                                var apt = listeAppartenir.FirstOrDefault(a => a.IdAppartenirViseeAptitude == selectedIdAppartenir);
-                                var aptLabel = apt == null ? "..." :
-                                    apt.NomAptitude != null ? $"{apt.NomAptitude} — {apt.NomCompetence}" : apt.NomCompetence;
-                                <li><strong>Aptitude VM:</strong> @(selectedIdAppartenir == 0 ? "..." : aptLabel)</li>
+                                var comp = listeAppartenir.FirstOrDefault(a => a.IdCompetenceFk == selectedIdCompetenceVm);
+                                <li><strong>Compétence VM:</strong> @(selectedIdCompetenceVm == 0 ? "..." : (comp?.NomCompetence ?? "..."))</li>
                             }
                         </ul>
                     </div>
@@ -300,8 +295,8 @@ else
     private int    selectedIdSousD     = 0;   // sous-domaine (0 = aucun)
     private int    selectedIdNomVisee  = 0;   // étape 6 : type de visée
     private int    selectedIdVisee     = 0;   // étape 7 : compétence/aptitude → donne l'IdVisée
-    private int    selectedIdVm        = 0;   // étape 8 : visée à maîtriser
-    private int    selectedIdAppartenir = 0;  // étape 9 : aptitude de la VM
+    private int    selectedIdVm          = 0;   // étape 8 : visée à maîtriser
+    private int    selectedIdCompetenceVm = 0; // étape 9 : compétence de la VM
 
     // ── Listes chargées depuis l'API ──────────────────────────────────────
     private List<CategorieDto>          listeCategories      = new();
@@ -371,7 +366,7 @@ else
         // Réinitialiser étapes 7+
         selectedIdVisee = 0;
         selectedIdVm    = 0; listeViseesMaitriser.Clear();
-        listeAppartenir.Clear(); selectedIdAppartenir = 0;
+        listeAppartenir.Clear(); selectedIdCompetenceVm = 0;
     }
 
     // Étape 7 : sélection de l'aptitude de la Visée (= Compétence) → donne l'IdVisée
@@ -379,7 +374,7 @@ else
     {
         selectedIdVisee = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
         selectedIdVm    = 0; listeViseesMaitriser.Clear();
-        listeAppartenir.Clear(); selectedIdAppartenir = 0;
+        listeAppartenir.Clear(); selectedIdCompetenceVm = 0;
         if (selectedIdVisee > 0)
             try { listeViseesMaitriser = await Api.GetViseesMaitriserRefAsync(selectedIdVisee); }
             catch (Exception ex) { loadError = ex.Message; }
@@ -390,16 +385,16 @@ else
     {
         selectedIdVm = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
         listeAppartenir.Clear();
-        selectedIdAppartenir = 0;
+        selectedIdCompetenceVm = 0;
         if (selectedIdVm > 0)
             try { listeAppartenir = await Api.GetAppartenirRefAsync(selectedIdVm, selectedIdVisee > 0 ? selectedIdVisee : null); }
             catch (Exception ex) { loadError = ex.Message; }
     }
 
-    // Étape 9 : sélection de l'aptitude de la VM
-    private void OnAppartenirChanged(ChangeEventArgs e)
+    // Étape 9 : sélection de la compétence de la VM
+    private void OnCompetenceVmChanged(ChangeEventArgs e)
     {
-        selectedIdAppartenir = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        selectedIdCompetenceVm = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
@@ -413,7 +408,7 @@ else
         if (level <= 5) { selectedIdNomVisee = 0; listeVisees.Clear(); }
         selectedIdVisee = 0;
         selectedIdVm = 0; listeViseesMaitriser.Clear();
-        listeAppartenir.Clear(); selectedIdAppartenir = 0;
+        listeAppartenir.Clear(); selectedIdCompetenceVm = 0;
     }
 
     private async Task ChargerDomaines()
@@ -428,7 +423,7 @@ else
     {
         listeVisees.Clear();
         selectedIdNomVisee = 0; selectedIdVisee = 0;
-        listeViseesMaitriser.Clear(); listeAppartenir.Clear(); selectedIdAppartenir = 0;
+        listeViseesMaitriser.Clear(); listeAppartenir.Clear(); selectedIdCompetenceVm = 0;
         if (selectedIdDomaine == 0) return;
         try { listeVisees = await Api.GetViseesRefAsync(selectedIdDomaine, selectedIdSousD > 0 ? selectedIdSousD : null); }
         catch (Exception ex) { loadError = ex.Message; }
