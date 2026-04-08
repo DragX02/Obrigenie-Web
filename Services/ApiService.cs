@@ -711,10 +711,15 @@ namespace Obrigenie.Services
         }
 
         // Retourne les entrées appartenir_visee_aptitude d'une visée à maîtriser.
-        // Endpoint : GET api/ref/appartenir/{idVm}
-        public async Task<List<AppartenirRefDto>> GetAppartenirRefAsync(int idVm)
+        // Si idVisee est fourni et qu'aucune entrée n'existe, le serveur retourne
+        // la compétence (Attendus) de la visée comme repli.
+        // Endpoint : GET api/ref/appartenir/{idVm}?idVisee={idVisee}
+        public async Task<List<AppartenirRefDto>> GetAppartenirRefAsync(int idVm, int? idVisee = null)
         {
-            var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/appartenir/{idVm}");
+            var url = idVisee.HasValue
+                ? $"api/ref/appartenir/{idVm}?idVisee={idVisee.Value}"
+                : $"api/ref/appartenir/{idVm}";
+            var request = await BuildAuthRequest(HttpMethod.Get, url);
             var response = await _httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode)
                 throw new HttpRequestException($"api/ref/appartenir/{idVm} a retourné {(int)response.StatusCode} {response.StatusCode}.");

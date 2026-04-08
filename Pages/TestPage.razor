@@ -162,23 +162,21 @@ else
                     </div>
                 }
 
-                @* Étape 8 : aptitudes liées à la VM (parler / écouter / lire / écrire…) *@
+                @* Étape 8 : aptitude liée à la VM *@
                 @if (selectedIdVm > 0 && listeAppartenir.Count > 0)
                 {
-                    <div class="mb-3 p-3 border rounded">
-                        <label class="form-label fw-bold">8. Aptitudes liées <span class="text-muted">(sélectionne celles qui s'appliquent)</span></label>
-                        @foreach (var a in listeAppartenir)
-                        {
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox"
-                                       id="rapt_@a.IdAppartenirViseeAptitude"
-                                       checked="@selectedAppartenirIds.Contains(a.IdAppartenirViseeAptitude)"
-                                       @onchange="e => ToggleAppartenir(a.IdAppartenirViseeAptitude, (bool)(e.Value ?? false))" />
-                                <label class="form-check-label" for="rapt_@a.IdAppartenirViseeAptitude">
-                                    @(a.NomAptitude ?? "—") <span class="text-muted small">(@a.NomCompetence)</span>
-                                </label>
-                            </div>
-                        }
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">8. Aptitude</label>
+                        <select class="form-select" value="@selectedIdAppartenir" @onchange="OnAppartenirChanged">
+                            <option value="0">-- Select an aptitude --</option>
+                            @foreach (var a in listeAppartenir)
+                            {
+                                var aptLabel = a.NomAptitude != null
+                                    ? $"{a.NomAptitude} — {a.NomCompetence}"
+                                    : a.NomCompetence;
+                                <option value="@a.IdAppartenirViseeAptitude">@aptLabel</option>
+                            }
+                        </select>
                     </div>
                 }
 
@@ -201,6 +199,13 @@ else
                             <li><strong>Sous-dom.:</strong> @(selectedIdSousD == 0 ? "—" : (listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp ?? "..."))</li>
                             <li><strong>Visée:</strong>    @(selectedIdVisee == 0 ? "..." : (listeVisees.FirstOrDefault(v => v.IdVisee == selectedIdVisee)?.Label ?? "..."))</li>
                             <li><strong>VM:</strong>       @(selectedIdVm == 0 ? "..." : (listeViseesMaitriser.FirstOrDefault(vm => vm.IdViseesMaitriser == selectedIdVm)?.NomViseesMaitriser ?? "..."))</li>
+                            @if (selectedIdVm > 0 && listeAppartenir.Count > 0)
+                            {
+                                var apt = listeAppartenir.FirstOrDefault(a => a.IdAppartenirViseeAptitude == selectedIdAppartenir);
+                                var aptLabel = apt == null ? "..." :
+                                    apt.NomAptitude != null ? $"{apt.NomAptitude} — {apt.NomCompetence}" : apt.NomCompetence;
+                                <li><strong>Aptitude:</strong> @(selectedIdAppartenir == 0 ? "..." : aptLabel)</li>
+                            }
                         </ul>
                     </div>
                 </div>
@@ -250,8 +255,8 @@ else
     private int    selectedIdDomaine  = 0;
     private int    selectedIdSousD    = 0;  // sous-domaine (0 = aucun)
     private int    selectedIdVisee    = 0;
-    private int          selectedIdVm          = 0;   // visée à maîtriser
-    private HashSet<int> selectedAppartenirIds = new(); // aptitudes cochées (étape 8)
+    private int selectedIdVm         = 0;   // visée à maîtriser
+    private int selectedIdAppartenir = 0;   // aptitude sélectionnée (étape 8)
 
     // ── Listes chargées depuis l'API ──────────────────────────────────────
     private List<CategorieDto>          listeCategories      = new();
@@ -320,7 +325,7 @@ else
         selectedIdVm    = 0;
         listeViseesMaitriser.Clear();
         listeAppartenir.Clear();
-        selectedAppartenirIds = new();
+        selectedIdAppartenir = 0;
         if (selectedIdVisee > 0)
             try { listeViseesMaitriser = await Api.GetViseesMaitriserRefAsync(selectedIdVisee); }
             catch (Exception ex) { loadError = ex.Message; }
@@ -330,16 +335,15 @@ else
     {
         selectedIdVm = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
         listeAppartenir.Clear();
-        selectedAppartenirIds = new();
+        selectedIdAppartenir = 0;
         if (selectedIdVm > 0)
-            try { listeAppartenir = await Api.GetAppartenirRefAsync(selectedIdVm); }
+            try { listeAppartenir = await Api.GetAppartenirRefAsync(selectedIdVm, selectedIdVisee > 0 ? selectedIdVisee : null); }
             catch (Exception ex) { loadError = ex.Message; }
     }
 
-    private void ToggleAppartenir(int id, bool isChecked)
+    private void OnAppartenirChanged(ChangeEventArgs e)
     {
-        if (isChecked) selectedAppartenirIds.Add(id);
-        else           selectedAppartenirIds.Remove(id);
+        selectedIdAppartenir = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
@@ -353,7 +357,7 @@ else
         if (level <= 4) { selectedIdSousD = 0; listeSousDomaines.Clear(); selectedIdVisee = 0; listeVisees.Clear(); }
         if (level <= 5) { selectedIdVisee = 0; listeVisees.Clear(); }
         selectedIdVm = 0; listeViseesMaitriser.Clear();
-        listeAppartenir.Clear(); selectedAppartenirIds = new();
+        listeAppartenir.Clear(); selectedIdAppartenir = 0;
     }
 
     private async Task ChargerDomaines()

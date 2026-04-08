@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "O:\\c#\\Obrigenie-Web\\Obrigenie.csproj": {}
+    "G:\\csharpcallender\\project_final_bac\\Obrigenie\\Obrigenie.csproj": {}
   },
   "projects": {
-    "O:\\c#\\Obrigenie-Web\\Obrigenie.csproj": {
+    "G:\\csharpcallender\\project_final_bac\\Obrigenie\\Obrigenie.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "O:\\c#\\Obrigenie-Web\\Obrigenie.csproj",
+        "projectUniqueName": "G:\\csharpcallender\\project_final_bac\\Obrigenie\\Obrigenie.csproj",
         "projectName": "Obrigenie",
-        "projectPath": "O:\\c#\\Obrigenie-Web\\Obrigenie.csproj",
-        "packagesPath": "C:\\Users\\Dragx\\.nuget\\packages\\",
-        "outputPath": "O:\\c#\\Obrigenie-Web\\obj\\",
+        "projectPath": "G:\\csharpcallender\\project_final_bac\\Obrigenie\\Obrigenie.csproj",
+        "packagesPath": "C:\\Users\\olbre\\.nuget\\packages\\",
+        "outputPath": "G:\\csharpcallender\\project_final_bac\\Obrigenie\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\Dragx\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\olbre\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -45,7 +45,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.200"
+        "SdkAnalysisLevel": "9.0.300"
       },
       "frameworks": {
         "net8.0": {
@@ -71,13 +71,13 @@
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",
               "target": "Package",
-              "version": "[8.0.25, )",
+              "version": "[8.0.23, )",
               "autoReferenced": true
             },
             "Microsoft.NET.Sdk.WebAssembly.Pack": {
               "suppressParent": "All",
               "target": "Package",
-              "version": "[10.0.4, )",
+              "version": "[9.0.12, )",
               "autoReferenced": true
             }
           },
@@ -94,19 +94,7 @@
           "warn": true,
           "downloadDependencies": [
             {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.25, 8.0.25]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.25, 8.0.25]"
-            },
-            {
               "name": "Microsoft.NETCore.App.Runtime.Mono.browser-wasm",
-              "version": "[8.0.25, 8.0.25]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Ref",
               "version": "[8.0.25, 8.0.25]"
             }
           ],
@@ -115,7 +103,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.200/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.310/PortableRuntimeIdentifierGraph.json"
         }
       },
       "runtimes": {
