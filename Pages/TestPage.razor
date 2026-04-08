@@ -1,15 +1,16 @@
 @* ─────────────────────────────────────────────────────────────────────────────
    TestPage.razor — Page de test de sélection en cascade réservée aux admins.
 
-   Flux de sélection en cascade à 8 niveaux :
+   Flux de sélection en cascade à 9 niveaux :
      1. Catégorie
      2. Cours
      3. Niveau
      4. Domaine
      5. Sous-domaine (optionnel)
-     6. Visée (filtrée par domaine + sous-domaine)
-     7. Visée à maîtriser (filtrée par visée)
-     8. Aptitude (Attendus) liée à la VM
+     6. Visée — NomVisée (type d'objectif)
+     7. Aptitude de la Visée — Compétence (ex : "Attendus") → détermine l'IdVisée
+     8. Visée à maîtriser
+     9. Aptitude de la VM (depuis appartenir_visee_aptitude)
 
    Une sous-sélection de langue optionnelle apparaît lorsque le cours "LM" est choisi.
    L'accès est réservé aux utilisateurs ADMIN.
@@ -133,26 +134,41 @@ else
                     </div>
                 }
 
-                @* Étape 6 : visée *@
+                @* Étape 6 : NomVisée (type d'objectif) *@
                 @if (selectedIdDomaine > 0)
                 {
                     <div class="mb-3">
                         <label class="form-label fw-bold">6. Visée</label>
-                        <select class="form-select" value="@selectedIdVisee" @onchange="OnViseeChanged">
+                        <select class="form-select" value="@selectedIdNomVisee" @onchange="OnNomViseeChanged">
                             <option value="0">-- Select a visée --</option>
-                            @foreach (var v in listeVisees)
+                            @foreach (var nv in listeVisees.GroupBy(v => v.IdNomVisee).Select(g => g.First()))
                             {
-                                <option value="@v.IdVisee">@v.Label</option>
+                                <option value="@nv.IdNomVisee">@nv.NomVisee</option>
                             }
                         </select>
                     </div>
                 }
 
-                @* Étape 7 : visée à maîtriser *@
+                @* Étape 7 : Aptitude de la Visée (= Compétence) *@
+                @if (selectedIdNomVisee > 0)
+                {
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">7. Aptitude</label>
+                        <select class="form-select" value="@selectedIdVisee" @onchange="OnViseeAptitudeChanged">
+                            <option value="0">-- Select an aptitude --</option>
+                            @foreach (var v in listeVisees.Where(v => v.IdNomVisee == selectedIdNomVisee))
+                            {
+                                <option value="@v.IdVisee">@v.NomCompetence</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @* Étape 8 : visée à maîtriser *@
                 @if (selectedIdVisee > 0)
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">7. Visée à maîtriser</label>
+                        <label class="form-label fw-bold">8. Visée à maîtriser</label>
                         <select class="form-select" value="@selectedIdVm" @onchange="OnVmChanged">
                             <option value="0">-- Select --</option>
                             @foreach (var vm in listeViseesMaitriser)
@@ -163,11 +179,11 @@ else
                     </div>
                 }
 
-                @* Étape 8 : aptitude (Attendus) liée à la VM *@
+                @* Étape 9 : aptitude de la VM (depuis appartenir_visee_aptitude) *@
                 @if (selectedIdVm > 0 && listeAppartenir.Count > 0)
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">8. Aptitude</label>
+                        <label class="form-label fw-bold">9. Aptitude</label>
                         <select class="form-select" value="@selectedIdAppartenir" @onchange="OnAppartenirChanged">
                             <option value="0">-- Select an aptitude --</option>
                             @foreach (var a in listeAppartenir)
@@ -189,23 +205,24 @@ else
                     <div class="card-body">
                         <h5 class="card-title">Your selection summary:</h5>
                         <ul>
-                            <li><strong>Category:</strong> @(selectedIdCat == 0 ? "..." : (listeCategories.FirstOrDefault(c => c.IdCat == selectedIdCat)?.NomCat ?? "..."))</li>
-                            <li><strong>Course:</strong>   @(string.IsNullOrEmpty(selectedCours)   ? "..." : selectedCours)</li>
-                            <li><strong>Level:</strong>    @(string.IsNullOrEmpty(selectedNiveau)  ? "..." : selectedNiveau)</li>
+                            <li><strong>Category:</strong>  @(selectedIdCat == 0 ? "..." : (listeCategories.FirstOrDefault(c => c.IdCat == selectedIdCat)?.NomCat ?? "..."))</li>
+                            <li><strong>Course:</strong>    @(string.IsNullOrEmpty(selectedCours)  ? "..." : selectedCours)</li>
+                            <li><strong>Level:</strong>     @(string.IsNullOrEmpty(selectedNiveau) ? "..." : selectedNiveau)</li>
                             @if (selectedCours == "LM")
                             {
                                 <li class="text-warning"><strong>Language:</strong> @(string.IsNullOrEmpty(selectedLangue) ? "..." : selectedLangue)</li>
                             }
-                            <li><strong>Domain:</strong>   @(selectedIdDomaine == 0 ? "..." : (domainesFiltres.FirstOrDefault(d => d.IdDom == selectedIdDomaine)?.Nom ?? "..."))</li>
+                            <li><strong>Domain:</strong>    @(selectedIdDomaine == 0 ? "..." : (domainesFiltres.FirstOrDefault(d => d.IdDom == selectedIdDomaine)?.Nom ?? "..."))</li>
                             <li><strong>Sous-dom.:</strong> @(selectedIdSousD == 0 ? "—" : (listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp ?? "..."))</li>
-                            <li><strong>Visée:</strong>    @(selectedIdVisee == 0 ? "..." : (listeVisees.FirstOrDefault(v => v.IdVisee == selectedIdVisee)?.Label ?? "..."))</li>
-                            <li><strong>VM:</strong>       @(selectedIdVm == 0 ? "..." : (listeViseesMaitriser.FirstOrDefault(vm => vm.IdViseesMaitriser == selectedIdVm)?.NomViseesMaitriser ?? "..."))</li>
+                            <li><strong>Visée:</strong>     @(selectedIdNomVisee == 0 ? "..." : (listeVisees.FirstOrDefault(v => v.IdNomVisee == selectedIdNomVisee)?.NomVisee ?? "..."))</li>
+                            <li><strong>Aptitude:</strong>  @(selectedIdVisee == 0 ? "..." : (listeVisees.FirstOrDefault(v => v.IdVisee == selectedIdVisee)?.NomCompetence ?? "..."))</li>
+                            <li><strong>VM:</strong>        @(selectedIdVm == 0 ? "..." : (listeViseesMaitriser.FirstOrDefault(vm => vm.IdViseesMaitriser == selectedIdVm)?.NomViseesMaitriser ?? "..."))</li>
                             @if (selectedIdVm > 0 && listeAppartenir.Count > 0)
                             {
                                 var apt = listeAppartenir.FirstOrDefault(a => a.IdAppartenirViseeAptitude == selectedIdAppartenir);
                                 var aptLabel = apt == null ? "..." :
                                     apt.NomAptitude != null ? $"{apt.NomAptitude} — {apt.NomCompetence}" : apt.NomCompetence;
-                                <li><strong>Aptitude:</strong> @(selectedIdAppartenir == 0 ? "..." : aptLabel)</li>
+                                <li><strong>Aptitude VM:</strong> @(selectedIdAppartenir == 0 ? "..." : aptLabel)</li>
                             }
                         </ul>
                     </div>
@@ -249,15 +266,16 @@ else
     }
 
     // ── Sélections courantes ───────────────────────────────────────────────
-    private int    selectedIdCat      = 0;
-    private string selectedCours      = "";
-    private string selectedNiveau     = "";
-    private string selectedLangue     = "";
-    private int    selectedIdDomaine  = 0;
-    private int    selectedIdSousD    = 0;  // sous-domaine (0 = aucun)
-    private int    selectedIdVisee    = 0;
-    private int    selectedIdVm       = 0;  // visée à maîtriser
-    private int    selectedIdAppartenir = 0; // aptitude sélectionnée (étape 8)
+    private int    selectedIdCat       = 0;
+    private string selectedCours       = "";
+    private string selectedNiveau      = "";
+    private string selectedLangue      = "";
+    private int    selectedIdDomaine   = 0;
+    private int    selectedIdSousD     = 0;   // sous-domaine (0 = aucun)
+    private int    selectedIdNomVisee  = 0;   // étape 6 : type de visée
+    private int    selectedIdVisee     = 0;   // étape 7 : compétence/aptitude → donne l'IdVisée
+    private int    selectedIdVm        = 0;   // étape 8 : visée à maîtriser
+    private int    selectedIdAppartenir = 0;  // étape 9 : aptitude de la VM
 
     // ── Listes chargées depuis l'API ──────────────────────────────────────
     private List<CategorieDto>          listeCategories      = new();
@@ -265,7 +283,7 @@ else
     private List<NiveauDto>             listeNiveaux         = new();
     private List<DomaineDto>            domainesFiltres      = new();
     private List<SousDomaineRefDto>     listeSousDomaines    = new();
-    private List<ViseeRefDto>           listeVisees          = new();
+    private List<ViseeRefDto>           listeVisees          = new();   // toutes les visées du domaine
     private List<ViseesMaitriserRefDto> listeViseesMaitriser = new();
     private List<AppartenirRefDto>      listeAppartenir      = new();
 
@@ -320,18 +338,28 @@ else
         await ChargerVisees();
     }
 
-    private async Task OnViseeChanged(ChangeEventArgs e)
+    // Étape 6 : sélection du type de Visée (NomVisée)
+    private void OnNomViseeChanged(ChangeEventArgs e)
+    {
+        selectedIdNomVisee = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        // Réinitialiser étapes 7+
+        selectedIdVisee = 0;
+        selectedIdVm    = 0; listeViseesMaitriser.Clear();
+        listeAppartenir.Clear(); selectedIdAppartenir = 0;
+    }
+
+    // Étape 7 : sélection de l'aptitude de la Visée (= Compétence) → donne l'IdVisée
+    private async Task OnViseeAptitudeChanged(ChangeEventArgs e)
     {
         selectedIdVisee = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
-        selectedIdVm    = 0;
-        listeViseesMaitriser.Clear();
-        listeAppartenir.Clear();
-        selectedIdAppartenir = 0;
+        selectedIdVm    = 0; listeViseesMaitriser.Clear();
+        listeAppartenir.Clear(); selectedIdAppartenir = 0;
         if (selectedIdVisee > 0)
             try { listeViseesMaitriser = await Api.GetViseesMaitriserRefAsync(selectedIdVisee); }
             catch (Exception ex) { loadError = ex.Message; }
     }
 
+    // Étape 8 : sélection de la VM
     private async Task OnVmChanged(ChangeEventArgs e)
     {
         selectedIdVm = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
@@ -342,6 +370,7 @@ else
             catch (Exception ex) { loadError = ex.Message; }
     }
 
+    // Étape 9 : sélection de l'aptitude de la VM
     private void OnAppartenirChanged(ChangeEventArgs e)
     {
         selectedIdAppartenir = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
@@ -349,14 +378,14 @@ else
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
-    // Réinitialise toutes les sélections/listes en aval du niveau indiqué (1=cours, 2=niveaux, …)
     private void ResetFrom(int level)
     {
         if (level <= 1) { selectedCours = ""; listeCours.Clear(); }
         if (level <= 2) { selectedNiveau = ""; listeNiveaux.Clear(); }
         if (level <= 3) { selectedIdDomaine = 0; domainesFiltres.Clear(); selectedLangue = ""; }
-        if (level <= 4) { selectedIdSousD = 0; listeSousDomaines.Clear(); selectedIdVisee = 0; listeVisees.Clear(); }
-        if (level <= 5) { selectedIdVisee = 0; listeVisees.Clear(); }
+        if (level <= 4) { selectedIdSousD = 0; listeSousDomaines.Clear(); selectedIdNomVisee = 0; listeVisees.Clear(); }
+        if (level <= 5) { selectedIdNomVisee = 0; listeVisees.Clear(); }
+        selectedIdVisee = 0;
         selectedIdVm = 0; listeViseesMaitriser.Clear();
         listeAppartenir.Clear(); selectedIdAppartenir = 0;
     }
@@ -372,7 +401,8 @@ else
     private async Task ChargerVisees()
     {
         listeVisees.Clear();
-        selectedIdVisee = 0; listeViseesMaitriser.Clear();
+        selectedIdNomVisee = 0; selectedIdVisee = 0;
+        listeViseesMaitriser.Clear(); listeAppartenir.Clear(); selectedIdAppartenir = 0;
         if (selectedIdDomaine == 0) return;
         try { listeVisees = await Api.GetViseesRefAsync(selectedIdDomaine, selectedIdSousD > 0 ? selectedIdSousD : null); }
         catch (Exception ex) { loadError = ex.Message; }

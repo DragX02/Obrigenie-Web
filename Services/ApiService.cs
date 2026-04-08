@@ -856,8 +856,12 @@ namespace Obrigenie.Services
     // DTO visée pour la sélection en cascade (ref)
     public class ViseeRefDto
     {
-        [JsonPropertyName("idVisee")] public int    IdVisee { get; set; }
-        [JsonPropertyName("label")]   public string Label   { get; set; } = string.Empty;
+        [JsonPropertyName("idVisee")]       public int    IdVisee       { get; set; }
+        [JsonPropertyName("idNomVisee")]    public int    IdNomVisee    { get; set; }
+        [JsonPropertyName("nomVisee")]      public string NomVisee      { get; set; } = string.Empty;
+        [JsonPropertyName("idCompetence")]  public int    IdCompetence  { get; set; }
+        [JsonPropertyName("nomCompetence")] public string NomCompetence { get; set; } = string.Empty;
+        [JsonPropertyName("label")]         public string Label         { get; set; } = string.Empty;
     }
 
     // DTO visée à maîtriser pour la sélection en cascade (ref)
