@@ -1,7 +1,7 @@
 @* ─────────────────────────────────────────────────────────────────────────────
    TestPage.razor — Page de test de sélection en cascade réservée aux admins.
 
-   Flux de sélection en cascade à 7 niveaux :
+   Flux de sélection en cascade à 8 niveaux :
      1. Catégorie
      2. Cours
      3. Niveau
@@ -9,6 +9,7 @@
      5. Sous-domaine (optionnel)
      6. Visée (filtrée par domaine + sous-domaine)
      7. Visée à maîtriser (filtrée par visée)
+     8. Aptitude (Attendus) liée à la VM
 
    Une sous-sélection de langue optionnelle apparaît lorsque le cours "LM" est choisi.
    L'accès est réservé aux utilisateurs ADMIN.
@@ -162,7 +163,7 @@ else
                     </div>
                 }
 
-                @* Étape 8 : aptitude liée à la VM *@
+                @* Étape 8 : aptitude (Attendus) liée à la VM *@
                 @if (selectedIdVm > 0 && listeAppartenir.Count > 0)
                 {
                     <div class="mb-3">
@@ -255,8 +256,8 @@ else
     private int    selectedIdDomaine  = 0;
     private int    selectedIdSousD    = 0;  // sous-domaine (0 = aucun)
     private int    selectedIdVisee    = 0;
-    private int selectedIdVm         = 0;   // visée à maîtriser
-    private int selectedIdAppartenir = 0;   // aptitude sélectionnée (étape 8)
+    private int    selectedIdVm       = 0;  // visée à maîtriser
+    private int    selectedIdAppartenir = 0; // aptitude sélectionnée (étape 8)
 
     // ── Listes chargées depuis l'API ──────────────────────────────────────
     private List<CategorieDto>          listeCategories      = new();

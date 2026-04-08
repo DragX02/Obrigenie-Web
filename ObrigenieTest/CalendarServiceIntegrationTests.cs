@@ -203,8 +203,8 @@ public class CalendarServiceIntegrationTests
 
         Assert.NotNull(calendar);
         // The cached Christmas holiday must be present in the returned calendar.
-        Assert.True(calendar.Holidays.Any(h =>
-            h.Name.Contains("Noel") || h.Name.Contains("Noël") || h.Name.Contains("hiver")));
+        Assert.Contains(calendar.Holidays, h =>
+            h.Name.Contains("Noel") || h.Name.Contains("Noël") || h.Name.Contains("hiver"));
     }
 
     /// <summary>

@@ -1,0 +1,76 @@
+@page "/mon-compte"
+@implements IDisposable
+
+@inject LanguageService Lang
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<div class="account-page">
+    <div class="account-card">
+
+        @* En-tête *@
+        <div class="account-header">
+            <div class="account-avatar-large">@userInitial</div>
+            <div>
+                <h2 class="account-title">@Lang.T("account.title")</h2>
+                <div class="account-email-label">@userEmail</div>
+            </div>
+        </div>
+
+        @* Section langue *@
+        <div class="account-section">
+            <div class="account-section-title">@Lang.T("account.lang")</div>
+
+            <div class="lang-buttons">
+                <button class="@LangClass("FR")" @onclick='() => SetLang("FR")'>
+                    🇫🇷 @Lang.T("account.langFR")
+                </button>
+                <button class="@LangClass("EN")" @onclick='() => SetLang("EN")'>
+                    🇬🇧 @Lang.T("account.langEN")
+                </button>
+                <button class="@LangClass("NL")" @onclick='() => SetLang("NL")'>
+                    🇧🇪 @Lang.T("account.langNL")
+                </button>
+            </div>
+
+            @if (saved)
+            {
+                <div class="lang-saved-msg">✓ @Lang.T("account.saved")</div>
+            }
+        </div>
+
+        @* Bouton retour *@
+        <button class="btn-account-back" @onclick="GoBack">
+            ← @Lang.T("account.back")
+        </button>
+    </div>
+</div>
+
+@code {
+    private string userEmail   = "";
+    private string userInitial = "U";
+    private bool   saved       = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Lang.InitAsync();
+        Lang.OnChange += StateHasChanged;
+        userEmail = await Auth.GetEmailAsync() ?? "";
+        userInitial = userEmail.Length > 0 ? userEmail[0].ToString().ToUpper() : "U";
+    }
+
+    public void Dispose() => Lang.OnChange -= StateHasChanged;
+
+    private string LangClass(string lang) =>
+        Lang.Current == lang ? "btn-lang btn-lang-active" : "btn-lang";
+
+    private async Task SetLang(string lang)
+    {
+        await Lang.SetAsync(lang);
+        saved = true;
+        // Masque la confirmation après 2 s
+        _ = Task.Delay(2000).ContinueWith(_ => InvokeAsync(() => { saved = false; StateHasChanged(); }));
+    }
+
+    private void GoBack() => Nav.NavigateTo(Nav.BaseUri, forceLoad: false);
+}
