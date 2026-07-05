@@ -643,6 +643,45 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<CoursDto>>() ?? new();
         }
 
+        // Récupère TOUS les niveaux disponibles (ayant des visées), indépendamment du cours.
+        // Alimente la première liste déroulante de la cascade réordonnée (Année en premier).
+        // Endpoint : GET api/ref/niveaux
+        // Retourne une liste de NiveauDto triée par code de niveau.
+        public async Task<List<NiveauDto>> GetNiveauxTousAsync()
+        {
+            var request = await BuildAuthRequest(HttpMethod.Get, "api/ref/niveaux");
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/niveaux a retourné {(int)response.StatusCode} {response.StatusCode}.");
+            return await response.Content.ReadFromJsonAsync<List<NiveauDto>>() ?? new();
+        }
+
+        // Récupère les catégories ayant au moins un cours enseigné au niveau donné.
+        // Deuxième étape de la cascade réordonnée (Année → Catégorie).
+        // Endpoint : GET api/ref/categories/by-niveau/{codeNiveau}
+        // codeNiveau : le code du niveau sélectionné.
+        public async Task<List<CategorieDto>> GetCategoriesByNiveauAsync(string codeNiveau)
+        {
+            var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/categories/by-niveau/{Uri.EscapeDataString(codeNiveau)}");
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/categories/by-niveau/{codeNiveau} a retourné {(int)response.StatusCode} {response.StatusCode}.");
+            return await response.Content.ReadFromJsonAsync<List<CategorieDto>>() ?? new();
+        }
+
+        // Récupère les cours d'une catégorie enseignés à un niveau donné.
+        // Troisième étape de la cascade réordonnée (Année → Catégorie → Cours).
+        // Endpoint : GET api/ref/cours/by-cat-niveau/{idCat}/{codeNiveau}
+        // idCat : la clé primaire de la catégorie ; codeNiveau : le code du niveau.
+        public async Task<List<CoursDto>> GetCoursByCatNiveauAsync(int idCat, string codeNiveau)
+        {
+            var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/cours/by-cat-niveau/{idCat}/{Uri.EscapeDataString(codeNiveau)}");
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/cours/by-cat-niveau/{idCat}/{codeNiveau} a retourné {(int)response.StatusCode} {response.StatusCode}.");
+            return await response.Content.ReadFromJsonAsync<List<CoursDto>>() ?? new();
+        }
+
         // Récupère les niveaux disponibles pour un code de cours spécifique.
         // Appelé lorsque l'utilisateur sélectionne un cours dans la première liste déroulante de la page de test.
         // Endpoint : GET api/ref/niveaux/{codeCours}
