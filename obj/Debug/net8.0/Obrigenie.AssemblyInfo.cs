@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Obrigenie")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1bc24457074df6b46dffa7d3a9fb1941bb634b3f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8891668791a299efa4abbc11ab1ca5e1765e07a4")]
 [assembly: System.Reflection.AssemblyProductAttribute("Obrigenie")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Obrigenie")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
