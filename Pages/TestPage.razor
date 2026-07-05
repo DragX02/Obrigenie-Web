@@ -23,11 +23,6 @@
 
 <PageTitle>Cascade Test</PageTitle>
 
-@if (!isAdmin)
-{
-    <div style="padding:2rem;text-align:center;color:var(--text-muted)">Access denied.</div>
-}
-
 @if (loadError != null)
 {
     <div class="alert alert-danger m-3">
@@ -267,19 +262,16 @@ else
         var role = await Auth.GetRoleAsync();
         isAdmin = role == "ADMIN";
 
-        if (isAdmin)
-        {
-            var token = await Auth.GetTokenAsync();
-            tokenDebug = string.IsNullOrEmpty(token) ? null : token[..Math.Min(20, token.Length)] + "…";
+        var token = await Auth.GetTokenAsync();
+        tokenDebug = string.IsNullOrEmpty(token) ? null : token[..Math.Min(20, token.Length)] + "…";
 
-            try
-            {
-                listeCategories = await Api.GetCategoriesAsync();
-            }
-            catch (Exception ex)
-            {
-                loadError = ex.Message;
-            }
+        try
+        {
+            listeCategories = await Api.GetCategoriesAsync();
+        }
+        catch (Exception ex)
+        {
+            loadError = ex.Message;
         }
     }
 
