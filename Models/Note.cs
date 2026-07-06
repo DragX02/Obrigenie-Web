@@ -33,5 +33,9 @@ namespace Obrigenie.Models
         // Clé étrangère optionnelle vers la visée (objectif du référentiel) associée à la note
         // via la cascade de sélection. Null si aucune visée n'est rattachée.
         public int? IdViseeFk { get; set; }
+
+        // Libellé lisible de la visée liée (« NomVisée — Compétence »), calculé côté serveur
+        // pour l'affichage dans le calendrier. Null si aucune visée n'est rattachée.
+        public string? ViseeLabel { get; set; }
     }
 }

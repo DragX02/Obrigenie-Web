@@ -151,7 +151,12 @@
                                  @onclick="() => OnTimeSlotClicked(hour)">
                                 @* Affiche la plage horaire de la note *@
                                 <span class="note-time">@($"{noteHere.Hour:D2}:00 → {endH:D2}:00")</span>
-                                @* Contenu textuel de la note *@
+                                @* Visée sélectionnée via la cascade (affichée en priorité) *@
+                                @if (!string.IsNullOrEmpty(noteHere.ViseeLabel))
+                                {
+                                    <span class="note-visee">🎯 @noteHere.ViseeLabel</span>
+                                }
+                                @* Contenu textuel de la note (optionnel) *@
                                 @noteHere.Content
                             </div>
                         }
@@ -281,12 +286,18 @@
                         <div class="course-mini" style="background-color: @course.Color;">@course.Name</div>
                     }
 
-                    @* Affiche jusqu'à 2 aperçus de notes tronqués à 16 caractères *@
+                    @* Affiche jusqu'à 2 aperçus de notes tronqués à 16 caractères.
+                       Si la note n'a pas de texte, on affiche le libellé de la visée liée. *@
                     @foreach (var note in day.Notes.Take(2))
                     {
-                        @* Tronque les notes longues et ajoute des points de suspension pour la lisibilité *@
-                        var preview = note.Content.Length > 16 ? note.Content[..16] + "…" : note.Content;
-                        <div class="note-mini">📝 @preview</div>
+                        @* Texte de la note si présent, sinon libellé de la visée choisie *@
+                        var raw = !string.IsNullOrEmpty(note.Content) ? note.Content : (note.ViseeLabel ?? "");
+                        var icon = !string.IsNullOrEmpty(note.Content) ? "📝" : "🎯";
+                        var preview = raw.Length > 16 ? raw[..16] + "…" : raw;
+                        @if (!string.IsNullOrEmpty(preview))
+                        {
+                            <div class="note-mini">@icon @preview</div>
+                        }
                     }
                 </div>
             }
