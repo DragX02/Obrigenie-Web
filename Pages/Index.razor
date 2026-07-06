@@ -151,10 +151,10 @@
                                  @onclick="() => OnTimeSlotClicked(hour)">
                                 @* Affiche la plage horaire de la note *@
                                 <span class="note-time">@($"{noteHere.Hour:D2}:00 → {endH:D2}:00")</span>
-                                @* Visée sélectionnée via la cascade (affichée en priorité) *@
-                                @if (!string.IsNullOrEmpty(noteHere.ViseeLabel))
+                                @* Contexte complet de la cascade (Année → Visée à maîtriser) *@
+                                @if (!string.IsNullOrEmpty(noteHere.ViseeContexte))
                                 {
-                                    <span class="note-visee">🎯 @noteHere.ViseeLabel</span>
+                                    <span class="note-visee">🎯 @noteHere.ViseeContexte</span>
                                 }
                                 @* Contenu textuel de la note (optionnel) *@
                                 @noteHere.Content
@@ -290,8 +290,10 @@
                        Si la note n'a pas de texte, on affiche le libellé de la visée liée. *@
                     @foreach (var note in day.Notes.Take(2))
                     {
-                        @* Texte de la note si présent, sinon libellé de la visée choisie *@
-                        var raw = !string.IsNullOrEmpty(note.Content) ? note.Content : (note.ViseeLabel ?? "");
+                        @* Texte de la note si présent, sinon contexte de cascade condensé sur une ligne *@
+                        var raw = !string.IsNullOrEmpty(note.Content)
+                            ? note.Content
+                            : (note.ViseeContexte ?? "").Replace("\n", " · ");
                         var icon = !string.IsNullOrEmpty(note.Content) ? "📝" : "🎯";
                         var preview = raw.Length > 16 ? raw[..16] + "…" : raw;
                         @if (!string.IsNullOrEmpty(preview))
@@ -394,18 +396,26 @@
                 <button class="cascade-back" @onclick="ToggleCascadePanel" title="Fermer la cascade">⟵</button>
                 <CascadeSelector OnSelectionChanged="OnCascadeChanged" />
 
-                @* Récapitulatif : visée qui sera enregistrée avec la note *@
+                @* Récapitulatif : contexte complet qui sera enregistré avec la note *@
                 @if (cascadeSelection?.IdVisee > 0)
                 {
                     <div class="cascade-recap">
-                        ✔ Visée liée : <strong>@cascadeSelection.NomVisee</strong>
-                        <span class="cascade-opt">— @cascadeSelection.NomCompetence</span>
+                        <div class="cascade-recap-titre">✔ Sera enregistré :</div>
+                        <span class="note-visee-recap">@BuildViseeContexte(cascadeSelection)</span>
                     </div>
                 }
                 else if (editingNote?.IdViseeFk > 0)
                 {
                     <div class="cascade-recap cascade-recap-muted">
-                        Visée déjà liée (réf. #@editingNote.IdViseeFk). Sélectionne à nouveau pour la remplacer.
+                        @if (!string.IsNullOrEmpty(editingNote.ViseeContexte))
+                        {
+                            <span class="note-visee-recap">@editingNote.ViseeContexte</span>
+                            <div class="cascade-opt">Sélectionne à nouveau pour remplacer.</div>
+                        }
+                        else
+                        {
+                            @: Visée déjà liée (réf. #@editingNote.IdViseeFk). Sélectionne à nouveau pour la remplacer.
+                        }
                     </div>
                 }
             </div>
@@ -1054,7 +1064,10 @@
         // Rattache la visée choisie dans la cascade, si une sélection valide a été faite.
         // Sans nouvelle sélection, on conserve la visée déjà liée à la note en modification.
         if (cascadeSelection?.IdVisee > 0)
-            note.IdViseeFk = cascadeSelection.IdVisee;
+        {
+            note.IdViseeFk     = cascadeSelection.IdVisee;
+            note.ViseeContexte = BuildViseeContexte(cascadeSelection);
+        }
 
         // Soumet la note à l'API et vérifie les erreurs
         var (success, error) = await Api.SaveNoteAsync(note);
@@ -1095,7 +1108,29 @@
     private void ToggleCascadePanel() => showCascadePanel = !showCascadePanel;
 
     // Reçoit la sélection courante remontée par le composant CascadeSelector.
-    // (Pour l'instant conservée en mémoire ; l'association à la note n'est pas encore persistée.)
     private void OnCascadeChanged(CascadeSelector.CascadeSelection selection)
         => cascadeSelection = selection;
+
+    // Compose le contexte complet de la cascade en texte multi-lignes (une ligne par niveau
+    // renseigné), figé au moment de l'enregistrement et affiché ensuite dans le calendrier.
+    private static string BuildViseeContexte(CascadeSelector.CascadeSelection s)
+    {
+        var lignes = new List<string>();
+        void Ajouter(string label, string? valeur)
+        {
+            if (!string.IsNullOrWhiteSpace(valeur)) lignes.Add($"{label} : {valeur}");
+        }
+
+        Ajouter("Année", s.NomNiveau);
+        Ajouter("Catégorie", s.NomCat);
+        Ajouter("Cours", s.NomCours);
+        Ajouter("Langue", s.Langue);
+        Ajouter("Domaine", s.NomDomaine);
+        Ajouter("Sous-domaine", s.NomSousDomaine);
+        Ajouter("Compétence", s.NomCompetence);
+        Ajouter("Visée", s.NomVisee);
+        Ajouter("Visée à maîtriser", s.NomViseesMaitriser);
+
+        return string.Join("\n", lignes);
+    }
 }
