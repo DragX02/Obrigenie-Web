@@ -572,6 +572,57 @@ h1:focus { outline: none; }
 .modal-char-count { text-align: right; font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
 .modal-error { color: #f44336; font-size: 0.8rem; margin-top: 0.5rem; }
 
+/* Note modal - disposition carte note + panneau cascade côte à côte */
+.note-modal-wrap { display: flex; align-items: stretch; gap: 1rem; max-width: 95vw; }
+.note-modal-wrap .modal-content { width: 400px; max-width: 90vw; flex: 0 0 auto; }
+
+/* En-tête de la modale : titre à gauche, bouton cascade à droite */
+.modal-header-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.modal-header-row h3 { margin: 0; }
+.btn-cascade-toggle {
+    background: transparent; color: var(--text); border: 2px solid var(--text);
+    padding: 0.3rem 0.7rem; border-radius: 6px; cursor: pointer;
+    font-weight: 600; font-size: 0.85rem; white-space: nowrap;
+}
+.btn-cascade-toggle:hover { background: var(--text); color: var(--modal-bg); }
+
+/* Panneau latéral de cascade */
+.cascade-panel {
+    position: relative; background: var(--modal-bg); color: var(--text);
+    border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    padding: 1.25rem 1.25rem 1.25rem; width: 340px; max-width: 90vw;
+    max-height: 80vh; overflow-y: auto;
+}
+.cascade-back {
+    position: absolute; top: 0.6rem; left: 0.6rem;
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 2px solid var(--text); background: transparent; color: var(--text);
+    font-size: 1rem; line-height: 1; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.cascade-back:hover { background: var(--text); color: var(--modal-bg); }
+
+/* Composant CascadeSelector */
+.cascade-selector { margin-top: 2.2rem; display: flex; flex-direction: column; gap: 0.7rem; }
+.cascade-field { display: flex; flex-direction: column; gap: 0.2rem; }
+.cascade-field label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+.cascade-field select {
+    padding: 0.4rem 0.5rem; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg-main); color: var(--text); font-size: 0.9rem; cursor: pointer;
+    max-width: 100%;
+}
+.cascade-field-lm select { border-color: #6ea8fe; }
+.cascade-opt { font-weight: 400; color: var(--text-muted); }
+.cascade-error { color: #f44336; font-size: 0.8rem; margin-bottom: 0.5rem; }
+.cascade-recap { margin-top: 0.9rem; padding: 0.5rem 0.6rem; border-radius: 6px; background: rgba(76,175,80,0.12); color: var(--text); font-size: 0.82rem; }
+.cascade-recap-muted { background: rgba(255,255,255,0.06); color: var(--text-muted); }
+
+/* Sur petit écran : empiler la carte note et le panneau cascade */
+@media (max-width: 820px) {
+    .note-modal-wrap { flex-direction: column; align-items: center; overflow-y: auto; max-height: 95vh; }
+    .cascade-panel { width: 400px; }
+}
+
 /* Note dans la grille horaire */
 .note-time { display: block; font-size: 0.7rem; font-weight: 600; opacity: 0.75; margin-bottom: 2px; }
 .time-row-covered { background: rgba(255, 152, 0, 0.04); }

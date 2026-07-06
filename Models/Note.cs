@@ -29,5 +29,9 @@ namespace Obrigenie.Models
 
         // L'horodatage UTC de la modification la plus récente de cette note sur le serveur.
         public DateTime ModifiedAt { get; set; }
+
+        // Clé étrangère optionnelle vers la visée (objectif du référentiel) associée à la note
+        // via la cascade de sélection. Null si aucune visée n'est rattachée.
+        public int? IdViseeFk { get; set; }
     }
 }

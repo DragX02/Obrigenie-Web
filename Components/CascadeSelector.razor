@@ -1,0 +1,374 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   CascadeSelector.razor — Composant réutilisable de sélection en cascade.
+
+   Reprend le flux réordonné de la page /test (TestPage.razor) sous forme de
+   composant compact, embarquable (ex : panneau latéral de la modale de note) :
+     1. Année            → Niveau (tous niveaux ayant des visées)
+     2. Catégorie        → catégories ayant des cours à ce niveau
+     3. Cours            → cours de la catégorie enseignés à ce niveau
+     4. Domaine          → domaines de la combinaison cours + niveau
+     5. Sous-domaine     → optionnel
+     6. Compétence/Attendu → champ competence de la visée
+     7. Visée            → NomVisée, filtrée par la compétence choisie
+     8. Visée à maîtriser
+
+   À chaque changement, OnSelectionChanged est invoqué avec l'état courant afin
+   que le parent puisse (plus tard) associer la sélection à une note.
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@inject ApiService Api
+
+<div class="cascade-selector">
+
+    @if (loadError != null)
+    {
+        <div class="cascade-error">@loadError</div>
+    }
+
+    @* Étape 1 : année (niveau) *@
+    <div class="cascade-field">
+        <label>1. Année</label>
+        <select value="@selectedNiveau" @onchange="OnNiveauChanged">
+            <option value="">-- Choisir une année --</option>
+            @foreach (var n in listeNiveaux)
+            {
+                <option value="@n.CodeNiveau">@n.NomNiveau</option>
+            }
+        </select>
+    </div>
+
+    @* Étape 2 : catégorie *@
+    @if (!string.IsNullOrEmpty(selectedNiveau))
+    {
+        <div class="cascade-field">
+            <label>2. Catégorie</label>
+            <select value="@selectedIdCat" @onchange="OnCategorieChanged">
+                <option value="0">-- Choisir une catégorie --</option>
+                @foreach (var c in listeCategories)
+                {
+                    <option value="@c.IdCat">@c.NomCat</option>
+                }
+            </select>
+        </div>
+    }
+
+    @* Étape 3 : cours *@
+    @if (selectedIdCat > 0)
+    {
+        <div class="cascade-field">
+            <label>3. Cours</label>
+            <select value="@selectedCours" @onchange="OnCoursChanged">
+                <option value="">-- Choisir un cours --</option>
+                @foreach (var c in listeCours)
+                {
+                    <option value="@c.CodeCours">@c.NomCours</option>
+                }
+            </select>
+        </div>
+    }
+
+    @* Sous-sélection langue (LM uniquement) *@
+    @if (selectedCours == "LM")
+    {
+        <div class="cascade-field cascade-field-lm">
+            <label>⭐ Langue</label>
+            <select value="@selectedLangue" @onchange="OnLangueChanged">
+                <option value="">-- Quelle langue ? --</option>
+                <option value="English">English</option>
+                <option value="Dutch">Dutch</option>
+                <option value="German">German</option>
+            </select>
+        </div>
+    }
+
+    @* Étape 4 : domaine *@
+    @if (!string.IsNullOrEmpty(selectedCours))
+    {
+        <div class="cascade-field">
+            <label>4. Domaine</label>
+            <select value="@selectedIdDomaine" @onchange="OnDomaineChanged">
+                <option value="0">-- Choisir un domaine --</option>
+                @foreach (var d in domainesFiltres)
+                {
+                    <option value="@d.IdDom">@d.Nom</option>
+                }
+            </select>
+        </div>
+    }
+
+    @* Étape 5 : sous-domaine (optionnel) *@
+    @if (selectedIdDomaine > 0 && listeSousDomaines.Count > 0)
+    {
+        <div class="cascade-field">
+            <label>5. Sous-domaine <span class="cascade-opt">(optionnel)</span></label>
+            <select value="@selectedIdSousD" @onchange="OnSousDChanged">
+                <option value="0">-- Aucun --</option>
+                @foreach (var s in listeSousDomaines)
+                {
+                    <option value="@s.IdSousDomaine">@s.NomComp</option>
+                }
+            </select>
+        </div>
+    }
+
+    @* Étape 6 : compétence / attendu *@
+    @if (selectedIdDomaine > 0 && listeVisees.Count > 0)
+    {
+        <div class="cascade-field">
+            <label>6. Compétence / Attendu</label>
+            <select value="@selectedIdCompetence" @onchange="OnCompetenceChanged">
+                <option value="0">-- Choisir --</option>
+                @foreach (var c in ListeCompetences)
+                {
+                    <option value="@c.Id">@c.Nom</option>
+                }
+            </select>
+        </div>
+    }
+
+    @* Étape 7 : visée (nom_visee) *@
+    @if (selectedIdCompetence > 0)
+    {
+        <div class="cascade-field">
+            <label>7. Visée</label>
+            <select value="@selectedIdNomVisee" @onchange="OnNomViseeChanged">
+                <option value="0">-- Choisir une visée --</option>
+                @foreach (var nv in ListeNomVisees)
+                {
+                    <option value="@nv.Id">@nv.Nom</option>
+                }
+            </select>
+        </div>
+    }
+
+    @* Étape 8 : visée à maîtriser *@
+    @if (selectedIdVisee > 0)
+    {
+        <div class="cascade-field">
+            <label>8. Visée à maîtriser</label>
+            <select value="@selectedIdVm" @onchange="OnVmChanged">
+                <option value="0">-- Choisir --</option>
+                @foreach (var vm in listeViseesMaitriser)
+                {
+                    <option value="@vm.IdViseesMaitriser">@vm.NomViseesMaitriser</option>
+                }
+            </select>
+        </div>
+    }
+</div>
+
+@code {
+    // Invoqué à chaque changement de sélection : permet au parent (modale de note)
+    // de connaître la visée choisie pour, plus tard, l'associer à la note.
+    [Parameter] public EventCallback<CascadeSelection> OnSelectionChanged { get; set; }
+
+    private string? loadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { listeNiveaux = await Api.GetNiveauxTousAsync(); }
+        catch (Exception ex) { loadError = ex.Message; }
+    }
+
+    // ── Sélections courantes ───────────────────────────────────────────────
+    private string selectedNiveau       = "";
+    private int    selectedIdCat        = 0;
+    private string selectedCours        = "";
+    private string selectedLangue       = "";
+    private int    selectedIdDomaine    = 0;
+    private int    selectedIdSousD      = 0;
+    private int    selectedIdCompetence = 0;
+    private int    selectedIdNomVisee   = 0;
+    private int    selectedIdVisee      = 0;
+    private int    selectedIdVm         = 0;
+
+    // ── Listes chargées ────────────────────────────────────────────────────
+    private List<NiveauDto>             listeNiveaux         = new();
+    private List<CategorieDto>          listeCategories      = new();
+    private List<CoursDto>              listeCours           = new();
+    private List<DomaineDto>            domainesFiltres      = new();
+    private List<SousDomaineRefDto>     listeSousDomaines    = new();
+    private List<ViseeRefDto>           listeVisees          = new();
+    private List<ViseesMaitriserRefDto> listeViseesMaitriser = new();
+
+    // ── Listes dérivées ────────────────────────────────────────────────────
+    private IEnumerable<(int Id, string Nom)> ListeCompetences =>
+        listeVisees.GroupBy(v => v.IdCompetence)
+                   .Select(g => (Id: g.Key, Nom: g.First().NomCompetence))
+                   .OrderBy(x => x.Nom);
+
+    private IEnumerable<(int Id, string Nom)> ListeNomVisees =>
+        listeVisees.Where(v => v.IdCompetence == selectedIdCompetence)
+                   .GroupBy(v => v.IdNomVisee)
+                   .Select(g => (Id: g.Key, Nom: g.First().NomVisee))
+                   .OrderBy(x => x.Nom);
+
+    // ── Gestionnaires ──────────────────────────────────────────────────────
+
+    private async Task OnNiveauChanged(ChangeEventArgs e)
+    {
+        selectedNiveau = e.Value?.ToString() ?? "";
+        ResetFrom(1);
+        if (!string.IsNullOrEmpty(selectedNiveau))
+            try { listeCategories = await Api.GetCategoriesByNiveauAsync(selectedNiveau); }
+            catch (Exception ex) { loadError = ex.Message; }
+        await Notify();
+    }
+
+    private async Task OnCategorieChanged(ChangeEventArgs e)
+    {
+        selectedIdCat = int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
+        ResetFrom(2);
+        if (selectedIdCat > 0)
+            try { listeCours = await Api.GetCoursByCatNiveauAsync(selectedIdCat, selectedNiveau); }
+            catch (Exception ex) { loadError = ex.Message; }
+        await Notify();
+    }
+
+    private async Task OnCoursChanged(ChangeEventArgs e)
+    {
+        selectedCours = e.Value?.ToString() ?? "";
+        ResetFrom(3);
+        await ChargerDomaines();
+        await Notify();
+    }
+
+    private async Task OnLangueChanged(ChangeEventArgs e)
+    {
+        selectedLangue = e.Value?.ToString() ?? "";
+        await Notify();
+    }
+
+    private async Task OnDomaineChanged(ChangeEventArgs e)
+    {
+        selectedIdDomaine = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        ResetFrom(4);
+        if (selectedIdDomaine > 0)
+        {
+            try { listeSousDomaines = await Api.GetSousDomainesRefAsync(selectedIdDomaine); }
+            catch (Exception ex) { loadError = ex.Message; }
+            await ChargerVisees();
+        }
+        await Notify();
+    }
+
+    private async Task OnSousDChanged(ChangeEventArgs e)
+    {
+        selectedIdSousD = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        ResetFrom(5);
+        await ChargerVisees();
+        await Notify();
+    }
+
+    private async Task OnCompetenceChanged(ChangeEventArgs e)
+    {
+        selectedIdCompetence = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        selectedIdNomVisee = 0; selectedIdVisee = 0;
+        selectedIdVm = 0; listeViseesMaitriser.Clear();
+        await Notify();
+    }
+
+    private async Task OnNomViseeChanged(ChangeEventArgs e)
+    {
+        selectedIdNomVisee = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        selectedIdVm = 0; listeViseesMaitriser.Clear();
+
+        selectedIdVisee = listeVisees
+            .FirstOrDefault(x => x.IdCompetence == selectedIdCompetence
+                              && x.IdNomVisee   == selectedIdNomVisee)?.IdVisee ?? 0;
+
+        if (selectedIdVisee > 0)
+            try { listeViseesMaitriser = await Api.GetViseesMaitriserRefAsync(selectedIdVisee); }
+            catch (Exception ex) { loadError = ex.Message; }
+        await Notify();
+    }
+
+    private async Task OnVmChanged(ChangeEventArgs e)
+    {
+        selectedIdVm = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        await Notify();
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    private void ResetFrom(int level)
+    {
+        if (level <= 1) { selectedIdCat = 0; listeCategories.Clear(); }
+        if (level <= 2) { selectedCours = ""; listeCours.Clear(); selectedLangue = ""; }
+        if (level <= 3) { selectedIdDomaine = 0; domainesFiltres.Clear(); }
+        if (level <= 4) { selectedIdSousD = 0; listeSousDomaines.Clear(); }
+        selectedIdCompetence = 0;
+        selectedIdNomVisee   = 0;
+        selectedIdVisee      = 0;
+        listeVisees.Clear();
+        selectedIdVm = 0; listeViseesMaitriser.Clear();
+    }
+
+    private async Task ChargerDomaines()
+    {
+        domainesFiltres.Clear();
+        if (string.IsNullOrEmpty(selectedCours) || string.IsNullOrEmpty(selectedNiveau)) return;
+        try { domainesFiltres = await Api.GetDomainesAsync(selectedCours, selectedNiveau); }
+        catch (Exception ex) { loadError = ex.Message; }
+    }
+
+    private async Task ChargerVisees()
+    {
+        listeVisees.Clear();
+        selectedIdCompetence = 0; selectedIdNomVisee = 0; selectedIdVisee = 0;
+        listeViseesMaitriser.Clear(); selectedIdVm = 0;
+        if (selectedIdDomaine == 0) return;
+        try { listeVisees = await Api.GetViseesRefAsync(selectedIdDomaine, selectedIdSousD > 0 ? selectedIdSousD : null); }
+        catch (Exception ex) { loadError = ex.Message; }
+    }
+
+    // Remonte l'état courant au parent (avec les libellés résolus).
+    private async Task Notify()
+    {
+        if (!OnSelectionChanged.HasDelegate) return;
+        await OnSelectionChanged.InvokeAsync(new CascadeSelection
+        {
+            CodeNiveau      = selectedNiveau,
+            NomNiveau       = listeNiveaux.FirstOrDefault(n => n.CodeNiveau == selectedNiveau)?.NomNiveau,
+            IdCat           = selectedIdCat,
+            NomCat          = listeCategories.FirstOrDefault(c => c.IdCat == selectedIdCat)?.NomCat,
+            CodeCours       = selectedCours,
+            NomCours        = listeCours.FirstOrDefault(c => c.CodeCours == selectedCours)?.NomCours,
+            Langue          = selectedLangue,
+            IdDomaine       = selectedIdDomaine,
+            NomDomaine      = domainesFiltres.FirstOrDefault(d => d.IdDom == selectedIdDomaine)?.Nom,
+            IdSousDomaine   = selectedIdSousD,
+            NomSousDomaine  = listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp,
+            IdCompetence    = selectedIdCompetence,
+            NomCompetence   = listeVisees.FirstOrDefault(v => v.IdCompetence == selectedIdCompetence)?.NomCompetence,
+            IdNomVisee      = selectedIdNomVisee,
+            NomVisee        = listeVisees.FirstOrDefault(v => v.IdNomVisee == selectedIdNomVisee)?.NomVisee,
+            IdVisee         = selectedIdVisee,
+            IdViseesMaitriser = selectedIdVm,
+            NomViseesMaitriser = listeViseesMaitriser.FirstOrDefault(vm => vm.IdViseesMaitriser == selectedIdVm)?.NomViseesMaitriser
+        });
+    }
+
+    // État complet de la sélection remonté au parent.
+    public class CascadeSelection
+    {
+        public string? CodeNiveau { get; set; }
+        public string? NomNiveau { get; set; }
+        public int     IdCat { get; set; }
+        public string? NomCat { get; set; }
+        public string? CodeCours { get; set; }
+        public string? NomCours { get; set; }
+        public string? Langue { get; set; }
+        public int     IdDomaine { get; set; }
+        public string? NomDomaine { get; set; }
+        public int     IdSousDomaine { get; set; }
+        public string? NomSousDomaine { get; set; }
+        public int     IdCompetence { get; set; }
+        public string? NomCompetence { get; set; }
+        public int     IdNomVisee { get; set; }
+        public string? NomVisee { get; set; }
+        public int     IdVisee { get; set; }
+        public int     IdViseesMaitriser { get; set; }
+        public string? NomViseesMaitriser { get; set; }
+    }
+}

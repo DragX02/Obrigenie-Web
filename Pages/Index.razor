@@ -300,15 +300,26 @@
 @* L'overlay et la carte de la modale ne sont affichés que lorsque showNoteModal est vrai *@
 @if (showNoteModal)
 {
-    @* Overlay semi-transparent : cliquer en dehors de la carte de modale la ferme *@
+    @* Overlay semi-transparent : cliquer en dehors la ferme *@
     <div class="modal-overlay" @onclick="CloseNoteModal">
 
-        @* Carte de la modale : stopPropagation empêche un clic à l'intérieur de la carte
-           de remonter jusqu'au gestionnaire de fermeture de l'overlay *@
-        <div class="modal-content" @onclick:stopPropagation="true">
+        @* Conteneur flex : carte de note à gauche, panneau cascade à droite.
+           stopPropagation empêche un clic à l'intérieur de fermer l'overlay *@
+        <div class="note-modal-wrap" @onclick:stopPropagation="true">
 
-            @* Le titre change selon que l'on crée ou modifie une note *@
-            <h3>@(editingNote != null ? "Modifier la note" : "Nouvelle note")</h3>
+        @* Carte de la modale *@
+        <div class="modal-content">
+
+            @* En-tête : titre + bouton d'affichage de la cascade (référentiel) *@
+            <div class="modal-header-row">
+                @* Le titre change selon que l'on crée ou modifie une note *@
+                <h3>@(editingNote != null ? "Modifier la note" : "Nouvelle note")</h3>
+
+                @* Bascule l'affichage du panneau de sélection en cascade *@
+                <button class="btn-cascade-toggle" @onclick="ToggleCascadePanel">
+                    @(showCascadePanel ? "Cascade ◂" : "Cascade ▸")
+                </button>
+            </div>
 
             @* Affiche la date au format français complet pour le contexte *@
             <p class="modal-date">@currentDate.ToString("dddd dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</p>
@@ -363,6 +374,33 @@
                 <p class="modal-error">@noteSaveError</p>
             }
         </div>
+
+        @* Panneau latéral de sélection en cascade (affiché à la demande) *@
+        @if (showCascadePanel)
+        {
+            <div class="cascade-panel">
+                @* Bouton retour : masque le panneau *@
+                <button class="cascade-back" @onclick="ToggleCascadePanel" title="Fermer la cascade">⟵</button>
+                <CascadeSelector OnSelectionChanged="OnCascadeChanged" />
+
+                @* Récapitulatif : visée qui sera enregistrée avec la note *@
+                @if (cascadeSelection?.IdVisee > 0)
+                {
+                    <div class="cascade-recap">
+                        ✔ Visée liée : <strong>@cascadeSelection.NomVisee</strong>
+                        <span class="cascade-opt">— @cascadeSelection.NomCompetence</span>
+                    </div>
+                }
+                else if (editingNote?.IdViseeFk > 0)
+                {
+                    <div class="cascade-recap cascade-recap-muted">
+                        Visée déjà liée (réf. #@editingNote.IdViseeFk). Sélectionne à nouveau pour la remplacer.
+                    </div>
+                }
+            </div>
+        }
+
+        </div>
     </div>
 }
 
@@ -415,6 +453,12 @@
 
     @* Contrôle si l'overlay de la modale de création/modification de note est affiché *@
     private bool showNoteModal = false;
+
+    @* Contrôle l'affichage du panneau latéral de sélection en cascade dans la modale *@
+    private bool showCascadePanel = false;
+
+    @* Dernière sélection remontée par le composant CascadeSelector (null tant que rien n'est choisi) *@
+    private CascadeSelector.CascadeSelection? cascadeSelection;
 
     @* Le contenu textuel de la note en cours de création ou de modification *@
     private string noteContent = "";
@@ -996,6 +1040,11 @@
         note.EndHour = noteEndHour;
         note.Content = noteContent;
 
+        // Rattache la visée choisie dans la cascade, si une sélection valide a été faite.
+        // Sans nouvelle sélection, on conserve la visée déjà liée à la note en modification.
+        if (cascadeSelection?.IdVisee > 0)
+            note.IdViseeFk = cascadeSelection.IdVisee;
+
         // Soumet la note à l'API et vérifie les erreurs
         var (success, error) = await Api.SaveNoteAsync(note);
         if (!success) { noteSaveError = error; return; }
@@ -1023,5 +1072,19 @@
     }
 
     // Ferme la modale de note sans enregistrer les modifications.
-    private void CloseNoteModal() => showNoteModal = false;
+    // Réinitialise aussi le panneau cascade pour repartir propre à la prochaine ouverture.
+    private void CloseNoteModal()
+    {
+        showNoteModal = false;
+        showCascadePanel = false;
+        cascadeSelection = null;
+    }
+
+    // Affiche / masque le panneau latéral de sélection en cascade.
+    private void ToggleCascadePanel() => showCascadePanel = !showCascadePanel;
+
+    // Reçoit la sélection courante remontée par le composant CascadeSelector.
+    // (Pour l'instant conservée en mémoire ; l'association à la note n'est pas encore persistée.)
+    private void OnCascadeChanged(CascadeSelector.CascadeSelection selection)
+        => cascadeSelection = selection;
 }
