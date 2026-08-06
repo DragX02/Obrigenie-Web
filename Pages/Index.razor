@@ -339,40 +339,41 @@
             @* Affiche la date au format français complet pour le contexte *@
             <p class="modal-date">@currentDate.ToString("dddd dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</p>
 
-            @* Plage horaire : sélecteur personnalisé. Chaque champ heure/minute est saisissable
-               au clavier (l'utilisateur choisit librement) ET ajustable par ses flèches ▲▼
+            @* Plage horaire : deux cases compactes (début / fin). Chaque case garde la taille
+               d'un champ heure classique et contient, à l'intérieur de son cadre, les nombres
+               heures et minutes saisissables + de petites flèches ▲▼ pour incrémenter/décrémenter
                (heures par pas de 1, minutes par pas de 5). *@
             <div class="modal-time-range">
                 <label>De</label>
-                <span class="time-stepper">
-                    <span class="ts-group">
-                        <button type="button" class="ts-arrow" @onclick="() => StepStartHour(1)">▲</button>
-                        <input class="ts-input" type="text" inputmode="numeric" maxlength="2"
-                               @bind="StartHourStr" @bind:event="onchange" />
-                        <button type="button" class="ts-arrow" @onclick="() => StepStartHour(-1)">▼</button>
+                <span class="time-box">
+                    <input class="tb-num" type="text" inputmode="numeric" maxlength="2"
+                           @bind="StartHourStr" @bind:event="onchange" />
+                    <span class="tb-spin">
+                        <button type="button" class="tb-arrow" @onclick="() => StepStartHour(1)">▲</button>
+                        <button type="button" class="tb-arrow" @onclick="() => StepStartHour(-1)">▼</button>
                     </span>
-                    <span class="ts-colon">:</span>
-                    <span class="ts-group">
-                        <button type="button" class="ts-arrow" @onclick="() => StepStartMinute(1)">▲</button>
-                        <input class="ts-input" type="text" inputmode="numeric" maxlength="2"
-                               @bind="StartMinStr" @bind:event="onchange" />
-                        <button type="button" class="ts-arrow" @onclick="() => StepStartMinute(-1)">▼</button>
+                    <span class="tb-colon">:</span>
+                    <input class="tb-num" type="text" inputmode="numeric" maxlength="2"
+                           @bind="StartMinStr" @bind:event="onchange" />
+                    <span class="tb-spin">
+                        <button type="button" class="tb-arrow" @onclick="() => StepStartMinute(1)">▲</button>
+                        <button type="button" class="tb-arrow" @onclick="() => StepStartMinute(-1)">▼</button>
                     </span>
                 </span>
                 <label>à</label>
-                <span class="time-stepper">
-                    <span class="ts-group">
-                        <button type="button" class="ts-arrow" @onclick="() => StepEndHour(1)">▲</button>
-                        <input class="ts-input" type="text" inputmode="numeric" maxlength="2"
-                               @bind="EndHourStr" @bind:event="onchange" />
-                        <button type="button" class="ts-arrow" @onclick="() => StepEndHour(-1)">▼</button>
+                <span class="time-box">
+                    <input class="tb-num" type="text" inputmode="numeric" maxlength="2"
+                           @bind="EndHourStr" @bind:event="onchange" />
+                    <span class="tb-spin">
+                        <button type="button" class="tb-arrow" @onclick="() => StepEndHour(1)">▲</button>
+                        <button type="button" class="tb-arrow" @onclick="() => StepEndHour(-1)">▼</button>
                     </span>
-                    <span class="ts-colon">:</span>
-                    <span class="ts-group">
-                        <button type="button" class="ts-arrow" @onclick="() => StepEndMinute(1)">▲</button>
-                        <input class="ts-input" type="text" inputmode="numeric" maxlength="2"
-                               @bind="EndMinStr" @bind:event="onchange" />
-                        <button type="button" class="ts-arrow" @onclick="() => StepEndMinute(-1)">▼</button>
+                    <span class="tb-colon">:</span>
+                    <input class="tb-num" type="text" inputmode="numeric" maxlength="2"
+                           @bind="EndMinStr" @bind:event="onchange" />
+                    <span class="tb-spin">
+                        <button type="button" class="tb-arrow" @onclick="() => StepEndMinute(1)">▲</button>
+                        <button type="button" class="tb-arrow" @onclick="() => StepEndMinute(-1)">▼</button>
                     </span>
                 </span>
             </div>
