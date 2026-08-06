@@ -21,6 +21,12 @@ namespace Obrigenie.Models
         // Une valeur de 0 signifie que l'heure de fin n'a pas été définie ; l'interface la traite alors comme Heure + 1.
         public int EndHour { get; set; }
 
+        // La minute de début associée à Hour (0-55, par pas de 5). 0 pour les notes sans minute définie.
+        public int Minute { get; set; }
+
+        // La minute de fin associée à EndHour (0-55, par pas de 5).
+        public int EndMinute { get; set; }
+
         // Le contenu textuel de la note. Maximum 2000 caractères (appliqué par la zone de texte de l'interface).
         public string Content { get; set; } = string.Empty;
 
