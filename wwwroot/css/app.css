@@ -569,6 +569,23 @@ h1:focus { outline: none; }
 .modal-time-range { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
 .modal-time-range label { font-size: 0.85rem; color: var(--text-muted); }
 .modal-time-range select { padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-main); color: var(--text); font-size: 0.9rem; cursor: pointer; }
+
+/* Sélecteur d'heure personnalisé : champ saisissable + flèches ▲▼ (heures ±1, minutes ±5) */
+.time-stepper { display: inline-flex; align-items: center; gap: 0.2rem; }
+.ts-group { display: inline-flex; flex-direction: column; align-items: center; }
+.ts-arrow {
+    width: 30px; height: 16px; padding: 0; line-height: 1;
+    border: 1px solid var(--border); border-radius: 4px;
+    background: var(--bg-main); color: var(--text); cursor: pointer; font-size: 0.6rem;
+    display: flex; align-items: center; justify-content: center; user-select: none;
+}
+.ts-arrow:hover { background: var(--text); color: var(--modal-bg); }
+.ts-input {
+    width: 36px; text-align: center; padding: 0.25rem 0; margin: 2px 0;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg-main); color: var(--text); font-size: 0.95rem;
+}
+.ts-colon { font-size: 1rem; color: var(--text); padding: 0 1px; }
 .modal-char-count { text-align: right; font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
 .modal-error { color: #f44336; font-size: 0.8rem; margin-top: 0.5rem; }
 

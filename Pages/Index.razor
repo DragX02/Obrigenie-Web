@@ -339,13 +339,42 @@
             @* Affiche la date au format français complet pour le contexte *@
             <p class="modal-date">@currentDate.ToString("dddd dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</p>
 
-            @* Plage horaire : champ saisissable au clavier + flèches natives ↑/↓
-               (le segment heures avance par 1, le segment minutes par 5 grâce à step="300"). *@
+            @* Plage horaire : sélecteur personnalisé. Chaque champ heure/minute est saisissable
+               au clavier (l'utilisateur choisit librement) ET ajustable par ses flèches ▲▼
+               (heures par pas de 1, minutes par pas de 5). *@
             <div class="modal-time-range">
                 <label>De</label>
-                <input type="time" step="300" min="06:00" max="23:00" @bind="noteStart" />
+                <span class="time-stepper">
+                    <span class="ts-group">
+                        <button type="button" class="ts-arrow" @onclick="() => StepStartHour(1)">▲</button>
+                        <input class="ts-input" type="text" inputmode="numeric" maxlength="2"
+                               @bind="StartHourStr" @bind:event="onchange" />
+                        <button type="button" class="ts-arrow" @onclick="() => StepStartHour(-1)">▼</button>
+                    </span>
+                    <span class="ts-colon">:</span>
+                    <span class="ts-group">
+                        <button type="button" class="ts-arrow" @onclick="() => StepStartMinute(1)">▲</button>
+                        <input class="ts-input" type="text" inputmode="numeric" maxlength="2"
+                               @bind="StartMinStr" @bind:event="onchange" />
+                        <button type="button" class="ts-arrow" @onclick="() => StepStartMinute(-1)">▼</button>
+                    </span>
+                </span>
                 <label>à</label>
-                <input type="time" step="300" min="06:00" max="23:00" @bind="noteEnd" />
+                <span class="time-stepper">
+                    <span class="ts-group">
+                        <button type="button" class="ts-arrow" @onclick="() => StepEndHour(1)">▲</button>
+                        <input class="ts-input" type="text" inputmode="numeric" maxlength="2"
+                               @bind="EndHourStr" @bind:event="onchange" />
+                        <button type="button" class="ts-arrow" @onclick="() => StepEndHour(-1)">▼</button>
+                    </span>
+                    <span class="ts-colon">:</span>
+                    <span class="ts-group">
+                        <button type="button" class="ts-arrow" @onclick="() => StepEndMinute(1)">▲</button>
+                        <input class="ts-input" type="text" inputmode="numeric" maxlength="2"
+                               @bind="EndMinStr" @bind:event="onchange" />
+                        <button type="button" class="ts-arrow" @onclick="() => StepEndMinute(-1)">▼</button>
+                    </span>
+                </span>
             </div>
 
             @* Zone de texte de la note : 2000 caractères maximum, un placeholder guide l'utilisateur *@
@@ -485,6 +514,40 @@
 
     @* Heure de fin sélectionnée dans le champ "à" de la modale (heures + minutes) *@
     private TimeOnly noteEnd = new(9, 0);
+
+    @* ── Adaptateurs texte "HH"/"MM" pour les champs saisissables du sélecteur d'heure ──
+       Le getter affiche la valeur courante sur 2 chiffres.
+       Le setter parse la saisie libre de l'utilisateur : entier valide → borné dans la plage,
+       saisie non numérique → ignorée (le champ retrouve sa valeur au prochain rendu). *@
+    private string StartHourStr { get => noteStart.Hour.ToString("D2");   set => SetHour(ref noteStart, value, 6, 22); }
+    private string StartMinStr  { get => noteStart.Minute.ToString("D2"); set => SetMinute(ref noteStart, value); }
+    private string EndHourStr   { get => noteEnd.Hour.ToString("D2");     set => SetHour(ref noteEnd, value, 6, 23); }
+    private string EndMinStr    { get => noteEnd.Minute.ToString("D2");   set => SetMinute(ref noteEnd, value); }
+
+    // Applique une saisie manuelle d'heure : borne l'entier dans [min, max] ; ignore le non-numérique.
+    private void SetHour(ref TimeOnly t, string? raw, int min, int max)
+    {
+        if (int.TryParse((raw ?? "").Trim(), out int v))
+            t = new TimeOnly(Math.Clamp(v, min, max), t.Minute);
+    }
+
+    // Applique une saisie manuelle de minute : l'utilisateur choisit librement dans [0, 59].
+    private void SetMinute(ref TimeOnly t, string? raw)
+    {
+        if (int.TryParse((raw ?? "").Trim(), out int v))
+            t = new TimeOnly(t.Hour, Math.Clamp(v, 0, 59));
+    }
+
+    // Flèches heures : ±1, bornées (début 6–22, fin 6–23).
+    private void StepStartHour(int dir) => noteStart = new TimeOnly(Math.Clamp(noteStart.Hour + dir, 6, 22), noteStart.Minute);
+    private void StepEndHour(int dir)   => noteEnd   = new TimeOnly(Math.Clamp(noteEnd.Hour + dir, 6, 23), noteEnd.Minute);
+
+    // Flèches minutes : pas de 5, alignées sur la grille des multiples de 5, bornées [0, 55].
+    private void StepStartMinute(int dir) => noteStart = new TimeOnly(noteStart.Hour, SnapMinute(noteStart.Minute, dir));
+    private void StepEndMinute(int dir)   => noteEnd   = new TimeOnly(noteEnd.Hour, SnapMinute(noteEnd.Minute, dir));
+
+    // Décale une minute d'un cran de 5 dans la direction donnée, en restant dans [0, 55].
+    private static int SnapMinute(int cur, int dir) => Math.Clamp((cur / 5 + dir) * 5, 0, 55);
 
     @* Message d'erreur de l'API si l'enregistrement de la note échoue ; null quand aucune erreur *@
     private string? noteSaveError = null;

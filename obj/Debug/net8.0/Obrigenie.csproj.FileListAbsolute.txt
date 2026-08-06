@@ -2115,6 +2115,6 @@ G:\csharpcallender\project_final_bac\Obrigenie\obj\Debug\net8.0\Obrigenie.dll
 G:\csharpcallender\project_final_bac\Obrigenie\obj\Debug\net8.0\refint\Obrigenie.dll
 G:\csharpcallender\project_final_bac\Obrigenie\obj\Debug\net8.0\Obrigenie.pdb
 G:\csharpcallender\project_final_bac\Obrigenie\obj\Debug\net8.0\ref\Obrigenie.dll
-G:\csharpcallender\project_final_bac\Obrigenie\obj\Debug\net8.0\compressed\sximyzyto4-e5f43ci9dc.gz
-G:\csharpcallender\project_final_bac\Obrigenie\obj\Debug\net8.0\compressed\xtagjm5cvc-5cs27q8bxr.gz
-G:\csharpcallender\project_final_bac\Obrigenie\obj\Debug\net8.0\compressed\j9h466dswd-ua0qhtrw4e.gz
+G:\csharpcallender\project_final_bac\Obrigenie\obj\Debug\net8.0\compressed\sximyzyto4-0ed5js68wr.gz
+G:\csharpcallender\project_final_bac\Obrigenie\obj\Debug\net8.0\compressed\xtagjm5cvc-5ha0hxhigs.gz
+G:\csharpcallender\project_final_bac\Obrigenie\obj\Debug\net8.0\compressed\j9h466dswd-dphk77nmc5.gz
