@@ -28,13 +28,10 @@
     @* Étape 1 : année (niveau) *@
     <div class="cascade-field">
         <label>1. Année</label>
-        <select value="@selectedNiveau" @onchange="OnNiveauChanged">
-            <option value="">-- Choisir une année --</option>
-            @foreach (var n in listeNiveaux)
-            {
-                <option value="@n.CodeNiveau">@n.NomNiveau</option>
-            }
-        </select>
+        <SearchableSelect Value="@selectedNiveau"
+                          ValueChanged="OnNiveauChanged"
+                          Placeholder="-- Choisir une année --"
+                          Options="OptionsNiveaux" EmptyValue="" />
     </div>
 
     @* Étape 2 : catégorie *@
@@ -42,13 +39,10 @@
     {
         <div class="cascade-field">
             <label>2. Catégorie</label>
-            <select value="@selectedIdCat" @onchange="OnCategorieChanged">
-                <option value="0">-- Choisir une catégorie --</option>
-                @foreach (var c in listeCategories)
-                {
-                    <option value="@c.IdCat">@c.NomCat</option>
-                }
-            </select>
+            <SearchableSelect Value="@selectedIdCat.ToString()"
+                              ValueChanged="OnCategorieChanged"
+                              Placeholder="-- Choisir une catégorie --"
+                              Options="OptionsCategories" EmptyValue="0" />
         </div>
     }
 
@@ -57,13 +51,10 @@
     {
         <div class="cascade-field">
             <label>3. Cours</label>
-            <select value="@selectedCours" @onchange="OnCoursChanged">
-                <option value="">-- Choisir un cours --</option>
-                @foreach (var c in listeCours)
-                {
-                    <option value="@c.CodeCours">@c.NomCours</option>
-                }
-            </select>
+            <SearchableSelect Value="@selectedCours"
+                              ValueChanged="OnCoursChanged"
+                              Placeholder="-- Choisir un cours --"
+                              Options="OptionsCours" EmptyValue="" />
         </div>
     }
 
@@ -72,12 +63,10 @@
     {
         <div class="cascade-field cascade-field-lm">
             <label>⭐ Langue</label>
-            <select value="@selectedLangue" @onchange="OnLangueChanged">
-                <option value="">-- Quelle langue ? --</option>
-                <option value="English">English</option>
-                <option value="Dutch">Dutch</option>
-                <option value="German">German</option>
-            </select>
+            <SearchableSelect Value="@selectedLangue"
+                              ValueChanged="OnLangueChanged"
+                              Placeholder="-- Quelle langue ? --"
+                              Options="OptionsLangues" EmptyValue="" />
         </div>
     }
 
@@ -86,13 +75,10 @@
     {
         <div class="cascade-field">
             <label>4. Domaine</label>
-            <select value="@selectedIdDomaine" @onchange="OnDomaineChanged">
-                <option value="0">-- Choisir un domaine --</option>
-                @foreach (var d in domainesFiltres)
-                {
-                    <option value="@d.IdDom">@d.Nom</option>
-                }
-            </select>
+            <SearchableSelect Value="@selectedIdDomaine.ToString()"
+                              ValueChanged="OnDomaineChanged"
+                              Placeholder="-- Choisir un domaine --"
+                              Options="OptionsDomaines" EmptyValue="0" />
         </div>
     }
 
@@ -101,13 +87,10 @@
     {
         <div class="cascade-field">
             <label>5. Sous-domaine <span class="cascade-opt">(optionnel)</span></label>
-            <select value="@selectedIdSousD" @onchange="OnSousDChanged">
-                <option value="0">-- Aucun --</option>
-                @foreach (var s in listeSousDomaines)
-                {
-                    <option value="@s.IdSousDomaine">@s.NomComp</option>
-                }
-            </select>
+            <SearchableSelect Value="@selectedIdSousD.ToString()"
+                              ValueChanged="OnSousDChanged"
+                              Placeholder="-- Aucun --"
+                              Options="OptionsSousDomaines" EmptyValue="0" />
         </div>
     }
 
@@ -116,13 +99,10 @@
     {
         <div class="cascade-field">
             <label>6. Compétence / Attendu</label>
-            <select value="@selectedIdCompetence" @onchange="OnCompetenceChanged">
-                <option value="0">-- Choisir --</option>
-                @foreach (var c in ListeCompetences)
-                {
-                    <option value="@c.Id">@c.Nom</option>
-                }
-            </select>
+            <SearchableSelect Value="@selectedIdCompetence.ToString()"
+                              ValueChanged="OnCompetenceChanged"
+                              Placeholder="-- Choisir --"
+                              Options="OptionsCompetences" EmptyValue="0" />
         </div>
     }
 
@@ -131,13 +111,10 @@
     {
         <div class="cascade-field">
             <label>7. Visée</label>
-            <select value="@selectedIdNomVisee" @onchange="OnNomViseeChanged">
-                <option value="0">-- Choisir une visée --</option>
-                @foreach (var nv in ListeNomVisees)
-                {
-                    <option value="@nv.Id">@nv.Nom</option>
-                }
-            </select>
+            <SearchableSelect Value="@selectedIdNomVisee.ToString()"
+                              ValueChanged="OnNomViseeChanged"
+                              Placeholder="-- Choisir une visée --"
+                              Options="OptionsNomVisees" EmptyValue="0" />
         </div>
     }
 
@@ -146,13 +123,10 @@
     {
         <div class="cascade-field">
             <label>8. Visée à maîtriser</label>
-            <select value="@selectedIdVm" @onchange="OnVmChanged">
-                <option value="0">-- Choisir --</option>
-                @foreach (var vm in listeViseesMaitriser)
-                {
-                    <option value="@vm.IdViseesMaitriser">@vm.NomViseesMaitriser</option>
-                }
-            </select>
+            <SearchableSelect Value="@selectedIdVm.ToString()"
+                              ValueChanged="OnVmChanged"
+                              Placeholder="-- Choisir --"
+                              Options="OptionsViseesMaitriser" EmptyValue="0" />
         </div>
     }
 </div>
@@ -191,6 +165,40 @@
     private List<ViseeRefDto>           listeVisees          = new();
     private List<ViseesMaitriserRefDto> listeViseesMaitriser = new();
 
+    // ── Options des listes déroulantes cherchables ─────────────────────────
+    private static SearchableSelect.SelectOption Opt(string value, string label) => new(value, label);
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsNiveaux =>
+        listeNiveaux.Select(n => Opt(n.CodeNiveau, n.NomNiveau));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsCategories =>
+        listeCategories.Select(c => Opt(c.IdCat.ToString(), c.NomCat));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsCours =>
+        listeCours.Select(c => Opt(c.CodeCours, c.NomCours));
+
+    private static readonly SearchableSelect.SelectOption[] OptionsLangues =
+    {
+        new("English", "English"),
+        new("Dutch",   "Dutch"),
+        new("German",  "German")
+    };
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsDomaines =>
+        domainesFiltres.Select(d => Opt(d.IdDom.ToString(), d.Nom));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsSousDomaines =>
+        listeSousDomaines.Select(s => Opt(s.IdSousDomaine.ToString(), s.NomComp));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsCompetences =>
+        ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsNomVisees =>
+        ListeNomVisees.Select(nv => Opt(nv.Id.ToString(), nv.Nom));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsViseesMaitriser =>
+        listeViseesMaitriser.Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser));
+
     // ── Listes dérivées ────────────────────────────────────────────────────
     private IEnumerable<(int Id, string Nom)> ListeCompetences =>
         listeVisees.GroupBy(v => v.IdCompetence)
@@ -205,9 +213,9 @@
 
     // ── Gestionnaires ──────────────────────────────────────────────────────
 
-    private async Task OnNiveauChanged(ChangeEventArgs e)
+    private async Task OnNiveauChanged(string? value)
     {
-        selectedNiveau = e.Value?.ToString() ?? "";
+        selectedNiveau = value ?? "";
         ResetFrom(1);
         if (!string.IsNullOrEmpty(selectedNiveau))
             try { listeCategories = await Api.GetCategoriesByNiveauAsync(selectedNiveau); }
@@ -215,9 +223,9 @@
         await Notify();
     }
 
-    private async Task OnCategorieChanged(ChangeEventArgs e)
+    private async Task OnCategorieChanged(string? value)
     {
-        selectedIdCat = int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
+        selectedIdCat = int.TryParse(value, out var id) ? id : 0;
         ResetFrom(2);
         if (selectedIdCat > 0)
             try { listeCours = await Api.GetCoursByCatNiveauAsync(selectedIdCat, selectedNiveau); }
@@ -225,23 +233,23 @@
         await Notify();
     }
 
-    private async Task OnCoursChanged(ChangeEventArgs e)
+    private async Task OnCoursChanged(string? value)
     {
-        selectedCours = e.Value?.ToString() ?? "";
+        selectedCours = value ?? "";
         ResetFrom(3);
         await ChargerDomaines();
         await Notify();
     }
 
-    private async Task OnLangueChanged(ChangeEventArgs e)
+    private async Task OnLangueChanged(string? value)
     {
-        selectedLangue = e.Value?.ToString() ?? "";
+        selectedLangue = value ?? "";
         await Notify();
     }
 
-    private async Task OnDomaineChanged(ChangeEventArgs e)
+    private async Task OnDomaineChanged(string? value)
     {
-        selectedIdDomaine = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        selectedIdDomaine = int.TryParse(value, out var v) ? v : 0;
         ResetFrom(4);
         if (selectedIdDomaine > 0)
         {
@@ -252,25 +260,25 @@
         await Notify();
     }
 
-    private async Task OnSousDChanged(ChangeEventArgs e)
+    private async Task OnSousDChanged(string? value)
     {
-        selectedIdSousD = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        selectedIdSousD = int.TryParse(value, out var v) ? v : 0;
         ResetFrom(5);
         await ChargerVisees();
         await Notify();
     }
 
-    private async Task OnCompetenceChanged(ChangeEventArgs e)
+    private async Task OnCompetenceChanged(string? value)
     {
-        selectedIdCompetence = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        selectedIdCompetence = int.TryParse(value, out var v) ? v : 0;
         selectedIdNomVisee = 0; selectedIdVisee = 0;
         selectedIdVm = 0; listeViseesMaitriser.Clear();
         await Notify();
     }
 
-    private async Task OnNomViseeChanged(ChangeEventArgs e)
+    private async Task OnNomViseeChanged(string? value)
     {
-        selectedIdNomVisee = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        selectedIdNomVisee = int.TryParse(value, out var v) ? v : 0;
         selectedIdVm = 0; listeViseesMaitriser.Clear();
 
         selectedIdVisee = listeVisees
@@ -283,9 +291,9 @@
         await Notify();
     }
 
-    private async Task OnVmChanged(ChangeEventArgs e)
+    private async Task OnVmChanged(string? value)
     {
-        selectedIdVm = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        selectedIdVm = int.TryParse(value, out var v) ? v : 0;
         await Notify();
     }
 

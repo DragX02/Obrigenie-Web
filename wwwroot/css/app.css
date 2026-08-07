@@ -634,6 +634,38 @@ h1:focus { outline: none; }
     max-width: 100%;
 }
 .cascade-field-lm select { border-color: #6ea8fe; }
+.cascade-field-lm .ss-input { border-color: #6ea8fe; }
+
+/* Liste déroulante cherchable (SearchableSelect) : même look qu'un <select>,
+   mais le champ accepte la saisie pour filtrer les options. */
+.ss-root { position: relative; }
+.ss-input {
+    width: 100%; box-sizing: border-box;
+    padding: 0.4rem 1.6rem 0.4rem 0.5rem;
+    border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg-main); color: var(--text); font-size: 0.9rem;
+    cursor: pointer; text-overflow: ellipsis;
+}
+.ss-input:focus { outline: none; border-color: #6ea8fe; cursor: text; }
+.ss-input::placeholder { color: var(--text-muted); }
+.ss-arrow {
+    position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%);
+    pointer-events: none; color: var(--text-muted); font-size: 0.75rem;
+}
+.ss-list {
+    position: absolute; z-index: 40; top: calc(100% + 2px); left: 0; right: 0;
+    max-height: 220px; overflow-y: auto;
+    background: var(--bg-main); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+}
+.ss-item {
+    padding: 0.35rem 0.5rem; font-size: 0.88rem; cursor: pointer;
+    line-height: 1.3;
+}
+.ss-item-active { background: rgba(110,168,254,0.18); }
+.ss-item-selected { font-weight: 600; color: #6ea8fe; }
+.ss-empty { padding: 0.4rem 0.5rem; font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
 .cascade-opt { font-weight: 400; color: var(--text-muted); }
 .cascade-error { color: #f44336; font-size: 0.8rem; margin-bottom: 0.5rem; }
 .cascade-recap { margin-top: 0.9rem; padding: 0.5rem 0.6rem; border-radius: 6px; background: rgba(76,175,80,0.12); color: var(--text); font-size: 0.82rem; }

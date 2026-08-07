@@ -1,0 +1,178 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   SearchableSelect.razor — Liste déroulante avec saisie libre.
+
+   Se comporte comme un <select> classique (même apparence, même chevron), mais
+   l'utilisateur peut taper dans le champ pour filtrer les options affichées.
+   La recherche ignore la casse et les accents ("visee" trouve "Visée").
+
+   Utilisation :
+     <SearchableSelect Options="mesOptions" Value="@valeur" ValueChanged="Handler"
+                       Placeholder="-- Choisir --" />
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@using System.Globalization
+@using System.Text
+
+<div class="ss-root @CssClass" @onfocusout="OnFocusOut">
+    <input type="text"
+           class="ss-input"
+           value="@DisplayText"
+           placeholder="@InputPlaceholder"
+           @onfocus="OnFocus"
+           @onclick="OnFocus"
+           @oninput="OnInput"
+           @onkeydown="OnKeyDown" />
+    <span class="ss-arrow">▾</span>
+
+    @if (open)
+    {
+        <div class="ss-list">
+            @if (Filtered.Count == 0)
+            {
+                <div class="ss-empty">Aucun résultat</div>
+            }
+            else
+            {
+                @for (var i = 0; i < Filtered.Count; i++)
+                {
+                    var opt = Filtered[i];
+                    var idx = i;
+                    <div class="ss-item @(opt.Value == Value ? "ss-item-selected" : "") @(idx == highlight ? "ss-item-active" : "")"
+                         @onmousedown:preventDefault="true"
+                         @onmousedown="() => Select(opt)"
+                         @onmouseover="() => highlight = idx">
+                        @opt.Label
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Options proposées (valeur technique + libellé affiché).</summary>
+    [Parameter] public IEnumerable<SelectOption> Options { get; set; } = Array.Empty<SelectOption>();
+
+    /// <summary>Valeur sélectionnée (chaîne ; le parent convertit si besoin).</summary>
+    [Parameter] public string? Value { get; set; }
+
+    /// <summary>Invoqué avec la nouvelle valeur lors d'une sélection.</summary>
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    /// <summary>Texte affiché quand rien n'est sélectionné (équivalent option vide).</summary>
+    [Parameter] public string Placeholder { get; set; } = "-- Choisir --";
+
+    /// <summary>Classe CSS supplémentaire posée sur la racine.</summary>
+    [Parameter] public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Si renseigné, une première entrée « vide » portant cette valeur est proposée
+    /// dans la liste (équivalent de l'ancienne option "-- Choisir --" / "-- Aucun --"),
+    /// ce qui permet d'annuler la sélection.
+    /// </summary>
+    [Parameter] public string? EmptyValue { get; set; }
+
+    private bool open;
+    private string? search;   // null = pas de saisie en cours (on affiche le libellé)
+    private int highlight = -1;
+
+    // Libellé de la valeur courante.
+    private string SelectedLabel =>
+        Options.FirstOrDefault(o => o.Value == (Value ?? ""))?.Label ?? "";
+
+    // Pendant la saisie on montre le texte tapé, sinon le libellé sélectionné.
+    private string DisplayText => search ?? SelectedLabel;
+
+    // Quand le champ est vidé pour taper, on rappelle la sélection en filigrane.
+    private string InputPlaceholder =>
+        search != null && SelectedLabel.Length > 0 ? SelectedLabel : Placeholder;
+
+    private List<SelectOption> Filtered
+    {
+        get
+        {
+            var all = Options.ToList();
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var needle = Normalize(search);
+                all = all.Where(o => Normalize(o.Label).Contains(needle)).ToList();
+            }
+            // L'entrée vide reste toujours accessible pour annuler la sélection.
+            if (EmptyValue != null) all.Insert(0, new SelectOption(EmptyValue, Placeholder));
+            return all;
+        }
+    }
+
+    private void OnFocus()
+    {
+        if (open) return;
+        open = true;
+        search = "";          // champ vidé : l'utilisateur peut taper immédiatement
+        highlight = -1;
+    }
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        search = e.Value?.ToString() ?? "";
+        open = true;
+        highlight = -1;
+    }
+
+    private void OnFocusOut()
+    {
+        open = false;
+        search = null;        // restaure l'affichage du libellé sélectionné
+        highlight = -1;
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        var list = Filtered;
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                open = true;
+                if (list.Count > 0) highlight = (highlight + 1) % list.Count;
+                break;
+            case "ArrowUp":
+                open = true;
+                if (list.Count > 0) highlight = highlight <= 0 ? list.Count - 1 : highlight - 1;
+                break;
+            case "Enter":
+                if (open && list.Count > 0)
+                    await Select(list[highlight >= 0 ? highlight : 0]);
+                break;
+            case "Escape":
+                OnFocusOut();
+                break;
+        }
+    }
+
+    private async Task Select(SelectOption opt)
+    {
+        open = false;
+        search = null;
+        highlight = -1;
+        Value = opt.Value;
+        if (ValueChanged.HasDelegate) await ValueChanged.InvokeAsync(opt.Value);
+    }
+
+    // Comparaison insensible à la casse et aux accents.
+    private static string Normalize(string s)
+    {
+        var d = s.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder(d.Length);
+        foreach (var c in d)
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                sb.Append(c);
+        return sb.ToString().Normalize(NormalizationForm.FormC).ToLowerInvariant();
+    }
+
+    /// <summary>Une entrée de la liste : valeur technique + libellé affiché.</summary>
+    public sealed class SelectOption
+    {
+        public SelectOption(string value, string label) { Value = value; Label = label; }
+        public string Value { get; }
+        public string Label { get; }
+    }
+}
