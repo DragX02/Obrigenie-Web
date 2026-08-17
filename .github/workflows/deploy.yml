@@ -8,7 +8,25 @@ jobs:
   deploy:
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      # Récupération du code avec git plutôt qu'avec actions/checkout : le runner
+      # self-hosted retéléchargeait le tarball de l'action à chaque run et
+      # codeload.github.com finissait par répondre 429 (Too Many Requests),
+      # ce qui faisait échouer le déploiement avant même la compilation.
+      - name: Checkout du code
+        run: |
+          set -e
+          # Garde-fou : ne jamais opérer à la racine si la variable était vide
+          test -n "$GITHUB_WORKSPACE"
+          cd "$GITHUB_WORKSPACE"
+          # Repart d'un espace de travail vide (aucun résidu du run précédent)
+          find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          git init -q .
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          # Récupère exactement le commit poussé, pas la tête de branche
+          git fetch -q --depth 1 origin "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+          # Retire le jeton du .git/config maintenant que le code est là
+          git remote set-url origin "https://github.com/${{ github.repository }}.git"
 
       - name: Check .NET version
         run: dotnet --version
