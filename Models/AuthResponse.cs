@@ -51,4 +51,27 @@ namespace Obrigenie.Models
         // Le prénom de l'utilisateur.
         public string Prenom { get; set; } = string.Empty;
     }
+
+    // Objet de transfert de données envoyé au serveur depuis la page « Mot de passe oublié ».
+    // Le lien de réinitialisation part toujours vers l'adresse enregistrée sur le compte.
+    public class ForgotPasswordDto
+    {
+        // L'adresse e-mail du compte dont le mot de passe doit être réinitialisé.
+        public string Email { get; set; } = string.Empty;
+    }
+
+    // Objet de transfert de données envoyé au serveur depuis la page de choix d'un nouveau mot de passe.
+    // Le jeton provient du lien reçu par e-mail et prouve que l'utilisateur contrôle l'adresse du compte.
+    public class ResetPasswordDto
+    {
+        // Le jeton à usage unique extrait du paramètre "?token=..." du lien e-mail.
+        public string Token { get; set; } = string.Empty;
+
+        // Le nouveau mot de passe souhaité. Doit satisfaire les mêmes exigences qu'à l'inscription
+        // (au moins 6 caractères, une lettre majuscule, un chiffre).
+        public string Password { get; set; } = string.Empty;
+
+        // Une deuxième saisie du nouveau mot de passe ; revalidée côté serveur.
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
 }

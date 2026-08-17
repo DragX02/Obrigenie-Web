@@ -5,31 +5,13 @@ using System.Text.Json.Serialization;
 
 namespace Obrigenie.Services
 {
-    // Service HTTP central pour le client Blazor WebAssembly Obrigenie.
-    // Encapsule toute la communication avec l'API REST du backend et expose des méthodes
-    // fortement typées pour l'authentification, les cours, les notes, la gestion des licences,
-    // le déclenchement du scraper du calendrier scolaire et les données de référence en cascade
-    // (cours / niveaux / domaines).
-    //
-    // Chaque méthode gère ses propres exceptions et retourne une valeur par défaut sûre (null,
-    // false ou liste vide) plutôt que de propager les exceptions au composant appelant, rendant
-    // l'interface résistante aux pannes réseau transitoires.
-    //
-    // Le HttpClient sous-jacent est injecté via la fabrique nommée "API" enregistrée dans
-    // Program.cs. AuthHeaderHandler attache automatiquement le jeton JWT Bearer à chaque requête,
-    // donc ce service n'a pas besoin de gérer les en-têtes d'authentification manuellement.
     public class ApiService
     {
-        // Client HTTP préconfiguré avec l'adresse de base de l'API et le gestionnaire d'auth JWT.
         private readonly HttpClient _httpClient;
 
-        // Fournit un accès direct au jeton JWT stocké pour les endpoints qui nécessitent
-        // l'en-tête Bearer ajouté manuellement (en complément d'AuthHeaderHandler).
+       
         private readonly AuthService _auth;
 
-        // Initialise le service avec le client HTTP et le service d'auth fournis par l'injection de dépendances.
-        // httpClient : le client HTTP utilisé pour tous les appels API.
-        // auth : le service d'auth utilisé pour lire le jeton JWT depuis localStorage.
         public ApiService(HttpClient httpClient, AuthService auth)
         {
             _httpClient = httpClient;
@@ -97,6 +79,132 @@ namespace Obrigenie.Services
                 return await response.Content.ReadFromJsonAsync<AuthResponse>();
 
             return null;
+        }
+
+        // Demande l'envoi d'un e-mail de réinitialisation de mot de passe à l'adresse indiquée.
+        // Le serveur répond toujours par le même message de succès, que l'adresse soit inscrite
+        // ou non, afin de ne pas révéler quels comptes existent : l'interface se contente donc
+        // d'afficher le message renvoyé.
+        // Endpoint : POST api/auth/forgot-password
+        // email : l'adresse e-mail du compte à récupérer.
+        // Retourne (true, messageServeur) si la demande a été acceptée ;
+        // (false, messageErreur) en cas de validation refusée, de limite de débit atteinte ou d'erreur réseau.
+        public async Task<(bool Success, string Message)> ForgotPasswordAsync(string email)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync(
+                    "api/auth/forgot-password", new ForgotPasswordDto { Email = email });
+
+                // Le serveur renvoie { "message": "..." } aussi bien en succès qu'en erreur métier
+                var message = await ReadMessageAsync(response);
+
+                if (response.IsSuccessStatusCode)
+                    return (true, message ?? "Si un compte existe avec cette adresse, un e-mail vient d'être envoyé.");
+
+                // 429 : la politique de limitation de débit du serveur a rejeté la requête
+                if ((int)response.StatusCode == 429)
+                    return (false, "Trop de tentatives. Veuillez réessayer dans quelques minutes.");
+
+                return (false, message ?? "Impossible d'envoyer l'e-mail de réinitialisation.");
+            }
+            catch
+            {
+                // Panne réseau ou serveur inaccessible
+                return (false, "Impossible de contacter le serveur. Veuillez réessayer plus tard.");
+            }
+        }
+
+        // Vérifie qu'un jeton de réinitialisation reçu par e-mail est encore valide, sans rien modifier.
+        // Permet à la page de réinitialisation d'afficher "lien expiré" avant que l'utilisateur
+        // ne saisisse un nouveau mot de passe.
+        // Endpoint : GET api/auth/validate-reset-token?token=...
+        // token : le jeton extrait de l'URL du lien e-mail.
+        // Retourne (true, null) si le jeton est exploitable ;
+        // (false, messageErreur) si le lien est invalide, expiré ou si le serveur est inaccessible.
+        public async Task<(bool Valid, string? Error)> ValidateResetTokenAsync(string token)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync(
+                    $"api/auth/validate-reset-token?token={Uri.EscapeDataString(token)}");
+
+                if (response.IsSuccessStatusCode) return (true, null);
+
+                var message = await ReadMessageAsync(response);
+                return (false, message ?? "Ce lien de réinitialisation est invalide ou a expiré.");
+            }
+            catch
+            {
+                return (false, "Impossible de contacter le serveur. Veuillez réessayer plus tard.");
+            }
+        }
+
+        // Enregistre le nouveau mot de passe choisi par l'utilisateur en présentant le jeton
+        // reçu par e-mail. Le jeton est à usage unique : il est effacé côté serveur en cas de succès.
+        // Endpoint : POST api/auth/reset-password
+        // token : le jeton extrait de l'URL du lien e-mail.
+        // password : le nouveau mot de passe en clair.
+        // confirmPassword : la confirmation du nouveau mot de passe (revalidée côté serveur).
+        // Retourne (true, messageServeur) si le mot de passe a été changé ;
+        // (false, messageErreur) sinon.
+        public async Task<(bool Success, string Message)> ResetPasswordAsync(
+            string token, string password, string confirmPassword)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/auth/reset-password", new ResetPasswordDto
+                {
+                    Token           = token,
+                    Password        = password,
+                    ConfirmPassword = confirmPassword
+                });
+
+                var message = await ReadMessageAsync(response);
+
+                if (response.IsSuccessStatusCode)
+                    return (true, message ?? "Mot de passe modifié ! Vous pouvez maintenant vous connecter.");
+
+                if ((int)response.StatusCode == 429)
+                    return (false, "Trop de tentatives. Veuillez réessayer dans quelques minutes.");
+
+                return (false, message ?? "Impossible de modifier le mot de passe.");
+            }
+            catch
+            {
+                return (false, "Impossible de contacter le serveur. Veuillez réessayer plus tard.");
+            }
+        }
+
+        // Extrait le texte lisible d'une réponse des endpoints d'authentification.
+        // Ces endpoints renvoient soit un objet JSON { "message": "..." }, soit une chaîne brute
+        // (les BadRequest("texte") d'ASP.NET Core). Les deux formes sont ramenées à une simple chaîne.
+        // response : la réponse HTTP dont le corps doit être lu.
+        // Retourne le message du serveur, ou null si le corps est vide.
+        private static async Task<string?> ReadMessageAsync(HttpResponseMessage response)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (string.IsNullOrWhiteSpace(body)) return null;
+
+            try
+            {
+                // Cas du JSON structuré : on cherche la propriété "message"
+                using var json = System.Text.Json.JsonDocument.Parse(body);
+                if (json.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                    json.RootElement.TryGetProperty("message", out var msg))
+                {
+                    return msg.GetString();
+                }
+
+                // JSON valide mais sans propriété "message" (ex. une chaîne JSON) : on renvoie le corps tel quel
+                return body.Trim('"');
+            }
+            catch
+            {
+                // Corps non JSON (texte brut renvoyé par BadRequest) : utilisable directement
+                return body;
+            }
         }
 
         // ──────────────────────────────────────────────────────────────────

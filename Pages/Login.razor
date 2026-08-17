@@ -76,6 +76,14 @@
                     @(isLoading ? "Logging in..." : "Log in")
                 </button>
             </div>
+
+            @* ── Lien de récupération de compte ──────────────────────────────
+               Mène à /forgot-password où l'utilisateur demande l'envoi d'un lien
+               de réinitialisation sur l'adresse e-mail de son compte.
+            ── *@
+            <p class="login-link">
+                <a href="/forgot-password">Mot de passe oublié ?</a>
+            </p>
         }
         else
         {

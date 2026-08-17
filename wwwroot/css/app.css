@@ -430,6 +430,19 @@ h1:focus { outline: none; }
 .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .error-message { color: #d32f2f; text-align: center; margin-top: 0.5rem; }
+.success-message { color: #2e7d32; text-align: center; margin-top: 0.5rem; line-height: 1.5; }
+
+/* Lien secondaire sous un formulaire (« Mot de passe oublié ? », retour à la connexion) */
+.login-link { text-align: center; margin-top: 1rem; font-size: 0.9rem; }
+.login-link a { color: #667eea; text-decoration: none; }
+.login-link a:hover { text-decoration: underline; }
+
+/* ===== MOT DE PASSE OUBLIÉ / RÉINITIALISATION ===== */
+/* Texte explicatif au-dessus ou en dessous du formulaire */
+.forgot-hint { color: #666; font-size: 0.9rem; line-height: 1.5; text-align: center; margin-bottom: 1rem; }
+/* Bloc affiché après l'envoi de la demande ou une fois le mot de passe changé */
+.forgot-sent { text-align: center; margin-bottom: 1rem; }
+.forgot-icon { font-size: 2.5rem; display: block; margin-bottom: 0.75rem; }
 
 /* ===== CALENDAR ===== */
 .calendar-container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
