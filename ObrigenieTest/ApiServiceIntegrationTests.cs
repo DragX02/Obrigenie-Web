@@ -87,7 +87,8 @@ public class ApiServiceIntegrationTests
 
     /// <summary>
     /// Verifies that a 200 OK response with a valid JSON body is deserialized
-    /// into a non-null <see cref="AuthResponse"/> with the expected Token and Email.
+    /// into a non-null <see cref="AuthResponse"/> with the expected Token and Email,
+    /// and that no error is reported alongside it.
     /// </summary>
     [Fact]
     public async Task LoginAsync_Ok_ReturnsAuthResponse()
@@ -95,24 +96,43 @@ public class ApiServiceIntegrationTests
         var body = JsonSerializer.Serialize(new { token = "jwt123", email = "prof@school.be", nom = "Doe", prenom = "John" });
         var svc  = Create(HttpStatusCode.OK, body);
 
-        var result = await svc.LoginAsync(new LoginDto { Email = "prof@school.be", Password = "pass" });
+        var (auth, error) = await svc.LoginAsync(new LoginDto { Email = "prof@school.be", Password = "pass" });
 
-        Assert.NotNull(result);
-        Assert.Equal("jwt123", result.Token);
-        Assert.Equal("prof@school.be", result.Email);
+        Assert.NotNull(auth);
+        Assert.Equal("jwt123", auth.Token);
+        Assert.Equal("prof@school.be", auth.Email);
+        Assert.Null(error);
     }
 
     /// <summary>
-    /// Verifies that a 401 Unauthorized response causes LoginAsync to return null.
+    /// Verifies that a 401 Unauthorized response yields no auth payload and surfaces
+    /// the server's own explanation rather than a generic "wrong password" message —
+    /// an unconfirmed account is also rejected with a 401.
     /// </summary>
     [Fact]
-    public async Task LoginAsync_Unauthorized_ReturnsNull()
+    public async Task LoginAsync_Unauthorized_ReturnsServerMessage()
     {
-        var svc = Create(HttpStatusCode.Unauthorized, "");
+        var svc = Create(HttpStatusCode.Unauthorized, "Veuillez confirmer votre email avant de vous connecter.");
 
-        var result = await svc.LoginAsync(new LoginDto { Email = "x@x.com", Password = "wrong" });
+        var (auth, error) = await svc.LoginAsync(new LoginDto { Email = "x@x.com", Password = "wrong" });
 
-        Assert.Null(result);
+        Assert.Null(auth);
+        Assert.Equal("Veuillez confirmer votre email avant de vous connecter.", error);
+    }
+
+    /// <summary>
+    /// Verifies that a 429 from the "auth" rate-limiting policy is reported as such,
+    /// since the body returned in that case is empty and carries no explanation.
+    /// </summary>
+    [Fact]
+    public async Task LoginAsync_TooManyRequests_ReturnsRateLimitMessage()
+    {
+        var svc = Create(HttpStatusCode.TooManyRequests, "");
+
+        var (auth, error) = await svc.LoginAsync(new LoginDto { Email = "x@x.com", Password = "pass" });
+
+        Assert.Null(auth);
+        Assert.Contains("Trop de tentatives", error);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -120,33 +140,53 @@ public class ApiServiceIntegrationTests
     // ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Verifies that a 200 OK response deserializes into a non-null AuthResponse
-    /// with the expected token.
+    /// Verifies that a 200 OK reports success and returns the server's message.
+    /// Registration issues no token — the account has to be confirmed by e-mail first —
+    /// so the caller must not expect an <see cref="AuthResponse"/> here.
     /// </summary>
     [Fact]
-    public async Task RegisterAsync_Ok_ReturnsAuthResponse()
+    public async Task RegisterAsync_Ok_ReturnsServerMessage()
     {
-        var body = JsonSerializer.Serialize(new { token = "newjwt", email = "new@school.be", nom = "New", prenom = "User" });
+        var body = JsonSerializer.Serialize(new { message = "Compte créé ! Vérifiez votre email pour confirmer votre inscription." });
         var svc  = Create(HttpStatusCode.OK, body);
 
-        var dto    = new RegisterDto { Email = "new@school.be", Password = "Pass1!", ConfirmPassword = "Pass1!", Nom = "New", Prenom = "User" };
-        var result = await svc.RegisterAsync(dto);
+        var dto = new RegisterDto { Email = "new@school.be", Password = "Pass1!", ConfirmPassword = "Pass1!", Nom = "New", Prenom = "User" };
+        var (success, message) = await svc.RegisterAsync(dto);
 
-        Assert.NotNull(result);
-        Assert.Equal("newjwt", result.Token);
+        Assert.True(success);
+        Assert.Equal("Compte créé ! Vérifiez votre email pour confirmer votre inscription.", message);
     }
 
     /// <summary>
-    /// Verifies that a 409 Conflict (duplicate email) causes RegisterAsync to return null.
+    /// Verifies that a rejected registration reports the reason given by the server
+    /// (here: the e-mail is already taken) instead of a generic failure message.
     /// </summary>
     [Fact]
-    public async Task RegisterAsync_Conflict_ReturnsNull()
+    public async Task RegisterAsync_Rejected_ReturnsServerMessage()
     {
-        var svc = Create(HttpStatusCode.Conflict, "");
+        var svc = Create(HttpStatusCode.BadRequest, "Un compte avec cet email existe déjà.");
 
         var dto = new RegisterDto { Email = "dup@school.be", Password = "Pass1!", ConfirmPassword = "Pass1!", Nom = "X", Prenom = "Y" };
+        var (success, message) = await svc.RegisterAsync(dto);
 
-        Assert.Null(await svc.RegisterAsync(dto));
+        Assert.False(success);
+        Assert.Equal("Un compte avec cet email existe déjà.", message);
+    }
+
+    /// <summary>
+    /// Verifies that hitting the shared login/register rate limit is reported as a
+    /// rate limit rather than as a validation error.
+    /// </summary>
+    [Fact]
+    public async Task RegisterAsync_TooManyRequests_ReturnsRateLimitMessage()
+    {
+        var svc = Create(HttpStatusCode.TooManyRequests, "");
+
+        var dto = new RegisterDto { Email = "new@school.be", Password = "Pass1!", ConfirmPassword = "Pass1!", Nom = "X", Prenom = "Y" };
+        var (success, message) = await svc.RegisterAsync(dto);
+
+        Assert.False(success);
+        Assert.Contains("Trop de tentatives", message);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

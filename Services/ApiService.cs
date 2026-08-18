@@ -50,35 +50,71 @@ namespace Obrigenie.Services
 
         // Envoie les identifiants email/mot de passe à l'endpoint de connexion et retourne la réponse
         // d'authentification du serveur si les identifiants sont valides.
+        // Le message d'erreur du serveur est remonté tel quel : un échec de connexion n'est pas
+        // toujours un mauvais mot de passe (compte non confirmé, limite de tentatives atteinte…)
+        // et l'utilisateur ne peut pas se dépanner si l'interface affiche toujours le même texte.
         // Endpoint : POST api/auth/login
         // loginDto : DTO contenant l'email et le mot de passe de l'utilisateur.
-        // Retourne un AuthResponse avec le JWT et les détails utilisateur en cas de succès ;
-        // null si les identifiants sont invalides ou en cas d'erreur réseau.
-        public async Task<AuthResponse?> LoginAsync(LoginDto loginDto)
+        // Retourne (AuthResponse, null) avec le JWT et les détails utilisateur en cas de succès ;
+        // (null, messageErreur) si les identifiants sont refusés ou en cas d'erreur réseau.
+        public async Task<(AuthResponse? Auth, string? Error)> LoginAsync(LoginDto loginDto)
         {
-            var response = await _httpClient.PostAsJsonAsync("api/auth/login", loginDto);
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/auth/login", loginDto);
 
-            // Désérialise et retourne le payload du jeton sur HTTP 200 ; null pour tout autre statut
-            if (response.IsSuccessStatusCode)
-                return await response.Content.ReadFromJsonAsync<AuthResponse>();
+                // Désérialise et retourne le payload du jeton sur HTTP 200
+                if (response.IsSuccessStatusCode)
+                    return (await response.Content.ReadFromJsonAsync<AuthResponse>(), null);
 
-            return null;
+                // 429 : la politique de limitation de débit du serveur a rejeté la requête
+                // (5 requêtes / 15 min par IP, partagées entre connexion et inscription)
+                if ((int)response.StatusCode == 429)
+                    return (null, "Trop de tentatives. Veuillez réessayer dans quelques minutes.");
+
+                // Le serveur renvoie une chaîne explicite ("Email ou mot de passe incorrect.",
+                // "Veuillez confirmer votre email avant de vous connecter.", …)
+                var message = await ReadMessageAsync(response);
+                return (null, message ?? "Email ou mot de passe incorrect.");
+            }
+            catch
+            {
+                // Panne réseau ou serveur inaccessible
+                return (null, "Impossible de contacter le serveur. Veuillez réessayer plus tard.");
+            }
         }
 
         // Envoie les données d'inscription au serveur pour créer un nouveau compte utilisateur.
         // Le serveur valide la robustesse du mot de passe et l'unicité de l'email.
+        // Attention : l'inscription ne connecte PAS l'utilisateur. Le compte est créé inactif et
+        // le serveur répond { "message": "..." } sans jeton — la connexion n'est possible qu'après
+        // le clic sur le lien de confirmation reçu par e-mail.
         // Endpoint : POST api/auth/register
         // registerDto : DTO avec tous les champs d'inscription incluant la confirmation du mot de passe.
-        // Retourne un AuthResponse (et JWT) pour le nouveau compte en cas de succès ;
-        // null en cas d'erreur de validation ou de panne réseau.
-        public async Task<AuthResponse?> RegisterAsync(RegisterDto registerDto)
+        // Retourne (true, messageServeur) si le compte a été créé ;
+        // (false, messageErreur) en cas d'erreur de validation, d'email déjà pris ou de panne réseau.
+        public async Task<(bool Success, string Message)> RegisterAsync(RegisterDto registerDto)
         {
-            var response = await _httpClient.PostAsJsonAsync("api/auth/register", registerDto);
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/auth/register", registerDto);
 
-            if (response.IsSuccessStatusCode)
-                return await response.Content.ReadFromJsonAsync<AuthResponse>();
+                var message = await ReadMessageAsync(response);
 
-            return null;
+                if (response.IsSuccessStatusCode)
+                    return (true, message ?? "Compte créé ! Vérifiez votre e-mail pour confirmer votre inscription.");
+
+                if ((int)response.StatusCode == 429)
+                    return (false, "Trop de tentatives. Veuillez réessayer dans quelques minutes.");
+
+                // Le serveur détaille la raison du refus ("Un compte avec cet email existe déjà.",
+                // "Le nom contient des caractères non autorisés…", …)
+                return (false, message ?? "Impossible de créer le compte. Veuillez réessayer.");
+            }
+            catch
+            {
+                return (false, "Impossible de contacter le serveur. Veuillez réessayer plus tard.");
+            }
         }
 
         // Demande l'envoi d'un e-mail de réinitialisation de mot de passe à l'adresse indiquée.

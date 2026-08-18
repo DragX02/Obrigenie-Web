@@ -59,8 +59,8 @@
            The active button receives the "active" CSS class.
         ── *@
         <div class="tab-buttons">
-            <button class="@(isRegister ? "" : "active")" @onclick="() => isRegister = false">Login</button>
-            <button class="@(isRegister ? "active" : "")" @onclick="() => isRegister = true">Register</button>
+            <button class="@(isRegister ? "" : "active")" @onclick="() => SwitchTab(false)">Login</button>
+            <button class="@(isRegister ? "active" : "")" @onclick="() => SwitchTab(true)">Register</button>
         </div>
 
         @if (!isRegister)
@@ -105,11 +105,21 @@
         }
 
         @* ── Error display ───────────────────────────────────────────────────
-           Shown when login or registration fails (wrong credentials, validation errors, etc.)
+           Shows the message returned by the server (wrong credentials, unconfirmed
+           account, email already taken, rate limit…) rather than a generic sentence.
         ── *@
         @if (!string.IsNullOrEmpty(errorMessage))
         {
             <p class="error-message">@errorMessage</p>
+        }
+
+        @* ── Success display ─────────────────────────────────────────────────
+           Registration does not log the user in: the account stays inactive until
+           the confirmation link is clicked, so the outcome is shown here instead.
+        ── *@
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <p class="success-message">@successMessage</p>
         }
     </div>
 </div>
@@ -123,6 +133,9 @@
 
     @* Holds the most recent error message to display beneath the form *@
     private string errorMessage = "";
+
+    @* Holds the confirmation message shown after a successful registration *@
+    private string successMessage = "";
 
     @* ── Login form field bindings ───────────────────────────────────────── *@
 
@@ -150,35 +163,47 @@
     private string registerConfirmPassword = "";
 
     /// <summary>
+    /// Switches between the login and registration tabs, clearing any message left
+    /// over from the other form so a stale error is never shown next to the new one.
+    /// </summary>
+    private void SwitchTab(bool register)
+    {
+        isRegister     = register;
+        errorMessage   = "";
+        successMessage = "";
+    }
+
+    /// <summary>
     /// Handles submission of the login form.
     /// Sends email and password to the API, saves the returned JWT token and email
     /// to localStorage, then performs a hard reload to the home page.
-    /// Displays an error message if the credentials are rejected.
+    /// Displays the server's own error message if the credentials are rejected.
     /// </summary>
     private async Task HandleLogin()
     {
-        // Clear any previous error before attempting a new login
-        errorMessage = "";
-        isLoading = true;
+        // Clear any previous message before attempting a new login
+        errorMessage   = "";
+        successMessage = "";
+        isLoading      = true;
 
         // POST credentials to the login endpoint and await the auth response
-        var result = await Api.LoginAsync(new LoginDto { Email = loginEmail, Password = loginPassword });
+        var (auth, error) = await Api.LoginAsync(new LoginDto { Email = loginEmail, Password = loginPassword });
 
-        if (result != null)
+        if (auth != null)
         {
             // Persist the JWT token so subsequent requests include the Authorization header
-            await Auth.SaveTokenAsync(result.Token);
+            await Auth.SaveTokenAsync(auth.Token);
 
             // Persist the email for display purposes elsewhere in the app
-            await Auth.SaveEmailAsync(result.Email);
+            await Auth.SaveEmailAsync(auth.Email);
 
             // forceLoad: true ensures the Blazor app re-initialises and picks up the new token
             Nav.NavigateTo("/", forceLoad: true);
         }
         else
         {
-            // The API returned a non-success response (e.g., 401 Unauthorized)
-            errorMessage = "Incorrect email or password.";
+            // Surface the reason given by the API (bad credentials, unconfirmed account, rate limit…)
+            errorMessage = error ?? "Incorrect email or password.";
         }
 
         isLoading = false;
@@ -190,13 +215,16 @@
     ///   - Passwords must match.
     ///   - Password must be at least 6 characters, contain at least one uppercase letter,
     ///     and contain at least one digit.
-    /// On success, saves the JWT and redirects to the home page.
+    /// On success the account is created but NOT logged in — it stays inactive until the
+    /// confirmation e-mail is clicked — so the page shows the server's message and returns
+    /// to the login tab instead of redirecting.
     /// Displays specific error messages for each validation or API failure.
     /// </summary>
     private async Task HandleRegister()
     {
-        // Clear any previous error before attempting registration
-        errorMessage = "";
+        // Clear any previous message before attempting registration
+        errorMessage   = "";
+        successMessage = "";
 
         // Validate that the two password fields match before calling the API
         if (registerPassword != registerConfirmPassword)
@@ -217,7 +245,7 @@
         isLoading = true;
 
         // Send the registration data to the server
-        var result = await Api.RegisterAsync(new RegisterDto
+        var (success, message) = await Api.RegisterAsync(new RegisterDto
         {
             Email           = registerEmail,
             Password        = registerPassword,
@@ -226,17 +254,24 @@
             Prenom          = registerPrenom
         });
 
-        if (result != null)
+        if (success)
         {
-            // Persist the returned JWT token and email, then navigate to the home page
-            await Auth.SaveTokenAsync(result.Token);
-            await Auth.SaveEmailAsync(result.Email);
-            Nav.NavigateTo("/", forceLoad: true);
+            // No token is issued at registration: the account is unusable until confirmed.
+            // Show the "check your inbox" message and hand the user back to the login tab.
+            successMessage = message;
+            isRegister     = false;
+
+            // Pre-fill the login email so the user only has to type their password once confirmed
+            loginEmail = registerEmail;
+
+            // Clear the registration form so the passwords are not left in the DOM
+            registerNom = registerPrenom = registerEmail = "";
+            registerPassword = registerConfirmPassword = "";
         }
         else
         {
-            // The server rejected the registration (e.g., email already in use)
-            errorMessage = "Registration error. Please try again.";
+            // Show why the server refused (email already in use, rate limit, invalid field…)
+            errorMessage = message;
         }
 
         isLoading = false;
