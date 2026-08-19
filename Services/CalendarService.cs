@@ -276,14 +276,16 @@ namespace Obrigenie.Services
             return new SchoolYearCalendar { SchoolYearStart = rentreeCurrent, Holidays = holidays };
         }
 
-        // Ajoute un marqueur synthétique "Rentree scolaire" à la liste des congés si aucune entrée de ce type
-        // n'existe déjà pour la date donnée.
+        // Ajoute un marqueur synthétique "Rentree scolaire" à la liste des congés si l'année
+        // scolaire visée n'en contient aucun.
         // Cela garantit que SchoolPeriodHelper trouve toujours une ancre de Rentrée lors du calcul
         // des limites de période, même lorsque les données de l'API sont incomplètes.
         private void EnsureSchoolStartExists(List<Holiday> holidays, DateTime rentreeDate)
         {
-            // Ajouter une entrée Rentrée synthétique uniquement si aucune n'existe déjà pour cette date exacte
-            if (!holidays.Any(h => h.Name.Contains("Rentree") && h.StartDate == rentreeDate))
+            // La comparaison porte sur l'année scolaire, pas sur la date exacte : une Rentrée
+            // officielle au 24 août laissait sinon ajouter un second marqueur au 26 août
+            // (date par défaut), et le calendrier affichait deux rentrées la même semaine.
+            if (!holidays.Any(h => EstRentree(h.Name) && AnneeScolaire(h.StartDate) == AnneeScolaire(rentreeDate)))
             {
                 holidays.Add(new Holiday
                 {

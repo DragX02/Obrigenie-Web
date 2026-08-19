@@ -83,6 +83,43 @@ public class CalendarServiceIntegrationTests
         return JsonSerializer.Serialize(items);
     }
 
+    /// <summary>
+    /// Verifies that a Rentrée sent by the API suppresses the synthetic marker for that
+    /// school year, even when its date differs from the default (August 26th).
+    ///
+    /// Regression: the check used to compare exact dates, so an official Rentrée on
+    /// August 24th still let a second marker be injected on August 26th, and the month
+    /// view showed two school starts in the same week.
+    /// </summary>
+    [Fact]
+    public async Task GetCalendarData_ApiRentreeOnAnotherDay_DoesNotAddASecondMarker()
+    {
+        int startYear = CurrentSchoolYearStart();
+
+        var payload = JsonSerializer.Serialize(new[]
+        {
+            new
+            {
+                nomEvenement  = "Rentrée scolaire",
+                dateDebut     = $"{startYear}-08-24",
+                dateFin       = $"{startYear}-08-24",
+                typeEvenement = "RENTREE",
+                anneeScolaire = $"{startYear}-{startYear + 1}"
+            }
+        });
+
+        var svc = CreateService(new FakeHandler(HttpStatusCode.OK, payload), new Mock<ILocalStorageService>());
+        var calendar = await svc.GetCalendarData();
+
+        var rentrees = calendar.Holidays
+            .Where(h => CalendarService.EstRentree(h.Name)
+                     && h.StartDate.Year == startYear && h.StartDate.Month == 8)
+            .ToList();
+
+        var rentree = Assert.Single(rentrees);
+        Assert.Equal(new DateTime(startYear, 8, 24), rentree.StartDate);
+    }
+
     /// <summary>Returns the start year of the current Belgian school year.</summary>
     private static int CurrentSchoolYearStart()
     {
