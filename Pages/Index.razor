@@ -38,6 +38,9 @@
 @* Injection de LanguageService pour les traductions et le re-render lors du changement de langue *@
 @inject LanguageService Lang
 
+@* Injection de IJSRuntime pour déclencher l'impression du calendrier depuis le navigateur *@
+@inject IJSRuntime JS
+
 @* ── Barre d'outils du mode d'affichage ──────────────────────────────────── *@
 <div class="calendar-container">
     <div class="view-mode-bar">
@@ -52,6 +55,19 @@
                 @onclick='() => SetViewMode(CalendarViewMode.Month)'>@Lang.T("cal.view.month")</button>
         <button class="@(viewMode == CalendarViewMode.SchoolPeriod   ? "view-btn active" : "view-btn")"
                 @onclick='() => SetViewMode(CalendarViewMode.SchoolPeriod)'>@Lang.T("cal.view.period")</button>
+    </div>
+
+    @* ── Barre d'impression ──────────────────────────────────────────────────
+       L'orientation du papier suit la vue : portrait pour la vue jour (une seule
+       colonne, grille verticale), paysage pour toutes les autres (grilles larges).
+       Le PDF passe par la même boîte de dialogue : le navigateur propose
+       "Enregistrer au format PDF" comme destination d'impression. *@
+    <div class="print-bar">
+        <button class="print-btn" @onclick="ImprimerCalendrier"
+                title="Imprimer la vue affichée (@OrientationImpression)">🖨 Imprimer</button>
+        <button class="print-btn" @onclick="ExporterPdf"
+                title="Ouvrir l'impression et choisir « Enregistrer au format PDF »">📄 PDF</button>
+        <span class="print-hint">@(printHint ?? $"Orientation : {OrientationImpression}")</span>
     </div>
 
     @* ── En-tête de navigation ─────────────────────────────────────────────── *@
@@ -1454,4 +1470,38 @@
 
         return string.Join("\n", lignes);
     }
+
+    @* ══════════════════════════════════════════════════════════════════════════
+       IMPRESSION / PDF
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    @* Message affiché à côté des boutons d'impression (null = affiche l'orientation) *@
+    private string? printHint = null;
+
+    // Orientation du papier déduite de la vue : la vue jour est une colonne verticale,
+    // toutes les autres sont des grilles larges qui ne tiennent qu'en paysage.
+    private string OrientationImpression =>
+        viewMode == CalendarViewMode.SingleDay ? "portrait" : "paysage";
+
+    // Lance la boîte de dialogue d'impression du navigateur en fixant au préalable
+    // la règle @page (format A4 + orientation) correspondant à la vue affichée.
+    private async Task ImprimerCalendrier()
+    {
+        printHint = null;
+        await LancerImpression();
+    }
+
+    // Même boîte de dialogue que l'impression : le PDF s'obtient en choisissant
+    // "Enregistrer au format PDF" comme destination, ce qui donne un rendu vectoriel
+    // fidèle sans dépendre d'une bibliothèque tierce.
+    private async Task ExporterPdf()
+    {
+        printHint = "Dans la fenêtre qui s'ouvre, choisis « Enregistrer au format PDF » comme destination.";
+        await LancerImpression();
+    }
+
+    // Appelle la fonction JS qui pose la règle @page puis ouvre window.print().
+    private Task LancerImpression()
+        => JS.InvokeVoidAsync("imprimerCalendrier",
+                              viewMode == CalendarViewMode.SingleDay ? "portrait" : "landscape").AsTask();
 }

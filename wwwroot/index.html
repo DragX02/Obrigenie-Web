@@ -7,7 +7,7 @@
     <title>Obrigenie</title>
     <base href="/" />
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
-    <link rel="stylesheet" href="css/app.css?v=8" />
+    <link rel="stylesheet" href="css/app.css?v=9" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="Obrigenie.styles.css" rel="stylesheet" />
 </head>
@@ -40,6 +40,25 @@
         // À appeler lorsqu'un nouveau PDF est chargé ou que la page est déchargée.
         window.libererUrlBlob = function (url) {
             if (url) URL.revokeObjectURL(url);
+        };
+
+        // Imprime le calendrier dans l'orientation demandée ("portrait" ou "landscape").
+        // La règle @page ne pouvant pas être posée depuis une feuille de style statique
+        // en fonction de la vue, on injecte (ou met à jour) une balise <style> dédiée
+        // juste avant d'ouvrir la boîte de dialogue d'impression.
+        // Cette même boîte de dialogue sert à l'export PDF ("Enregistrer au format PDF").
+        window.imprimerCalendrier = function (orientation) {
+            const sens = orientation === 'portrait' ? 'portrait' : 'landscape';
+
+            let style = document.getElementById('print-orientation');
+            if (!style) {
+                style = document.createElement('style');
+                style.id = 'print-orientation';
+                document.head.appendChild(style);
+            }
+            style.textContent = '@page { size: A4 ' + sens + '; margin: 10mm; }';
+
+            window.print();
         };
     </script>
 </body>

@@ -517,6 +517,16 @@ h1:focus { outline: none; }
 }
 
 /* Single Day */
+/* Barre d'impression : boutons Imprimer / PDF + rappel de l'orientation utilisee */
+.print-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.print-btn {
+    padding: 0.3rem 0.75rem; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg-card); color: var(--text); font-size: 0.85rem; cursor: pointer;
+    transition: background 0.15s;
+}
+.print-btn:hover { background: var(--row-hover); }
+.print-hint { font-size: 0.75rem; color: var(--text-muted); }
+
 .single-day-header { text-align: center; margin-bottom: 1rem; }
 .day-name { display: block; text-transform: capitalize; color: var(--text-muted); }
 .day-number { display: block; font-size: 3rem; font-weight: bold; color: var(--text); }
@@ -1227,3 +1237,59 @@ h1:focus { outline: none; }
     transition: opacity .2s;
 }
 .btn-confirm-login:hover { opacity: .88; }
+
+/* ===== IMPRESSION / EXPORT PDF =====
+   L'orientation du papier (@page) est posee dynamiquement par window.imprimerCalendrier :
+   portrait pour la vue jour, paysage pour les grilles semaine / mois / trimestre.
+   Ici on ne s'occupe que du contenu : masquer l'interface et rendre la grille lisible
+   sur du papier blanc, meme quand l'application est en theme sombre. */
+@media print {
+    /* Impression sur fond blanc : on repasse toutes les variables de theme en clair
+       plutot que de surcharger chaque regle une par une. */
+    #app-root, .dark, .light {
+        --bg-main: #ffffff;
+        --bg-card: #ffffff;
+        --text: #000000;
+        --text-muted: #333333;
+        --border: #999999;
+        --row-hover: transparent;
+        --modal-bg: #ffffff;
+        --time-label-color: #333333;
+        --day-cell-bg: #ffffff;
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+
+    /* Masque tout ce qui n'a pas de sens sur papier : navigation, boutons, modale */
+    .flyout, .flyout-overlay, .top-bar, .view-mode-bar, .print-bar,
+    .nav-btn, .modal-overlay, #blazor-error-ui { display: none !important; }
+
+    /* Le calendrier occupe toute la page, sans marge ni contrainte de hauteur */
+    #app-root, .main-wrapper, .content-area, .calendar-container {
+        display: block !important;
+        width: 100% !important;
+        max-width: none !important;
+        min-height: 0 !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+
+    /* La vue trimestre defile horizontalement a l'ecran : tout doit etre visible a l'impression */
+    .trimestre-scroll { overflow: visible !important; }
+
+    /* Notes et cellules en clair, avec un contour visible sur papier */
+    .note-block, .note-mini { background: #ffffff !important; color: #000000 !important; border: 1px solid #999999 !important; }
+    .mini-course, .note-visee { color: #1b5e20 !important; }
+
+    /* Les puces de cours identifient un cours par leur couleur : on la conserve */
+    .course-block, .course-mini { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    /* Evite qu'une cellule, une note ou une ligne horaire soit coupee entre deux pages */
+    .day-cell, .time-cell, .time-label, .note-block, .trim-cell { break-inside: avoid; page-break-inside: avoid; }
+
+    /* Le titre de periode reste en tete de la page imprimee */
+    .calendar-header { margin: 0 0 6mm !important; }
+    .week-title { font-size: 1.1rem !important; }
+}
