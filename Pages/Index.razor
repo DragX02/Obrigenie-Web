@@ -4,7 +4,7 @@
    Il s'agit de la route d'accueil ("/") et de la vue principale avec laquelle
    les utilisateurs authentifiés et licenciés interagissent. Elle prend en charge
    cinq modes d'affichage contrôlés par une barre d'outils :
-     • SingleDay   — grille horaire pour un jour (06:00–22:00)
+     • SingleDay   — grille horaire pour un jour (08:00–18:00)
      • Week        — grille Lun–Ven pour la semaine en cours
      • WeekAndWeekend — grille Lun–Dim pour la semaine en cours
      • Month       — grille complète sur 6 semaines du mois
@@ -97,9 +97,9 @@
             <span class="day-number">@currentDay.DayOfMonth</span>
         </div>
 
-        @* Grille horaire de 06:00 à 22:00 *@
+        @* Grille horaire de 08:00 à 18:00 *@
         <div class="time-grid">
-            @for (int h = 6; h <= 22; h++)
+            @for (int h = 8; h <= 17; h++)
             {
                 @* Capture la variable de boucle pour que la fermeture lambda capture la bonne valeur *@
                 var hour = h;
@@ -520,9 +520,9 @@
        Le getter affiche la valeur courante sur 2 chiffres.
        Le setter parse la saisie libre de l'utilisateur : entier valide → borné dans la plage,
        saisie non numérique → ignorée (le champ retrouve sa valeur au prochain rendu). *@
-    private string StartHourStr { get => noteStart.Hour.ToString("D2");   set => SetHour(ref noteStart, value, 6, 22); }
+    private string StartHourStr { get => noteStart.Hour.ToString("D2");   set => SetHour(ref noteStart, value, 8, 17); }
     private string StartMinStr  { get => noteStart.Minute.ToString("D2"); set => SetMinute(ref noteStart, value); }
-    private string EndHourStr   { get => noteEnd.Hour.ToString("D2");     set => SetHour(ref noteEnd, value, 6, 23); }
+    private string EndHourStr   { get => noteEnd.Hour.ToString("D2");     set => SetHour(ref noteEnd, value, 9, 18); }
     private string EndMinStr    { get => noteEnd.Minute.ToString("D2");   set => SetMinute(ref noteEnd, value); }
 
     // Applique une saisie manuelle d'heure : borne l'entier dans [min, max] ; ignore le non-numérique.
@@ -539,9 +539,9 @@
             t = new TimeOnly(t.Hour, Math.Clamp(v, 0, 59));
     }
 
-    // Flèches heures : ±1, bornées (début 6–22, fin 6–23).
-    private void StepStartHour(int dir) => noteStart = new TimeOnly(Math.Clamp(noteStart.Hour + dir, 6, 22), noteStart.Minute);
-    private void StepEndHour(int dir)   => noteEnd   = new TimeOnly(Math.Clamp(noteEnd.Hour + dir, 6, 23), noteEnd.Minute);
+    // Flèches heures : ±1, bornées (début 8–17, fin 9–18).
+    private void StepStartHour(int dir) => noteStart = new TimeOnly(Math.Clamp(noteStart.Hour + dir, 8, 17), noteStart.Minute);
+    private void StepEndHour(int dir)   => noteEnd   = new TimeOnly(Math.Clamp(noteEnd.Hour + dir, 9, 18), noteEnd.Minute);
 
     // Flèches minutes : pas de 5, alignées sur la grille des multiples de 5, bornées [0, 55].
     private void StepStartMinute(int dir) => noteStart = new TimeOnly(noteStart.Hour, SnapMinute(noteStart.Minute, dir));
@@ -1091,7 +1091,7 @@
             : new TimeOnly(hour, 0);
         noteEnd     = editingNote != null && editingNote.EndHour > 0
             ? new TimeOnly(editingNote.EndHour, editingNote.EndMinute)
-            : new TimeOnly(Math.Min(hour + 1, 23), 0);
+            : new TimeOnly(Math.Min(hour + 1, 18), 0);
 
         // Efface toute erreur d'enregistrement précédente à l'ouverture d'une nouvelle modale
         noteSaveError = null;

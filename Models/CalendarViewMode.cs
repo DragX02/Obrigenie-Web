@@ -22,7 +22,7 @@ namespace Obrigenie.Models
         Month,
 
         /// <summary>
-        /// Shows a single day with an hourly time grid from 06:00 to 22:00.
+        /// Shows a single day with an hourly time grid from 08:00 to 18:00.
         /// </summary>
         SingleDay,
 
