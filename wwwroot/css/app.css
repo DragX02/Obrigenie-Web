@@ -583,6 +583,15 @@ h1:focus { outline: none; }
 .course-mini { font-size: 0.65rem; color: white; padding: 1px 4px; border-radius: 3px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .note-mini { font-size: 0.65rem; color: #E65100; background: #FFF3E0; padding: 1px 4px; border-radius: 3px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dark .note-mini { background: #2d1f0a; color: #FFB74D; }
+
+/* Vues semaine / semaine+ : la note detaille horaire, cours et texte sur plusieurs lignes */
+.note-mini-week { white-space: normal; padding: 3px 5px; line-height: 1.35; }
+.note-mini-week .mini-time { display: block; font-weight: 700; }
+.mini-course { display: block; font-weight: 600; color: #4CAF50; }
+.mini-text { display: block; }
+
+/* Horaire prefixe sur la puce de cours (une seule ligne, donc en ligne) */
+.course-mini .mini-time { font-weight: 700; opacity: 0.85; margin-right: 3px; }
 .trim-note-dot { font-size: 0.7rem; line-height: 1; display: block; margin-top: 1px; }
 
 /* Modal */
@@ -626,6 +635,29 @@ h1:focus { outline: none; }
     display: flex; align-items: center; justify-content: center;
 }
 .tb-arrow:hover { color: var(--text); }
+/* Repetition d'une nouvelle note : plage de dates + boutons de jours de la semaine */
+.modal-repeat {
+    display: flex; flex-direction: column; gap: 0.4rem;
+    padding: 0.5rem; margin-bottom: 0.75rem;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg-main);
+}
+.modal-repeat-dates { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.modal-repeat-dates label { font-size: 0.85rem; color: var(--text-muted); }
+.date-box {
+    padding: 2px 5px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg-card); color: var(--text); font-size: 0.9rem;
+}
+.modal-repeat-days { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+.dow-btn {
+    padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--bg-card); color: var(--text-muted);
+    font-size: 0.8rem; cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.dow-btn:hover { color: var(--text); }
+.dow-btn.active { background: #4CAF50; border-color: #4CAF50; color: #fff; font-weight: 600; }
+.modal-repeat-count { font-size: 0.75rem; color: var(--text-muted); }
+
 .modal-char-count { text-align: right; font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
 .modal-error { color: #f44336; font-size: 0.8rem; margin-top: 0.5rem; }
 

@@ -268,6 +268,11 @@
        ════════════════════════════════════════════════════════════════════════ *@
     else
     {
+        @* Vues semaine et semaine+ : cellules larges, on y détaille horaires et cours.
+           La vue mois partage la même grille mais reste en mode aperçu compact. *@
+        var isWeekView = viewMode == CalendarViewMode.Week
+                      || viewMode == CalendarViewMode.WeekAndWeekend;
+
         @* Ligne d'en-tête des colonnes de la grille : noms de jours abrégés pour chaque colonne *@
         <div class="grid-header" style="grid-template-columns: repeat(@gridSpan, 1fr); display: grid;">
             @foreach (var day in days.Take(gridSpan))
@@ -294,25 +299,60 @@
                         <span class="holiday-name">@day.ShortHolidayName</span>
                     }
 
-                    @* Affiche jusqu'à 3 mini-puces de cours pour éviter le débordement de la cellule *@
+                    @* Affiche jusqu'à 3 mini-puces de cours pour éviter le débordement de la cellule.
+                       En vue semaine, l'horaire du cours est préfixé au nom. *@
                     @foreach (var course in day.Courses.Take(3))
                     {
-                        <div class="course-mini" style="background-color: @course.Color;">@course.Name</div>
+                        <div class="course-mini" style="background-color: @course.Color;">
+                            @if (isWeekView)
+                            {
+                                <span class="mini-time">@($"{course.StartTime:hh\\:mm}–{course.EndTime:hh\\:mm}")</span>
+                            }
+                            @course.Name
+                        </div>
                     }
 
-                    @* Affiche jusqu'à 2 aperçus de notes tronqués à 16 caractères.
-                       Si la note n'a pas de texte, on affiche le libellé de la visée liée. *@
-                    @foreach (var note in day.Notes.Take(2))
+                    @if (isWeekView)
                     {
-                        @* Texte de la note si présent, sinon contexte de cascade condensé sur une ligne *@
-                        var raw = !string.IsNullOrEmpty(note.Content)
-                            ? note.Content
-                            : (note.ViseeContexte ?? "").Replace("\n", " · ");
-                        var icon = !string.IsNullOrEmpty(note.Content) ? "📝" : "🎯";
-                        var preview = raw.Length > 16 ? raw[..16] + "…" : raw;
-                        @if (!string.IsNullOrEmpty(preview))
+                        @* Vues semaine / semaine+ : les cellules sont assez larges pour montrer,
+                           pour chaque note, son horaire, le cours issu de la cascade et son texte. *@
+                        @foreach (var note in day.Notes.OrderBy(n => n.Hour).ThenBy(n => n.Minute))
                         {
-                            <div class="note-mini">@icon @preview</div>
+                            @* Heure de fin : repli sur Hour+1 quand EndHour vaut 0 (notes anciennes) *@
+                            var endH = note.EndHour > 0 ? note.EndHour : note.Hour + 1;
+                            var endM = note.EndHour > 0 ? note.EndMinute : 0;
+                            @* Nom du cours extrait de la ligne "Cours : ..." du contexte de cascade *@
+                            var cours = NoteCourseLabel(note);
+
+                            <div class="note-mini note-mini-week">
+                                <span class="mini-time">@($"{note.Hour:D2}:{note.Minute:D2} → {endH:D2}:{endM:D2}")</span>
+                                @if (!string.IsNullOrEmpty(cours))
+                                {
+                                    <span class="mini-course">📘 @cours</span>
+                                }
+                                @if (!string.IsNullOrEmpty(note.Content))
+                                {
+                                    <span class="mini-text">📝 @note.Content</span>
+                                }
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        @* Vue mois : cellules étroites, on garde jusqu'à 2 aperçus tronqués à 16 caractères.
+                           Si la note n'a pas de texte, on affiche le libellé de la visée liée. *@
+                        @foreach (var note in day.Notes.Take(2))
+                        {
+                            @* Texte de la note si présent, sinon contexte de cascade condensé sur une ligne *@
+                            var raw = !string.IsNullOrEmpty(note.Content)
+                                ? note.Content
+                                : (note.ViseeContexte ?? "").Replace("\n", " · ");
+                            var icon = !string.IsNullOrEmpty(note.Content) ? "📝" : "🎯";
+                            var preview = raw.Length > 16 ? raw[..16] + "…" : raw;
+                            @if (!string.IsNullOrEmpty(preview))
+                            {
+                                <div class="note-mini">@icon @preview</div>
+                            }
                         }
                     }
                 </div>
@@ -390,6 +430,41 @@
                 </span>
             </div>
 
+            @* Répétition — uniquement à la création : la note est enregistrée sur chaque jour
+               de la semaine coché, de la date de début à la date de fin incluses.
+               Sans aucun jour coché, la note n'est créée que pour la date affichée. *@
+            @if (editingNote == null)
+            {
+                <div class="modal-repeat">
+                    <div class="modal-repeat-dates">
+                        <label>Du</label>
+                        <input type="date" class="date-box" @bind="repeatStart" @bind:format="yyyy-MM-dd" />
+                        <label>au</label>
+                        <input type="date" class="date-box" @bind="repeatEnd" @bind:format="yyyy-MM-dd" />
+                    </div>
+
+                    @* Boutons bascule des jours de la semaine (lundi → vendredi) *@
+                    <div class="modal-repeat-days">
+                        @foreach (var (jour, libelle) in RepeatDayButtons)
+                        {
+                            @* Capture la variable de boucle pour la fermeture du gestionnaire de clic *@
+                            var j = jour;
+                            <button type="button"
+                                    class="dow-btn @(repeatDays.Contains(j) ? "active" : "")"
+                                    @onclick="() => ToggleRepeatDay(j)">@libelle</button>
+                        }
+                    </div>
+
+                    @* Récapitulatif du nombre de notes qui seront créées *@
+                    <div class="modal-repeat-count">
+                        @{ var nb = RepeatDates().Count; }
+                        @(repeatDays.Count == 0
+                            ? "Aucun jour coché : la note ne sera créée que pour la date affichée."
+                            : $"{nb} note(s) seront créées.")
+                    </div>
+                </div>
+            }
+
             @* Zone de texte de la note : 2000 caractères maximum, un placeholder guide l'utilisateur *@
             <textarea @bind="noteContent" placeholder="Saisissez votre note ici..." rows="4" maxlength="2000"></textarea>
 
@@ -397,8 +472,12 @@
             <div class="modal-char-count">@noteContent.Length / 2000</div>
 
             <div class="modal-buttons">
-                @* Bouton Enregistrer : désactivé quand l'heure de fin n'est pas après l'heure de début *@
-                <button class="btn-save" @onclick="SaveNote" disabled="@(noteEnd <= noteStart)">Enregistrer</button>
+                @* Bouton Enregistrer : désactivé quand l'heure de fin n'est pas après l'heure de début,
+                   qu'un enregistrement est déjà en cours ou qu'aucune date ne correspond aux jours cochés *@
+                <button class="btn-save" @onclick="SaveNote"
+                        disabled="@(noteEnd <= noteStart || noteSaving || RepeatDates().Count == 0)">
+                    @(noteSaving ? "Enregistrement…" : "Enregistrer")
+                </button>
 
                 @* Bouton Supprimer : affiché uniquement lors de la modification d'une note existante *@
                 @if (editingNote != null)
@@ -414,6 +493,12 @@
             @if (noteEnd <= noteStart)
             {
                 <p class="modal-error">L'heure de fin doit être postérieure à l'heure de début.</p>
+            }
+
+            @* Erreur de validation : des jours sont cochés mais aucune date de la plage ne correspond *@
+            @if (editingNote == null && repeatDays.Count > 0 && RepeatDates().Count == 0)
+            {
+                <p class="modal-error">Aucune date entre le début et la fin ne correspond aux jours cochés.</p>
             }
 
             @* Erreur API/enregistrement affichée quand le serveur rejette la note *@
@@ -539,6 +624,22 @@
         return Math.Max(n.Hour + 1, endH);
     }
 
+    // Extrait le nom du cours de la ligne "Cours : ..." du contexte de cascade figé sur la note
+    // (voir BuildViseeContexte). Chaîne vide quand la note n'est rattachée à aucune cascade.
+    private static string NoteCourseLabel(Note n)
+    {
+        if (string.IsNullOrEmpty(n.ViseeContexte)) return string.Empty;
+
+        foreach (var ligne in n.ViseeContexte.Split('\n'))
+        {
+            var t = ligne.Trim();
+            if (t.StartsWith("Cours :", StringComparison.Ordinal))
+                return t["Cours :".Length..].Trim();
+        }
+
+        return string.Empty;
+    }
+
     // Une plage d'heures de la grille rendue comme une seule cellule fusionnée.
     // Start est inclusif, End exclusif (une note 09:00→11:00 donne Start=9, End=11).
     private sealed class NoteBlock
@@ -583,6 +684,51 @@
 
     @* Heure de fin sélectionnée dans le champ "à" de la modale (heures + minutes) *@
     private TimeOnly noteEnd = new(9, 0);
+
+    @* ── Répétition d'une nouvelle note sur plusieurs jours ──
+       Bornes de la plage de répétition (incluses), réinitialisées sur la date affichée
+       à chaque ouverture de la modale. *@
+    private DateTime repeatStart = DateTime.Today;
+    private DateTime repeatEnd   = DateTime.Today;
+
+    @* Jours de la semaine cochés ; vide = la note n'est créée que pour la date affichée *@
+    private HashSet<DayOfWeek> repeatDays = new();
+
+    @* Vrai pendant l'envoi des notes à l'API (évite un double clic sur Enregistrer) *@
+    private bool noteSaving = false;
+
+    @* Boutons de jours proposés dans la modale (semaine scolaire) *@
+    private static readonly (DayOfWeek Jour, string Libelle)[] RepeatDayButtons =
+    {
+        (DayOfWeek.Monday,    "Lun"),
+        (DayOfWeek.Tuesday,   "Mar"),
+        (DayOfWeek.Wednesday, "Mer"),
+        (DayOfWeek.Thursday,  "Jeu"),
+        (DayOfWeek.Friday,    "Ven"),
+    };
+
+    // Coche / décoche un jour de la semaine dans la sélection de répétition.
+    private void ToggleRepeatDay(DayOfWeek jour)
+    {
+        if (!repeatDays.Remove(jour)) repeatDays.Add(jour);
+    }
+
+    // Liste des dates auxquelles la note sera enregistrée.
+    // Aucun jour coché : uniquement la date affichée (comportement d'origine).
+    // Sinon : toutes les dates de la plage [repeatStart, repeatEnd] tombant un jour coché.
+    // Le total est plafonné à 400 dates pour éviter un envoi massif sur une plage aberrante.
+    private List<DateTime> RepeatDates()
+    {
+        if (editingNote != null || repeatDays.Count == 0)
+            return new List<DateTime> { currentDate.Date };
+
+        var dates = new List<DateTime>();
+        for (var d = repeatStart.Date; d <= repeatEnd.Date && dates.Count < 400; d = d.AddDays(1))
+        {
+            if (repeatDays.Contains(d.DayOfWeek)) dates.Add(d);
+        }
+        return dates;
+    }
 
     @* ── Adaptateurs texte "HH"/"MM" pour les champs saisissables du sélecteur d'heure ──
        Le getter affiche la valeur courante sur 2 chiffres.
@@ -1161,8 +1307,14 @@
             ? new TimeOnly(editingNote.EndHour, editingNote.EndMinute)
             : new TimeOnly(Math.Min(hour + 1, 18), 0);
 
+        // Réinitialise la répétition sur la date affichée : par défaut, une seule note est créée
+        repeatStart = currentDate.Date;
+        repeatEnd   = currentDate.Date;
+        repeatDays.Clear();
+
         // Efface toute erreur d'enregistrement précédente à l'ouverture d'une nouvelle modale
         noteSaveError = null;
+        noteSaving    = false;
 
         showNoteModal = true;
     }
@@ -1174,18 +1326,65 @@
     private async Task SaveNote()
     {
         // Ne fait rien si le contexte de jour est absent ou si la plage horaire est invalide
-        if (currentDay == null || noteEnd <= noteStart) return;
+        if (currentDay == null || noteEnd <= noteStart || noteSaving) return;
 
         noteSaveError = null;
 
-        // Construit un DateTime UTC à minuit pour éviter la dérive horaire dans le corps JSON.
-        // L'utilisation de DateTimeKind.Utc garantit que le sérialiseur n'ajoute pas de décalage +HH:mm.
-        var noteDate = new DateTime(
-            currentDay.Date.Year, currentDay.Date.Month, currentDay.Date.Day,
-            0, 0, 0, DateTimeKind.Utc);
+        // Modification : la répétition ne s'applique qu'à la création, on ne touche
+        // qu'à la note ouverte et sa date d'origine est conservée.
+        if (editingNote != null)
+        {
+            ApplyFormTo(editingNote);
+            var (ok, err) = await Api.SaveNoteAsync(editingNote);
+            if (!ok) { noteSaveError = err; return; }
+        }
+        else
+        {
+            // Création : une note par date retenue (date affichée seule, ou toutes les
+            // dates de la plage tombant un jour de la semaine coché)
+            var dates = RepeatDates();
+            if (dates.Count == 0) { noteSaveError = "Aucune date ne correspond aux jours cochés."; return; }
 
-        // Réutilise l'objet note existant en modification ; en crée un nouveau en ajout
-        var note = editingNote ?? new Note { Date = noteDate };
+            noteSaving = true;
+            int creees = 0;
+
+            foreach (var jour in dates)
+            {
+                // Construit un DateTime UTC à minuit pour éviter la dérive horaire dans le corps JSON.
+                // L'utilisation de DateTimeKind.Utc garantit que le sérialiseur n'ajoute pas de décalage +HH:mm.
+                var note = new Note
+                {
+                    Date = new DateTime(jour.Year, jour.Month, jour.Day, 0, 0, 0, DateTimeKind.Utc)
+                };
+                ApplyFormTo(note);
+
+                // Soumet la note à l'API ; en cas d'échec on s'arrête en signalant ce qui a déjà été créé
+                var (ok, err) = await Api.SaveNoteAsync(note);
+                if (!ok)
+                {
+                    noteSaving    = false;
+                    noteSaveError = creees == 0 ? err : $"{creees} note(s) créée(s), puis erreur : {err}";
+                    await UpdateCalendarView();
+                    return;
+                }
+
+                creees++;
+            }
+
+            noteSaving = false;
+        }
+
+        // Ferme la modale et recharge la vue courante pour refléter les notes enregistrées
+        // (la répétition peut avoir touché d'autres jours que celui affiché)
+        showNoteModal    = false;
+        showCascadePanel = false;
+        cascadeSelection = null;
+        await UpdateCalendarView();
+    }
+
+    // Recopie les champs de la modale (horaire, texte, cascade) sur une note à enregistrer.
+    private void ApplyFormTo(Note note)
+    {
         note.Hour      = noteStart.Hour;
         note.Minute    = noteStart.Minute;
         note.EndHour   = noteEnd.Hour;
@@ -1199,15 +1398,6 @@
             note.IdViseeFk     = cascadeSelection.IdVisee;
             note.ViseeContexte = BuildViseeContexte(cascadeSelection);
         }
-
-        // Soumet la note à l'API et vérifie les erreurs
-        var (success, error) = await Api.SaveNoteAsync(note);
-        if (!success) { noteSaveError = error; return; }
-
-        // Ferme la modale et recharge les données du jour pour refléter la note enregistrée
-        showNoteModal = false;
-        currentDay = await CreateDayWithDataAsync(currentDate);
-        days = new List<Day> { currentDay };
     }
 
     // Supprime la note en cours de modification via l'API.
