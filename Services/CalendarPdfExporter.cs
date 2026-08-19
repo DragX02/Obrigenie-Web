@@ -29,6 +29,15 @@ namespace Obrigenie.Services
             var pdf = new PdfWriter(landscape: false);
             Titre(pdf, titre);
 
+            // Conge couvrant la journee, rappele sous le titre dans sa couleur
+            if (!string.IsNullOrEmpty(jour.HolidayName))
+            {
+                var conge = PdfWriter.Nettoyer(jour.HolidayName);
+                float largeur = PdfWriter.LargeurApprox(conge, 9f);
+                pdf.Text(Math.Max(Marge, (pdf.PageWidth - largeur) / 2), 38f, 9f, conge, true,
+                         HolidayColors.VersPdf(jour.HolidayName));
+            }
+
             float largeurLabel = 44f;
             float xGrille      = Marge;
             float xContenu     = Marge + largeurLabel;
@@ -114,7 +123,8 @@ namespace Obrigenie.Services
                     var conge = PdfWriter.Nettoyer(jour.ShortHolidayName);
                     float largeurEntete = PdfWriter.LargeurApprox(entete, 9f) + 10;
                     pdf.Text(x + largeurEntete, HautGrille + 6, 7.5f,
-                             PdfWriter.Tronquer(conge, 7.5f, lCol - largeurEntete - 6), false, OrangeNote);
+                             PdfWriter.Tronquer(conge, 7.5f, lCol - largeurEntete - 6), false,
+                             HolidayColors.VersPdf(jour.ShortHolidayName));
                 }
 
                 float yGrille = HautGrille + hEntete;
@@ -194,7 +204,7 @@ namespace Obrigenie.Services
                 {
                     pdf.Text(x + 5, yTexte, 7.5f,
                              PdfWriter.Tronquer(PdfWriter.Nettoyer(jour.ShortHolidayName), 7.5f, lCell - 10),
-                             false, OrangeNote);
+                             false, HolidayColors.VersPdf(jour.ShortHolidayName));
                     yTexte += 10;
                 }
 
@@ -232,6 +242,8 @@ namespace Obrigenie.Services
         {
             public bool DansPeriode;
             public bool Vacances;
+            // Nom du conge couvrant le jour : sert a en deduire la couleur d'affichage
+            public string Conge = string.Empty;
             public int  NbNotes;
             public string PremierCours = string.Empty;
         }
@@ -279,7 +291,7 @@ namespace Obrigenie.Services
                     pdf.Rect(x, HautGrille + hEntete, lCol, hTotale, 0.6f, GrisTrait);
                     pdf.Text(x + 3, HautGrille + hEntete + hTotale / 2 - 4, 7f,
                              PdfWriter.Tronquer(PdfWriter.Nettoyer(semaine.VacancesLibelle), 7f, lCol - 6),
-                             false, OrangeNote);
+                             false, HolidayColors.VersPdf(semaine.VacancesLibelle));
                     continue;
                 }
 
@@ -296,7 +308,7 @@ namespace Obrigenie.Services
 
                     if (jour.Vacances)
                     {
-                        pdf.Text(x + 3, yTexte, 7f, "Conge", false, OrangeNote);
+                        pdf.Text(x + 3, yTexte, 7f, "Conge", false, HolidayColors.VersPdf(jour.Conge));
                         yTexte += 9;
                     }
 

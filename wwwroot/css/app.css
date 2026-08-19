@@ -527,6 +527,19 @@ h1:focus { outline: none; }
 .print-btn:hover { background: var(--row-hover); }
 .print-hint { font-size: 0.75rem; color: var(--text-muted); }
 
+/* Bandeau du conge couvrant la journee, dans la vue jour.
+   Les couleurs (fond, bordure, texte) sont posees en style inline par la page :
+   chaque conge a la sienne, deduite de son nom. */
+.day-holiday-banner {
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 5px 12px;
+    margin-bottom: 0.5rem;
+    border: 1px solid;
+    border-radius: 8px;
+}
+
 /* En-tete du jour : compact, pour ne pas eloigner la grille du titre */
 .single-day-header { text-align: center; margin-bottom: 0.35rem; line-height: 1.15; }
 .day-name { display: block; text-transform: capitalize; color: var(--text-muted); font-size: 0.9rem; }

@@ -92,17 +92,7 @@ namespace Obrigenie.Services
         // "Rentree scolaire" que "Rentrée scolaire", et un test sur la seule forme sans
         // accent laisserait passer la variante accentuée.
         public static bool EstRentree(string? nom)
-        {
-            if (string.IsNullOrEmpty(nom)) return false;
-
-            // Décomposition Unicode : "é" devient "e" + accent, l'accent est ensuite écarté
-            var sansAccent = new string(nom.Normalize(System.Text.NormalizationForm.FormD)
-                .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c)
-                            != System.Globalization.UnicodeCategory.NonSpacingMark)
-                .ToArray());
-
-            return sansAccent.Contains("Rentree", StringComparison.OrdinalIgnoreCase);
-        }
+            => TexteUtil.SansAccents(nom).Contains("Rentree", StringComparison.OrdinalIgnoreCase);
 
         // Applique les corrections personnelles de l'utilisateur au calendrier officiel.
         //

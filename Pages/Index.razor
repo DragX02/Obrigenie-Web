@@ -113,6 +113,17 @@
             <span class="day-number">@currentDay.DayOfMonth</span>
         </div>
 
+        @* Bandeau du congé couvrant la journée, dans la couleur propre à ce congé.
+           La vue jour n'indiquait rien : rien ne distinguait un jour de vacances
+           d'un jour de classe sans note. *@
+        @if (!string.IsNullOrEmpty(currentDay.HolidayName))
+        {
+            <div class="day-holiday-banner"
+                 style="background-color: @HolidayColors.Fond(currentDay.HolidayName, "33"); border-color: @HolidayColors.Pour(currentDay.HolidayName); color: @HolidayColors.Pour(currentDay.HolidayName);">
+                @currentDay.HolidayName
+            </div>
+        }
+
         @* Grille horaire de 08:00 à 18:00.
            Mise en page en CSS grid : colonne 1 = étiquettes d'heure, colonne 2 = contenu.
            Une note qui s'étend sur plusieurs heures fusionne les cellules de contenu
@@ -237,8 +248,12 @@
                             @if (week.IsFullHoliday)
                             {
                                 @* Quand toute la semaine est en vacances, fusionner les 5 cellules de jours
-                                   en un seul bloc de vacances qui s'étend sur toute la colonne *@
-                                <div class="trim-cell-holiday-span">@week.HolidayShortName</div>
+                                   en un seul bloc de vacances qui s'étend sur toute la colonne,
+                                   dans la couleur propre au congé *@
+                                <div class="trim-cell-holiday-span"
+                                     style="background-color: @HolidayColors.Fond(week.HolidayShortName, "33"); color: @HolidayColors.Pour(week.HolidayShortName);">
+                                    @week.HolidayShortName
+                                </div>
                             }
                             else
                             {
@@ -246,16 +261,23 @@
                                 @foreach (var day in week.Days)
                                 {
                                     @* Applique les classes CSS pour les jours de vacances, aujourd'hui et les jours hors période *@
+                                    @* Jour de congé : teinté de la couleur du congé concerné *@
+                                    var styleJour = day.IsInPeriod && day.IsHoliday
+                                        ? $"background-color: {HolidayColors.Fond(day.HolidayShortName)};"
+                                        : null;
+
                                     <div class="trim-cell @(day.IsInPeriod && day.IsHoliday ? "trim-cell-hol" : "") @(day.IsToday ? "trim-cell-today" : "") @(!day.IsInPeriod ? "trim-cell-out" : "")"
+                                         style="@styleJour"
                                          @onclick="() => SelectDay(day.Date)">
 
                                         @* Affiche le contenu uniquement pour les jours situés dans la période en cours *@
                                         @if (day.IsInPeriod)
                                         {
-                                            @* Affiche un badge "C" pour les jours de congé dans la période *@
+                                            @* Badge de congé, dans la couleur du congé, avec son nom en infobulle *@
                                             @if (day.IsHoliday)
                                             {
-                                                <span class="trim-conge">C</span>
+                                                <span class="trim-conge" title="@day.HolidayShortName"
+                                                      style="color: @HolidayColors.Pour(day.HolidayShortName);">C</span>
                                             }
 
                                             @* Affiche une mini-puce de cours pour chaque cours planifié ce jour *@
@@ -302,8 +324,18 @@
         <div class="days-grid" style="grid-template-columns: repeat(@gridSpan, 1fr);">
             @foreach (var day in days)
             {
+                @* Couleur propre au congé (déduite de son nom) : la même dans toutes les vues,
+                   pour repérer d'un coup d'œil Toussaint, Noël, Carnaval, etc. *@
+                var couleurConge = string.IsNullOrEmpty(day.HolidayName) ? null : HolidayColors.Pour(day.HolidayName);
+
+                @* Fond teinté et liseré de la couleur du congé ; sans congé, la cellule garde son style *@
+                var styleConge = couleurConge == null
+                    ? null
+                    : $"background-color: {HolidayColors.Fond(day.HolidayName)}; border-left: 4px solid {couleurConge};";
+
                 @* Applique les classes CSS : vacances, rentrée scolaire et mise en évidence d'aujourd'hui *@
                 <div class="day-cell @(day.IsHoliday ? "holiday" : "") @(day.IsSchoolStart ? "school-start" : "") @(day.Date == DateTime.Today ? "today" : "")"
+                     style="@styleConge"
                      @onclick="() => SelectDay(day.Date)">
 
                     @* Numéro du jour dans le coin supérieur gauche de la cellule *@
@@ -312,7 +344,7 @@
                     @* Étiquette courte du nom de vacances quand le jour est férié *@
                     @if (!string.IsNullOrEmpty(day.ShortHolidayName))
                     {
-                        <span class="holiday-name">@day.ShortHolidayName</span>
+                        <span class="holiday-name" style="color: @couleurConge;">@day.ShortHolidayName</span>
                     }
 
                     @* Affiche jusqu'à 3 mini-puces de cours pour éviter le débordement de la cellule.
@@ -1501,6 +1533,7 @@
             {
                 DansPeriode  = jour.IsInPeriod,
                 Vacances     = jour.IsHoliday,
+                Conge        = jour.HolidayShortName,
                 NbNotes      = jour.Notes.Count,
                 PremierCours = jour.Courses.FirstOrDefault()?.Name ?? string.Empty,
             }).ToList(),
