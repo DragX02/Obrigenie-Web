@@ -109,8 +109,6 @@ namespace Obrigenie.Services
         public static SchoolYearCalendar AppliquerCorrections(SchoolYearCalendar calendrier,
                                                              IReadOnlyList<UserConge> corrections)
         {
-            if (corrections.Count == 0) return calendrier;
-
             // Corrections rattachées à un congé officiel, indexées par son identifiant
             var parCalendrier = corrections
                 .Where(c => c.IdCalendrierFk is > 0)
@@ -118,10 +116,6 @@ namespace Obrigenie.Services
                 .ToDictionary(g => g.Key, g => g.First());
 
             var resultat = new List<Holiday>();
-
-            // Années scolaires dont la Rentrée a été déplacée par l'utilisateur : les marqueurs
-            // synthétiques ajoutés à la date par défaut y deviennent des doublons.
-            var rentreesCorrigees = new Dictionary<int, DateTime>();
 
             // Début d'année scolaire, déplacé si la Rentrée correspondante est corrigée
             var debutAnnee = calendrier.SchoolYearStart;
@@ -157,19 +151,14 @@ namespace Obrigenie.Services
 
                 if (!estRentree) continue;
 
-                rentreesCorrigees[AnneeScolaire(correction.DateDebut.Date)] = correction.DateDebut.Date;
-
                 // Le début d'année scolaire suit la Rentrée que l'utilisateur vient de rectifier
                 if (conge.StartDate.Date == debutAnnee.Date) debutAnnee = correction.DateDebut.Date;
             }
 
-            // Retire les marqueurs de Rentrée synthétiques (Id = 0, posés à la date par défaut
-            // quand l'API n'en fournit pas) devenus des doublons de la Rentrée corrigée.
-            if (rentreesCorrigees.Count > 0)
-            {
-                resultat.RemoveAll(h => h.Id <= 0 && EstRentree(h.Name)
-                                     && rentreesCorrigees.ContainsKey(AnneeScolaire(h.StartDate)));
-            }
+            // Écarte les doublons : le calendrier officiel décrit souvent le même congé
+            // deux fois sous des libellés différents, et un marqueur de Rentrée de secours
+            // peut s'ajouter par-dessus.
+            var idsCorriges = new HashSet<int>(parCalendrier.Keys);
 
             // Congés ajoutés par l'utilisateur (sans congé officiel de référence)
             foreach (var ajout in corrections.Where(c => c.IdCalendrierFk is null or 0 && !c.Masque))
@@ -185,14 +174,77 @@ namespace Obrigenie.Services
             return new SchoolYearCalendar
             {
                 SchoolYearStart = debutAnnee,
-                Holidays        = resultat.OrderBy(h => h.StartDate).ToList(),
+                Holidays        = Dedupliquer(resultat, idsCorriges),
             };
+        }
+
+        // Ne conserve qu'une entrée par congé réel, triée par date de début.
+        //
+        // Deux cas de doublons se présentent :
+        //   • le calendrier officiel décrit le même congé sous deux libellés
+        //     ("Vacances d'automne (Toussaint)" et "Conge d'automne (Toussaint)") ;
+        //   • une Rentrée officielle coexiste avec le marqueur de secours ajouté
+        //     automatiquement, ou avec une seconde entrée de Rentrée.
+        // Corriger la date de l'une laissait l'autre en place, et le calendrier
+        // affichait le congé à deux endroits.
+        //
+        // En cas de doublon, la version corrigée par l'utilisateur l'emporte, sinon
+        // une entrée officielle passe avant un marqueur synthétique.
+        private static List<Holiday> Dedupliquer(List<Holiday> conges, HashSet<int> idsCorriges)
+        {
+            var resultat = new List<Holiday>();
+
+            foreach (var conge in conges.OrderBy(h => h.StartDate))
+            {
+                var doublon = resultat.FirstOrDefault(garde => MemeConge(garde, conge));
+
+                if (doublon == null)
+                {
+                    resultat.Add(conge);
+                    continue;
+                }
+
+                if (Priorite(conge, idsCorriges) > Priorite(doublon, idsCorriges))
+                    resultat[resultat.IndexOf(doublon)] = conge;
+            }
+
+            return resultat.OrderBy(h => h.StartDate).ToList();
+        }
+
+        // 2 = corrigé par l'utilisateur, 1 = entrée officielle, 0 = marqueur synthétique
+        private static int Priorite(Holiday conge, HashSet<int> idsCorriges)
+            => idsCorriges.Contains(conge.Id) ? 2 : conge.Id > 0 ? 1 : 0;
+
+        // Deux entrées décrivent-elles le même congé ?
+        private static bool MemeConge(Holiday a, Holiday b)
+        {
+            // Un congé d'août appartient à l'année scolaire qui commence : deux congés
+            // d'années scolaires différentes ne sont jamais le même.
+            if (AnneeScolaire(a.StartDate) != AnneeScolaire(b.StartDate)) return false;
+
+            // Une année scolaire n'a qu'une rentrée, même si les dates diffèrent :
+            // c'est précisément ce décalage que l'utilisateur vient corriger.
+            if (EstRentree(a.Name) && EstRentree(b.Name)) return true;
+
+            // Pour les autres congés, il faut le même libellé de fond ET des périodes qui
+            // se chevauchent : "Lundi de Paques" et "Vacances de printemps (Paques)"
+            // partagent le mot-clé mais sont bien deux congés distincts.
+            if (HolidayColors.Cle(a.Name) != HolidayColors.Cle(b.Name)) return false;
+
+            return a.StartDate.Date <= b.EndDate.Date && b.StartDate.Date <= a.EndDate.Date;
         }
 
         // Année scolaire à laquelle appartient une date, selon la convention du projet
         // (également appliquée par la colonne calculée anneeScolaire en base) :
         // à partir d'août la date relève de l'année qui commence, avant elle de la précédente.
-        private static int AnneeScolaire(DateTime date) => date.Month >= 8 ? date.Year : date.Year - 1;
+        public static int AnneeScolaire(DateTime date) => date.Month >= 8 ? date.Year : date.Year - 1;
+
+        // Libellé "2026-2027" de l'année scolaire contenant la date donnée.
+        public static string LibelleAnneeScolaire(DateTime date)
+        {
+            int debut = AnneeScolaire(date);
+            return $"{debut}-{debut + 1}";
+        }
 
         // Convertit une liste de DTO bruts du calendrier API en modèle SchoolYearCalendar de l'application.
         // Lors de la conversion :

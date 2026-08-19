@@ -35,7 +35,12 @@ public class UserCongeTests
 
         var resultat = CalendarService.AppliquerCorrections(calendrier, new List<UserConge>());
 
-        Assert.Same(calendrier, resultat);
+        // Le contenu est inchangé, mais la liste est reconstruite : la déduplication
+        // des doublons du calendrier officiel s'applique même sans aucune correction.
+        var conge = Assert.Single(resultat.Holidays);
+        Assert.Equal("Toussaint", conge.Name);
+        Assert.Equal(new DateTime(2026, 10, 26), conge.StartDate);
+        Assert.Equal(calendrier.SchoolYearStart, resultat.SchoolYearStart);
     }
 
     [Fact]
@@ -222,6 +227,111 @@ public class UserCongeTests
 
         Assert.Equal(2, resultat.Holidays.Count);
         Assert.Contains(resultat.Holidays, h => h.Id == 0 && h.StartDate == new DateTime(2026, 8, 26));
+    }
+
+    // ── Doublons du calendrier officiel ─────────────────────────────────────
+
+    [Fact]
+    public void DeuxRentreesLaMemeAnnee_UneSeuleEstAffichee()
+    {
+        // Constaté en production : le calendrier officiel contient deux entrées de
+        // rentrée pour la même année scolaire, et le mois d'août en affichait deux.
+        var calendrier = Officiel(
+            Conge(1, "Rentrée scolaire", new DateTime(2026, 8, 24), new DateTime(2026, 8, 24)),
+            Conge(2, "Rentree scolaire", new DateTime(2026, 8, 28), new DateTime(2026, 8, 28)));
+
+        Assert.Single(CalendarService.AppliquerCorrections(calendrier, new List<UserConge>()).Holidays);
+    }
+
+    [Fact]
+    public void DeuxRentreesLaMemeAnnee_LaVersionCorrigeeEstRetenue()
+    {
+        // Corriger l'une des deux entrées laissait l'autre en place : c'est la
+        // correction de l'utilisateur qui doit s'imposer.
+        var calendrier = Officiel(
+            Conge(1, "Rentrée scolaire", new DateTime(2026, 8, 24), new DateTime(2026, 8, 24)),
+            Conge(2, "Rentree scolaire", new DateTime(2026, 8, 28), new DateTime(2026, 8, 28)));
+
+        var corrections = new List<UserConge>
+        {
+            new() { Id = 5, IdCalendrierFk = 2, Nom = "Rentrée scolaire",
+                    DateDebut = new DateTime(2026, 8, 31), DateFin = new DateTime(2026, 8, 31) },
+        };
+
+        var conge = Assert.Single(CalendarService.AppliquerCorrections(calendrier, corrections).Holidays);
+
+        Assert.Equal(new DateTime(2026, 8, 31), conge.StartDate);
+    }
+
+    [Fact]
+    public void RentreesDAnneesScolairesDifferentes_SontToutesConservees()
+    {
+        var calendrier = Officiel(
+            Conge(1, "Rentrée scolaire", new DateTime(2025, 8, 25), new DateTime(2025, 8, 25)),
+            Conge(2, "Rentrée scolaire", new DateTime(2026, 8, 24), new DateTime(2026, 8, 24)));
+
+        Assert.Equal(2, CalendarService.AppliquerCorrections(calendrier, new List<UserConge>()).Holidays.Count);
+    }
+
+    [Fact]
+    public void MemeCongeSousDeuxLibelles_EstAfficheUneSeuleFois()
+    {
+        // Le calendrier officiel décrit chaque congé deux fois, avec des libellés
+        // différents mais les mêmes dates.
+        var calendrier = Officiel(
+            Conge(1, "Vacances d'automne (Toussaint)", new DateTime(2026, 10, 19), new DateTime(2026, 11, 1)),
+            Conge(2, "Congé d'automne (Toussaint)", new DateTime(2026, 10, 19), new DateTime(2026, 11, 1)));
+
+        Assert.Single(CalendarService.AppliquerCorrections(calendrier, new List<UserConge>()).Holidays);
+    }
+
+    [Fact]
+    public void MemeCongeSousDeuxLibelles_LaCorrectionSAppliqueAuxDeux()
+    {
+        // L'utilisateur ne corrige qu'une des deux lignes : sa correction doit
+        // remplacer le doublon, sinon l'ancienne période resterait affichée.
+        var calendrier = Officiel(
+            Conge(1, "Vacances d'automne (Toussaint)", new DateTime(2026, 10, 19), new DateTime(2026, 11, 1)),
+            Conge(2, "Congé d'automne (Toussaint)", new DateTime(2026, 10, 19), new DateTime(2026, 11, 1)));
+
+        var corrections = new List<UserConge>
+        {
+            new() { Id = 5, IdCalendrierFk = 1, Nom = "Toussaint",
+                    DateDebut = new DateTime(2026, 10, 26), DateFin = new DateTime(2026, 11, 8) },
+        };
+
+        var conge = Assert.Single(CalendarService.AppliquerCorrections(calendrier, corrections).Holidays);
+
+        Assert.Equal(new DateTime(2026, 10, 26), conge.StartDate);
+        Assert.Equal(new DateTime(2026, 11, 8), conge.EndDate);
+    }
+
+    [Fact]
+    public void CongesHomonymesSansChevauchement_SontConserves()
+    {
+        // "Lundi de Pâques" et "Vacances de printemps (Pâques)" partagent le mot-clé
+        // mais sont deux congés distincts : seules des périodes qui se chevauchent
+        // désignent un doublon.
+        var calendrier = Officiel(
+            Conge(1, "Lundi de Pâques", new DateTime(2027, 4, 6), new DateTime(2027, 4, 6)),
+            Conge(2, "Vacances de printemps (Pâques)", new DateTime(2027, 4, 27), new DateTime(2027, 5, 10)));
+
+        Assert.Equal(2, CalendarService.AppliquerCorrections(calendrier, new List<UserConge>()).Holidays.Count);
+    }
+
+    [Fact]
+    public void MarqueurSynthetique_SEffaceDevantLaRentreeOfficielle()
+    {
+        // Le marqueur de secours (Id = 0) ne doit jamais masquer l'entrée réelle.
+        var calendrier = Officiel(
+            new Holiday { Id = 0, Name = "Rentree scolaire",
+                          StartDate = new DateTime(2026, 8, 26), EndDate = new DateTime(2026, 8, 26) },
+            Conge(1, "Rentrée scolaire", new DateTime(2026, 8, 24), new DateTime(2026, 8, 24)));
+
+        var conge = Assert.Single(CalendarService.AppliquerCorrections(calendrier, new List<UserConge>()).Holidays);
+
+        Assert.Equal(1, conge.Id);
+        Assert.Equal(new DateTime(2026, 8, 24), conge.StartDate);
     }
 
     // ── Ajout ───────────────────────────────────────────────────────────────

@@ -41,6 +41,27 @@ namespace Obrigenie.Services
             "#0277BD", "#6A1B9A", "#AD1457", "#EF6C00", "#2E7D32", "#00838F", "#5D4037",
         };
 
+        // Clé identifiant le congé derrière ses variantes de libellé.
+        //
+        // Le calendrier officiel contient plusieurs écritures du même congé
+        // ("Vacances d'automne (Toussaint)" et "Conge d'automne (Toussaint)",
+        // "Jour de l'Armistice" et "Commemoration de l'Armistice"). Elles partagent
+        // le même mot-clé, ce qui permet de les reconnaître comme un seul congé.
+        // Un nom sans mot-clé connu est sa propre clé.
+        public static string Cle(string? nom)
+        {
+            if (string.IsNullOrWhiteSpace(nom)) return string.Empty;
+
+            var normalise = TexteUtil.SansAccents(nom).ToLowerInvariant();
+
+            foreach (var (motCle, _) in ParMotCle)
+            {
+                if (normalise.Contains(motCle, StringComparison.Ordinal)) return motCle;
+            }
+
+            return normalise;
+        }
+
         // Couleur hexadécimale (#RRGGBB) associée à un nom de congé.
         public static string Pour(string? nom)
         {
