@@ -22,8 +22,9 @@
 
         <h2 class="conges-title">Mes congés</h2>
         <p class="conges-intro">
-            Les dates ci-dessous viennent du calendrier scolaire officiel. Corrige-les si elles
-            ne correspondent pas à ton école : tes modifications ne s'appliquent qu'à ton calendrier.
+            Les dates ci-dessous viennent du calendrier scolaire officiel, pour l'année scolaire
+            en cours et la suivante. Corrige-les si elles ne correspondent pas à ton école :
+            tes modifications ne s'appliquent qu'à ton calendrier.
         </p>
 
         @if (chargement)
@@ -46,11 +47,23 @@
                 <div class="conges-vide">Aucun congé officiel n'a pu être chargé.</div>
             }
 
+            @* Année scolaire du groupe précédent, pour n'écrire l'intitulé qu'au changement *@
+            int anneeAffichee = 0;
+
             @foreach (var conge in congesOfficiels)
             {
                 @* Capture pour les fermetures des gestionnaires de clic *@
                 var id = conge.Id;
                 var ligne = Ligne(id);
+
+                @* Sépare visuellement les deux années scolaires proposées : une même
+                   rentrée existe pour chacune, l'intitulé évite de corriger la mauvaise. *@
+                var annee = CalendarService.AnneeScolaire(conge.StartDate);
+                if (annee != anneeAffichee)
+                {
+                    anneeAffichee = annee;
+                    <div class="conges-annee">Année scolaire @annee-@(annee + 1)</div>
+                }
 
                 <div class="conge-row @(ligne.Masque ? "conge-row-masquee" : "")">
                     <input class="conge-nom" @bind="ligne.Nom" />
@@ -176,8 +189,15 @@
         // est justement l'une des plus souvent fausses. Les marqueurs synthétiques
         // (Id = 0, ajoutés en secours quand l'API n'en fournit pas) n'ont pas de ligne
         // en base à corriger et sont donc écartés.
+        //
+        // Seules l'année scolaire en cours et la suivante sont proposées : corriger une
+        // année déjà écoulée n'a pas d'intérêt et allongeait la liste pour rien.
+        int anneeCourante = CalendarService.AnneeScolaire(DateTime.Today);
+
         congesOfficiels = calendrier.Holidays
             .Where(h => h.Id > 0)
+            .Where(h => CalendarService.AnneeScolaire(h.StartDate) >= anneeCourante
+                     && CalendarService.AnneeScolaire(h.StartDate) <= anneeCourante + 1)
             .OrderBy(h => h.StartDate)
             .ToList();
 

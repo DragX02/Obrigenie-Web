@@ -1360,3 +1360,10 @@ h1:focus { outline: none; }
 .btn-conge-reset { color: #dc3545; }
 
 .conge-etat { font-size: 0.72rem; color: var(--text-muted); }
+
+/* Intitule d'annee scolaire separant les groupes de conges */
+.conges-annee {
+    margin: 0.9rem 0 0.4rem;
+    font-size: 0.78rem; font-weight: 600; letter-spacing: 0.3px;
+    color: var(--text-muted); text-transform: uppercase;
+}
