@@ -63,10 +63,100 @@ namespace Obrigenie.Services
             return pdf.Build();
         }
 
-        // ── Vues semaine / semaine+ / mois : paysage ─────────────────────────
+        // ── Vues semaine / semaine+ : grille horaire en paysage ──────────────
 
-        // Grille de jours en colonnes. `colonnes` vaut 5 (semaine), 7 (semaine+)
-        // ou 7 avec plusieurs lignes (mois).
+        // Emploi du temps de la semaine : colonne d'heures à gauche, un jour par
+        // colonne, et chaque note placée dans son créneau en couvrant toute sa durée.
+        public static byte[] Semaine(string titre, IReadOnlyList<Day> jours, int heureDebut, int heureFin)
+        {
+            var pdf = new PdfWriter(landscape: true);
+            Titre(pdf, titre);
+
+            if (jours.Count == 0) return pdf.Build();
+
+            float largeurLabel = 38f;
+            float hEntete      = 20f;
+
+            float xJours  = Marge + largeurLabel;
+            float hauteur = pdf.PageHeight - HautGrille - Marge;
+            float lCol    = (pdf.PageWidth - Marge - xJours) / jours.Count;
+
+            int nbLignes = Math.Max(1, heureFin - heureDebut);
+            float hLigne = (hauteur - hEntete) / nbLignes;
+
+            // Cadre extérieur et séparation de la colonne des heures
+            pdf.Rect(Marge, HautGrille, pdf.PageWidth - 2 * Marge, hauteur, 0.8f, GrisTrait);
+            pdf.Line(xJours, HautGrille, xJours, HautGrille + hauteur, 0.8f, GrisTrait);
+            pdf.Line(Marge, HautGrille + hEntete, pdf.PageWidth - Marge, HautGrille + hEntete, 0.8f, GrisTrait);
+
+            // Étiquettes d'heure et lignes horizontales, sur toute la largeur
+            for (int h = heureDebut; h < heureFin; h++)
+            {
+                float y = HautGrille + hEntete + (h - heureDebut) * hLigne;
+                if (h > heureDebut) pdf.Line(Marge, y, pdf.PageWidth - Marge, y, 0.4f, GrisTrait);
+                pdf.Text(Marge + 4, y + 4, 8f, $"{h:D2}:00", false, GrisTexte);
+            }
+
+            for (int i = 0; i < jours.Count; i++)
+            {
+                var jour = jours[i];
+                float x = xJours + i * lCol;
+
+                // Séparateur vertical entre les jours
+                if (i > 0) pdf.Line(x, HautGrille, x, HautGrille + hauteur, 0.5f, GrisTrait);
+
+                // En-tête de colonne : nom du jour et numéro, plus le congé éventuel
+                var entete = $"{Abreger(jour.DayOfWeek)} {jour.DayOfMonth}";
+                pdf.Text(x + 4, HautGrille + 5, 9f, PdfWriter.Nettoyer(entete), true);
+
+                if (!string.IsNullOrEmpty(jour.ShortHolidayName))
+                {
+                    var conge = PdfWriter.Nettoyer(jour.ShortHolidayName);
+                    float largeurEntete = PdfWriter.LargeurApprox(entete, 9f) + 10;
+                    pdf.Text(x + largeurEntete, HautGrille + 6, 7.5f,
+                             PdfWriter.Tronquer(conge, 7.5f, lCol - largeurEntete - 6), false, OrangeNote);
+                }
+
+                float yGrille = HautGrille + hEntete;
+
+                // Cours du jour : bande claire couvrant leurs heures, dessinée avant
+                // les notes pour que celles-ci restent lisibles par-dessus
+                foreach (var cours in jour.Courses)
+                {
+                    int debut = Math.Max(cours.StartTime.Hours, heureDebut);
+                    int fin   = Math.Min(cours.EndTime.Minutes > 0 ? cours.EndTime.Hours + 1 : cours.EndTime.Hours, heureFin);
+                    if (fin <= debut) continue;
+
+                    float yc = yGrille + (debut - heureDebut) * hLigne;
+                    float hc = (fin - debut) * hLigne;
+
+                    pdf.FillRect(x + 1, yc + 1, lCol - 2, hc - 2, "0.93 0.93 0.93");
+                    pdf.Text(x + 4, yc + 3, 7f,
+                             PdfWriter.Tronquer(PdfWriter.Nettoyer($"{cours.StartTime:hh\\:mm}-{cours.EndTime:hh\\:mm} {cours.Name}"),
+                                                7f, lCol - 8),
+                             true, VertCours);
+                }
+
+                // Notes fusionnées sur toute leur durée, fond blanc pour couvrir
+                // proprement une éventuelle bande de cours
+                foreach (var bloc in NoteLayout.Blocs(jour.Notes, heureDebut, heureFin))
+                {
+                    float y = yGrille + (bloc.Start - heureDebut) * hLigne;
+                    float h = (bloc.End - bloc.Start) * hLigne;
+
+                    pdf.FillRect(x + 2, y + 2, lCol - 4, h - 4, "1 1 1");
+                    pdf.Rect(x + 2, y + 2, lCol - 4, h - 4, 0.7f, "0.85 0.55 0.1");
+                    DessinerNotes(pdf, bloc.Notes, x + 5, y + 5, lCol - 10, h - 10, 7f, complet: true);
+                }
+            }
+
+            return pdf.Build();
+        }
+
+        // ── Vue mois : paysage ───────────────────────────────────────────────
+
+        // Grille de jours en cellules : une case par jour, sur `colonnes` colonnes.
+        // Utilisée pour la vue mois, où une grille horaire n'aurait pas de sens.
         public static byte[] Grille(string titre, IReadOnlyList<Day> jours, int colonnes)
         {
             var pdf = new PdfWriter(landscape: true);

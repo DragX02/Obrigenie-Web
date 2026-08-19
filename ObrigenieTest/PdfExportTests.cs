@@ -146,6 +146,21 @@ public class PdfExportTests
     }
 
     [Fact]
+    public void Semaine_DrawsTheHourColumnAndTheNoteRanges()
+    {
+        var jours = new List<Day> { DayWith(Note(9, 0, 11, 0)), DayWith(), DayWith(), DayWith(), DayWith() };
+        var octets = CalendarPdfExporter.Semaine("Semaine 17/08 - 21/08", jours, 8, 18);
+
+        AssertPdfValide(octets);
+
+        // La colonne des heures doit couvrir toute la grille, et chaque note garder sa plage
+        var texte = Encoding.Latin1.GetString(octets);
+        Assert.Contains("(08:00) Tj", texte);
+        Assert.Contains("(17:00) Tj", texte);
+        Assert.Contains("(09:00 -> 11:00) Tj", texte);
+    }
+
+    [Fact]
     public void Periode_ProducesAStructurallyValidPdf()
     {
         var semaines = new List<CalendarPdfExporter.PeriodeSemaine>

@@ -1446,22 +1446,33 @@
             CalendarViewMode.SchoolPeriod =>
                 CalendarPdfExporter.Periode(weekTitle, ProjeterPeriodePdf(), NomsJoursSemaine()),
 
-            _ => CalendarPdfExporter.Grille(weekTitle, days, gridSpan),
+            CalendarViewMode.Month =>
+                CalendarPdfExporter.Grille(weekTitle, days, gridSpan),
+
+            // Semaine et semaine+ : emploi du temps avec la colonne des heures
+            _ => CalendarPdfExporter.Semaine(weekTitle, days, GridStartHour, GridEndHour),
         };
 
         await JS.InvokeVoidAsync("telechargerFichier", NomFichierPdf(), octets, "application/pdf");
     }
 
-    // Nom du fichier PDF proposé au navigateur, dérivé de la vue affichée.
-    private string NomFichierPdf() => viewMode switch
+    // Nom du fichier PDF proposé au navigateur : la vue affichée suivie de sa date,
+    // au format ISO pour que les fichiers se classent chronologiquement dans le dossier.
+    private string NomFichierPdf()
     {
-        CalendarViewMode.SingleDay      => "journal_jour.pdf",
-        CalendarViewMode.Week           => "journal_semaine.pdf",
-        CalendarViewMode.WeekAndWeekend => "journal_semaine_weekend.pdf",
-        CalendarViewMode.Month          => "journal_mois.pdf",
-        CalendarViewMode.SchoolPeriod   => "journal_trimestre.pdf",
-        _                               => "journal.pdf",
-    };
+        // Date de référence : le premier jour affiché en vue grille, la date courante sinon
+        var debut = days.FirstOrDefault()?.Date ?? currentDate;
+
+        return viewMode switch
+        {
+            CalendarViewMode.SingleDay      => $"journal_jour_{currentDate:yyyy-MM-dd}.pdf",
+            CalendarViewMode.Week           => $"journal_semaine_{debut:yyyy-MM-dd}.pdf",
+            CalendarViewMode.WeekAndWeekend => $"journal_semaine_weekend_{debut:yyyy-MM-dd}.pdf",
+            CalendarViewMode.Month          => $"journal_mois_{currentDate:yyyy-MM}.pdf",
+            CalendarViewMode.SchoolPeriod   => $"journal_trimestre_{schoolPeriodStart:yyyy-MM-dd}_{schoolPeriodEnd:yyyy-MM-dd}.pdf",
+            _                               => $"journal_{currentDate:yyyy-MM-dd}.pdf",
+        };
+    }
 
     // Noms de jours affichés en tête de ligne du tableau trimestre.
     private List<string> NomsJoursSemaine() => new()
