@@ -7,7 +7,7 @@
     <title>Obrigenie</title>
     <base href="/" />
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
-    <link rel="stylesheet" href="css/app.css?v=9" />
+    <link rel="stylesheet" href="css/app.css?v=10" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="Obrigenie.styles.css" rel="stylesheet" />
 </head>
@@ -40,6 +40,24 @@
         // À appeler lorsqu'un nouveau PDF est chargé ou que la page est déchargée.
         window.libererUrlBlob = function (url) {
             if (url) URL.revokeObjectURL(url);
+        };
+
+        // Télécharge un fichier construit côté Blazor (tableau d'octets) sous le nom donné.
+        // Le navigateur l'enregistre dans son dossier de téléchargement configuré ;
+        // une page web ne peut pas imposer le dossier de destination, seulement le nom.
+        window.telechargerFichier = function (nomFichier, octets, typeMime) {
+            const blob = new Blob([new Uint8Array(octets)], { type: typeMime });
+            const url = URL.createObjectURL(blob);
+
+            const lien = document.createElement('a');
+            lien.href = url;
+            lien.download = nomFichier;
+            document.body.appendChild(lien);
+            lien.click();
+            lien.remove();
+
+            // Laisse le temps au téléchargement de démarrer avant de libérer l'URL blob
+            setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
         };
 
         // Imprime le calendrier dans l'orientation demandée ("portrait" ou "landscape").

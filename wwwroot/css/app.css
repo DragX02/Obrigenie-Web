@@ -451,7 +451,7 @@ h1:focus { outline: none; }
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
 }
 
 .nav-btn {
@@ -503,7 +503,7 @@ h1:focus { outline: none; }
     font-weight: 600;
     padding: 6px 14px;
     border-radius: 20px;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
     background: var(--primary);
     color: white;
     display: inline-block;
@@ -527,9 +527,10 @@ h1:focus { outline: none; }
 .print-btn:hover { background: var(--row-hover); }
 .print-hint { font-size: 0.75rem; color: var(--text-muted); }
 
-.single-day-header { text-align: center; margin-bottom: 1rem; }
-.day-name { display: block; text-transform: capitalize; color: var(--text-muted); }
-.day-number { display: block; font-size: 3rem; font-weight: bold; color: var(--text); }
+/* En-tete du jour : compact, pour ne pas eloigner la grille du titre */
+.single-day-header { text-align: center; margin-bottom: 0.35rem; line-height: 1.15; }
+.day-name { display: block; text-transform: capitalize; color: var(--text-muted); font-size: 0.9rem; }
+.day-number { display: block; font-size: 1.9rem; font-weight: bold; color: var(--text); }
 
 /* Grille horaire : colonne 1 = etiquettes d'heure, colonne 2 = cellules de contenu.
    Une cellule peut couvrir plusieurs lignes (grid-row: N / span X) : les heures

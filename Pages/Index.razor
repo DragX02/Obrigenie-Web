@@ -66,7 +66,7 @@
         <button class="print-btn" @onclick="ImprimerCalendrier"
                 title="Imprimer la vue affichée (@OrientationImpression)">🖨 Imprimer</button>
         <button class="print-btn" @onclick="ExporterPdf"
-                title="Ouvrir l'impression et choisir « Enregistrer au format PDF »">📄 PDF</button>
+                title="Télécharger directement @NomFichierPdf()">📄 PDF</button>
         <span class="print-hint">@(printHint ?? $"Orientation : {OrientationImpression}")</span>
     </div>
 
@@ -120,7 +120,7 @@
         <div class="time-grid">
             @* Blocs fusionnés du jour : chacun couvre une plage d'heures et porte les notes
                qui s'y trouvent (plusieurs notes lorsqu'elles se chevauchent) *@
-            @{ var noteBlocks = BuildNoteBlocks(currentDay); }
+            @{ var noteBlocks = NoteLayout.Blocs(currentDay.Notes, GridStartHour, GridEndHour); }
 
             @for (int h = GridStartHour; h < GridEndHour; h++)
             {
@@ -338,7 +338,7 @@
                             var endH = note.EndHour > 0 ? note.EndHour : note.Hour + 1;
                             var endM = note.EndHour > 0 ? note.EndMinute : 0;
                             @* Nom du cours extrait de la ligne "Cours : ..." du contexte de cascade *@
-                            var cours = NoteCourseLabel(note);
+                            var cours = NoteLayout.CourseLabel(note);
 
                             <div class="note-mini note-mini-week">
                                 <span class="mini-time">@($"{note.Hour:D2}:{note.Minute:D2} → {endH:D2}:{endM:D2}")</span>
@@ -629,71 +629,9 @@
     private const int GridStartHour = 8;
     private const int GridEndHour   = 18;
 
-    // Première heure NON couverte par la note, c.-à-d. le nombre de lignes qu'elle occupe
-    // dans la grille. Une fin à 11:00 s'arrête à la ligne 10:00 ; une fin à 11:15 déborde
-    // sur la ligne 11:00 et l'occupe donc entièrement. Minimum : une ligne.
-    private static int NoteRowEnd(Note n)
-    {
-        int endH = n.EndHour > 0 ? n.EndHour : n.Hour + 1;
-        int endM = n.EndHour > 0 ? n.EndMinute : 0;
-        if (endM > 0) endH++;
-        return Math.Max(n.Hour + 1, endH);
-    }
-
-    // Extrait le nom du cours de la ligne "Cours : ..." du contexte de cascade figé sur la note
-    // (voir BuildViseeContexte). Chaîne vide quand la note n'est rattachée à aucune cascade.
-    private static string NoteCourseLabel(Note n)
-    {
-        if (string.IsNullOrEmpty(n.ViseeContexte)) return string.Empty;
-
-        foreach (var ligne in n.ViseeContexte.Split('\n'))
-        {
-            var t = ligne.Trim();
-            if (t.StartsWith("Cours :", StringComparison.Ordinal))
-                return t["Cours :".Length..].Trim();
-        }
-
-        return string.Empty;
-    }
-
-    // Une plage d'heures de la grille rendue comme une seule cellule fusionnée.
-    // Start est inclusif, End exclusif (une note 09:00→11:00 donne Start=9, End=11).
-    private sealed class NoteBlock
-    {
-        public int Start;
-        public int End;
-        public List<Note> Notes = new();
-    }
-
-    // Regroupe les notes du jour en blocs à fusionner dans la grille.
-    // Les notes qui se chevauchent partagent le même bloc : sans cela, la note commençant
-    // à l'intérieur d'une autre tomberait sur une ligne déjà absorbée et ne serait pas rendue.
-    // Les notes débordant de la grille sont rognées sur [GridStartHour, GridEndHour[ ;
-    // celles qui tombent entièrement hors de la grille sont ignorées.
-    private static List<NoteBlock> BuildNoteBlocks(Day day)
-    {
-        var blocks = new List<NoteBlock>();
-
-        foreach (var n in day.Notes.OrderBy(n => n.Hour))
-        {
-            int start = Math.Max(n.Hour, GridStartHour);
-            int end   = Math.Min(NoteRowEnd(n), GridEndHour);
-            if (end <= start) continue;
-
-            // Chevauchement avec le bloc précédent : on l'étend au lieu d'en créer un nouveau
-            if (blocks.Count > 0 && start < blocks[^1].End)
-            {
-                blocks[^1].End = Math.Max(blocks[^1].End, end);
-                blocks[^1].Notes.Add(n);
-            }
-            else
-            {
-                blocks.Add(new NoteBlock { Start = start, End = end, Notes = { n } });
-            }
-        }
-
-        return blocks;
-    }
+    // La disposition des notes dans la grille (fusion des heures couvertes, extraction
+    // du cours de la cascade) vit dans NoteLayout : elle est partagée avec l'export PDF
+    // pour que le papier reproduise exactement la grille affichée.
 
     @* Heure de début sélectionnée dans le champ "De" de la modale (heures + minutes) *@
     private TimeOnly noteStart = new(8, 0);
@@ -1491,14 +1429,65 @@
         await LancerImpression();
     }
 
-    // Même boîte de dialogue que l'impression : le PDF s'obtient en choisissant
-    // "Enregistrer au format PDF" comme destination, ce qui donne un rendu vectoriel
-    // fidèle sans dépendre d'une bibliothèque tierce.
+    // Génère le PDF de la vue affichée et le télécharge directement, sans passer
+    // par la boîte de dialogue d'impression. Le fichier est produit côté client par
+    // CalendarPdfExporter : texte vectoriel, aucune bibliothèque externe.
+    // Le navigateur l'enregistre dans son dossier de téléchargement habituel ;
+    // seul le nom du fichier est imposé ici, pas le dossier de destination.
     private async Task ExporterPdf()
     {
-        printHint = "Dans la fenêtre qui s'ouvre, choisis « Enregistrer au format PDF » comme destination.";
-        await LancerImpression();
+        printHint = null;
+
+        var octets = viewMode switch
+        {
+            CalendarViewMode.SingleDay =>
+                CalendarPdfExporter.Jour(weekTitle, currentDay ?? new Day(), GridStartHour, GridEndHour),
+
+            CalendarViewMode.SchoolPeriod =>
+                CalendarPdfExporter.Periode(weekTitle, ProjeterPeriodePdf(), NomsJoursSemaine()),
+
+            _ => CalendarPdfExporter.Grille(weekTitle, days, gridSpan),
+        };
+
+        await JS.InvokeVoidAsync("telechargerFichier", NomFichierPdf(), octets, "application/pdf");
     }
+
+    // Nom du fichier PDF proposé au navigateur, dérivé de la vue affichée.
+    private string NomFichierPdf() => viewMode switch
+    {
+        CalendarViewMode.SingleDay      => "journal_jour.pdf",
+        CalendarViewMode.Week           => "journal_semaine.pdf",
+        CalendarViewMode.WeekAndWeekend => "journal_semaine_weekend.pdf",
+        CalendarViewMode.Month          => "journal_mois.pdf",
+        CalendarViewMode.SchoolPeriod   => "journal_trimestre.pdf",
+        _                               => "journal.pdf",
+    };
+
+    // Noms de jours affichés en tête de ligne du tableau trimestre.
+    private List<string> NomsJoursSemaine() => new()
+    {
+        Lang.T("cal.day.mon"), Lang.T("cal.day.tue"), Lang.T("cal.day.wed"),
+        Lang.T("cal.day.thu"), Lang.T("cal.day.fri"),
+    };
+
+    // Projette les semaines de la vue trimestre (types internes à la page) vers
+    // les objets simples attendus par l'exportateur PDF.
+    private List<CalendarPdfExporter.PeriodeSemaine> ProjeterPeriodePdf()
+        => trimWeeks.Select(semaine => new CalendarPdfExporter.PeriodeSemaine
+        {
+            Entete = semaine.WeekNum.HasValue
+                ? $"S{semaine.WeekNum} {semaine.DateLabel}"
+                : semaine.DateLabel,
+            VacancesCompletes = semaine.IsFullHoliday,
+            VacancesLibelle   = semaine.HolidayShortName,
+            Jours = semaine.Days.Select(jour => new CalendarPdfExporter.PeriodeJour
+            {
+                DansPeriode  = jour.IsInPeriod,
+                Vacances     = jour.IsHoliday,
+                NbNotes      = jour.Notes.Count,
+                PremierCours = jour.Courses.FirstOrDefault()?.Name ?? string.Empty,
+            }).ToList(),
+        }).ToList();
 
     // Appelle la fonction JS qui pose la règle @page puis ouvre window.print().
     private Task LancerImpression()
