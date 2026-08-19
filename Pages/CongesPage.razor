@@ -163,17 +163,21 @@
     private async Task Recharger()
     {
         chargement = true;
+        erreur     = null;
 
         var calendrier = await CalendarSvc.GetCalendarData();
 
         // Les marqueurs de Rentrée ancrent la numérotation des semaines scolaires :
         // ils ne sont pas corrigeables ici pour éviter de décaler tout le calendrier.
         congesOfficiels = calendrier.Holidays
-            .Where(h => h.Id > 0 && !h.Name.Contains("Rentree", StringComparison.OrdinalIgnoreCase))
+            .Where(h => h.Id > 0 && !CalendarService.EstRentree(h.Name))
             .OrderBy(h => h.StartDate)
             .ToList();
 
-        var toutes = await Api.GetCongesAsync();
+        // L'erreur éventuelle est affichée : sans elle, une table absente ou des droits
+        // manquants se traduiraient par une page vide sans explication.
+        var (toutes, erreurChargement) = await Api.GetCongesAsync();
+        erreur = erreurChargement;
 
         corrections   = toutes.Where(c => c.IdCalendrierFk is > 0)
                               .GroupBy(c => c.IdCalendrierFk!.Value)

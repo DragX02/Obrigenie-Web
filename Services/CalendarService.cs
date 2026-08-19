@@ -87,6 +87,23 @@ namespace Obrigenie.Services
             return GenerateOfflineCalendar();
         }
 
+        // Vrai lorsque le nom désigne un marqueur de Rentrée scolaire.
+        // La comparaison ignore les accents : selon la source, la base contient aussi bien
+        // "Rentree scolaire" que "Rentrée scolaire", et un test sur la seule forme sans
+        // accent laisserait passer la variante accentuée.
+        public static bool EstRentree(string? nom)
+        {
+            if (string.IsNullOrEmpty(nom)) return false;
+
+            // Décomposition Unicode : "é" devient "e" + accent, l'accent est ensuite écarté
+            var sansAccent = new string(nom.Normalize(System.Text.NormalizationForm.FormD)
+                .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c)
+                            != System.Globalization.UnicodeCategory.NonSpacingMark)
+                .ToArray());
+
+            return sansAccent.Contains("Rentree", StringComparison.OrdinalIgnoreCase);
+        }
+
         // Applique les corrections personnelles de l'utilisateur au calendrier officiel.
         //
         // Le calendrier officiel est commun à tous et alimenté automatiquement ; ses dates
@@ -114,7 +131,7 @@ namespace Obrigenie.Services
             {
                 // Congé officiel sans correction, ou marqueur de Rentrée : conservé tel quel
                 if (conge.Id <= 0 || !parCalendrier.TryGetValue(conge.Id, out var correction)
-                    || conge.Name.Contains("Rentree", StringComparison.OrdinalIgnoreCase))
+                    || EstRentree(conge.Name))
                 {
                     resultat.Add(conge);
                     continue;

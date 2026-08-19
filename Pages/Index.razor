@@ -867,8 +867,10 @@
             var calendarData = await CalendarSvc.GetCalendarData();
 
             // Applique par-dessus les corrections de congés propres à l'utilisateur
-            // (dates rectifiées, congés masqués ou ajoutés depuis la page Congés)
-            var corrections = await Api.GetCongesAsync();
+            // (dates rectifiées, congés masqués ou ajoutés depuis la page Congés).
+            // Une erreur de chargement est ignorée ici : le calendrier officiel s'affiche
+            // seul, et la page Congés se charge de signaler le problème.
+            var (corrections, _) = await Api.GetCongesAsync();
             cachedHolidays = CalendarService.AppliquerCorrections(calendarData, corrections).Holidays;
         }
         catch

@@ -366,17 +366,27 @@ namespace Obrigenie.Services
 
         // Récupère les corrections de congés de l'utilisateur courant.
         // Endpoint : GET api/conges
-        // Retourne une liste vide en cas d'erreur réseau : le calendrier officiel
-        // reste alors affiché tel quel plutôt que de faire échouer le chargement.
-        public async Task<List<UserConge>> GetCongesAsync()
+        // Ne lève jamais : en cas d'échec, retourne une liste vide accompagnée du message
+        // d'erreur. Le calendrier peut ainsi s'afficher avec les congés officiels seuls,
+        // tandis que la page Congés affiche la raison de l'échec au lieu de rester muette.
+        public async Task<(List<UserConge> Conges, string? Error)> GetCongesAsync()
         {
             try
             {
-                return await _httpClient.GetFromJsonAsync<List<UserConge>>("api/conges") ?? new();
+                var reponse = await _httpClient.GetAsync("api/conges");
+
+                if (!reponse.IsSuccessStatusCode)
+                {
+                    var body = await reponse.Content.ReadAsStringAsync();
+                    return (new(), $"Error {(int)reponse.StatusCode}: {body}");
+                }
+
+                var conges = await reponse.Content.ReadFromJsonAsync<List<UserConge>>();
+                return (conges ?? new(), null);
             }
-            catch
+            catch (Exception ex)
             {
-                return new();
+                return (new(), ex.Message);
             }
         }
 

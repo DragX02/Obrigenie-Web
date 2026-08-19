@@ -110,6 +110,29 @@ public class UserCongeTests
         Assert.Equal("Noel", conge.Name);
     }
 
+    [Theory]
+    [InlineData("Rentree scolaire", true)]
+    [InlineData("Rentrée scolaire", true)]   // la base contient la forme accentuée
+    [InlineData("RENTRÉE SCOLAIRE", true)]
+    [InlineData("Conge d'automne (Toussaint)", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void EstRentree_IgnoreLesAccentsEtLaCasse(string? nom, bool attendu)
+    {
+        Assert.Equal(attendu, CalendarService.EstRentree(nom));
+    }
+
+    [Fact]
+    public void MarqueurDeRentreeAccentue_NEstPasMasque()
+    {
+        // Bug constaté en production : le test portait sur "Rentree" sans accent,
+        // laissant passer "Rentrée scolaire" tel qu'il est stocké en base.
+        var calendrier = Officiel(Conge(1, "Rentrée scolaire", new DateTime(2026, 8, 24), new DateTime(2026, 8, 24)));
+        var corrections = new List<UserConge> { new() { Id = 5, IdCalendrierFk = 1, Nom = "x", Masque = true } };
+
+        Assert.Single(CalendarService.AppliquerCorrections(calendrier, corrections).Holidays);
+    }
+
     [Fact]
     public void MarqueurDeRentree_NEstJamaisMasque()
     {
