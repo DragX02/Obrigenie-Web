@@ -112,8 +112,10 @@ namespace Obrigenie.Services
         // Une correction qui ne correspond plus à aucun congé officiel — le calendrier
         // ayant pu être reconstruit côté serveur — est ignorée plutôt qu'affichée en double.
         //
-        // Les marqueurs de Rentrée ne sont jamais masqués : ils servent d'ancre au calcul
-        // des semaines scolaires, et les faire disparaître décalerait toute la numérotation.
+        // La date d'une Rentrée est corrigeable comme n'importe quel congé — c'est même
+        // une des dates les plus souvent fausses. Seul son masquage est refusé : elle sert
+        // d'ancre au calcul des semaines scolaires, et la supprimer décalerait toute la
+        // numérotation. Corriger une Rentrée déplace aussi le début d'année scolaire.
         public static SchoolYearCalendar AppliquerCorrections(SchoolYearCalendar calendrier,
                                                              IReadOnlyList<UserConge> corrections)
         {
@@ -127,18 +129,32 @@ namespace Obrigenie.Services
 
             var resultat = new List<Holiday>();
 
+            // Années scolaires dont la Rentrée a été déplacée par l'utilisateur : les marqueurs
+            // synthétiques ajoutés à la date par défaut y deviennent des doublons.
+            var rentreesCorrigees = new Dictionary<int, DateTime>();
+
+            // Début d'année scolaire, déplacé si la Rentrée correspondante est corrigée
+            var debutAnnee = calendrier.SchoolYearStart;
+
             foreach (var conge in calendrier.Holidays)
             {
-                // Congé officiel sans correction, ou marqueur de Rentrée : conservé tel quel
-                if (conge.Id <= 0 || !parCalendrier.TryGetValue(conge.Id, out var correction)
-                    || EstRentree(conge.Name))
+                // Congé officiel sans correction : conservé tel quel
+                if (conge.Id <= 0 || !parCalendrier.TryGetValue(conge.Id, out var correction))
                 {
                     resultat.Add(conge);
                     continue;
                 }
 
-                // Congé masqué par l'utilisateur : il disparaît de son calendrier
-                if (correction.Masque) continue;
+                bool estRentree = EstRentree(conge.Name);
+
+                // Congé masqué par l'utilisateur : il disparaît de son calendrier.
+                // Une Rentrée fait exception, elle reste toujours affichée.
+                if (correction.Masque)
+                {
+                    if (!estRentree) continue;
+                    resultat.Add(conge);
+                    continue;
+                }
 
                 // Congé corrigé : les dates et le nom de l'utilisateur remplacent l'officiel
                 resultat.Add(new Holiday
@@ -148,6 +164,21 @@ namespace Obrigenie.Services
                     StartDate = correction.DateDebut.Date,
                     EndDate   = correction.DateFin.Date,
                 });
+
+                if (!estRentree) continue;
+
+                rentreesCorrigees[AnneeScolaire(correction.DateDebut.Date)] = correction.DateDebut.Date;
+
+                // Le début d'année scolaire suit la Rentrée que l'utilisateur vient de rectifier
+                if (conge.StartDate.Date == debutAnnee.Date) debutAnnee = correction.DateDebut.Date;
+            }
+
+            // Retire les marqueurs de Rentrée synthétiques (Id = 0, posés à la date par défaut
+            // quand l'API n'en fournit pas) devenus des doublons de la Rentrée corrigée.
+            if (rentreesCorrigees.Count > 0)
+            {
+                resultat.RemoveAll(h => h.Id <= 0 && EstRentree(h.Name)
+                                     && rentreesCorrigees.ContainsKey(AnneeScolaire(h.StartDate)));
             }
 
             // Congés ajoutés par l'utilisateur (sans congé officiel de référence)
@@ -163,10 +194,15 @@ namespace Obrigenie.Services
 
             return new SchoolYearCalendar
             {
-                SchoolYearStart = calendrier.SchoolYearStart,
+                SchoolYearStart = debutAnnee,
                 Holidays        = resultat.OrderBy(h => h.StartDate).ToList(),
             };
         }
+
+        // Année scolaire à laquelle appartient une date, selon la convention du projet
+        // (également appliquée par la colonne calculée anneeScolaire en base) :
+        // à partir d'août la date relève de l'année qui commence, avant elle de la précédente.
+        private static int AnneeScolaire(DateTime date) => date.Month >= 8 ? date.Year : date.Year - 1;
 
         // Convertit une liste de DTO bruts du calendrier API en modèle SchoolYearCalendar de l'application.
         // Lors de la conversion :

@@ -65,10 +65,15 @@
                     <div class="conge-actions">
                         <button class="btn-conge" @onclick="() => Enregistrer(ligne)">Enregistrer</button>
 
-                        @* Masquer / réafficher : un congé masqué disparaît du calendrier *@
-                        <button class="btn-conge" @onclick="() => BasculerMasque(ligne)">
-                            @(ligne.Masque ? "Réafficher" : "Masquer")
-                        </button>
+                        @* Masquer / réafficher : un congé masqué disparaît du calendrier.
+                           Une Rentrée ne peut pas être masquée : elle ancre la numérotation
+                           des semaines scolaires, sa date reste en revanche corrigeable. *@
+                        @if (!CalendarService.EstRentree(conge.Name))
+                        {
+                            <button class="btn-conge" @onclick="() => BasculerMasque(ligne)">
+                                @(ligne.Masque ? "Réafficher" : "Masquer")
+                            </button>
+                        }
 
                         @* Réinitialiser n'apparaît que si une correction existe côté serveur *@
                         @if (ligne.Id > 0)
@@ -167,10 +172,12 @@
 
         var calendrier = await CalendarSvc.GetCalendarData();
 
-        // Les marqueurs de Rentrée ancrent la numérotation des semaines scolaires :
-        // ils ne sont pas corrigeables ici pour éviter de décaler tout le calendrier.
+        // Tous les congés issus de la base sont corrigeables, Rentrée comprise : sa date
+        // est justement l'une des plus souvent fausses. Les marqueurs synthétiques
+        // (Id = 0, ajoutés en secours quand l'API n'en fournit pas) n'ont pas de ligne
+        // en base à corriger et sont donc écartés.
         congesOfficiels = calendrier.Holidays
-            .Where(h => h.Id > 0 && !CalendarService.EstRentree(h.Name))
+            .Where(h => h.Id > 0)
             .OrderBy(h => h.StartDate)
             .ToList();
 

@@ -144,6 +144,86 @@ public class UserCongeTests
         Assert.Single(CalendarService.AppliquerCorrections(calendrier, corrections).Holidays);
     }
 
+    // ── Correction d'une Rentrée ────────────────────────────────────────────
+
+    [Fact]
+    public void RentreeCorrigee_PrendLaNouvelleDate()
+    {
+        // Une date de rentrée fausse est précisément ce que l'utilisateur vient corriger :
+        // la correction doit s'appliquer, seul le masquage lui reste interdit.
+        var calendrier = Officiel(Conge(1, "Rentrée scolaire", new DateTime(2026, 9, 1), new DateTime(2026, 9, 1)));
+        var corrections = new List<UserConge>
+        {
+            new() { Id = 5, IdCalendrierFk = 1, Nom = "Rentrée scolaire",
+                    DateDebut = new DateTime(2026, 8, 24), DateFin = new DateTime(2026, 8, 24) },
+        };
+
+        var conge = Assert.Single(CalendarService.AppliquerCorrections(calendrier, corrections).Holidays);
+
+        Assert.Equal(new DateTime(2026, 8, 24), conge.StartDate);
+    }
+
+    [Fact]
+    public void RentreeCorrigee_DeplaceLeDebutDAnneeScolaire()
+    {
+        // SchoolYearStart ancre la numérotation des semaines : il suit la correction,
+        // sinon les étiquettes de période resteraient calées sur la date erronée.
+        var calendrier = Officiel(Conge(1, "Rentrée scolaire", new DateTime(2026, 8, 24), new DateTime(2026, 8, 24)));
+        var corrections = new List<UserConge>
+        {
+            new() { Id = 5, IdCalendrierFk = 1, Nom = "Rentrée scolaire",
+                    DateDebut = new DateTime(2026, 9, 1), DateFin = new DateTime(2026, 9, 1) },
+        };
+
+        var resultat = CalendarService.AppliquerCorrections(calendrier, corrections);
+
+        Assert.Equal(new DateTime(2026, 9, 1), resultat.SchoolYearStart);
+    }
+
+    [Fact]
+    public void RentreeCorrigee_SupprimeLeMarqueurSynthetiqueDeLaMemeAnnee()
+    {
+        // EnsureSchoolStartExists ajoute une Rentrée synthétique (Id = 0) à la date par
+        // défaut du 26 août quand l'API n'en fournit pas à cette date exacte. Après
+        // correction, elle ferait double emploi avec la vraie Rentrée.
+        var calendrier = Officiel(
+            Conge(1, "Rentrée scolaire", new DateTime(2026, 9, 1), new DateTime(2026, 9, 1)),
+            new Holiday { Id = 0, Name = "Rentree scolaire",
+                          StartDate = new DateTime(2026, 8, 26), EndDate = new DateTime(2026, 8, 26) });
+
+        var corrections = new List<UserConge>
+        {
+            new() { Id = 5, IdCalendrierFk = 1, Nom = "Rentrée scolaire",
+                    DateDebut = new DateTime(2026, 8, 24), DateFin = new DateTime(2026, 8, 24) },
+        };
+
+        var conge = Assert.Single(CalendarService.AppliquerCorrections(calendrier, corrections).Holidays);
+
+        Assert.Equal(new DateTime(2026, 8, 24), conge.StartDate);
+    }
+
+    [Fact]
+    public void SansCorrectionDeRentree_LeMarqueurSynthetiqueEstConserve()
+    {
+        // Sans correction de Rentrée, rien ne change : le marqueur reste l'ancre
+        // sur laquelle repose la numérotation des semaines.
+        var calendrier = Officiel(
+            Conge(1, "Toussaint", new DateTime(2026, 10, 26), new DateTime(2026, 11, 6)),
+            new Holiday { Id = 0, Name = "Rentree scolaire",
+                          StartDate = new DateTime(2026, 8, 26), EndDate = new DateTime(2026, 8, 26) });
+
+        var corrections = new List<UserConge>
+        {
+            new() { Id = 5, IdCalendrierFk = 1, Nom = "Conge d'automne",
+                    DateDebut = new DateTime(2026, 10, 19), DateFin = new DateTime(2026, 10, 30) },
+        };
+
+        var resultat = CalendarService.AppliquerCorrections(calendrier, corrections);
+
+        Assert.Equal(2, resultat.Holidays.Count);
+        Assert.Contains(resultat.Holidays, h => h.Id == 0 && h.StartDate == new DateTime(2026, 8, 26));
+    }
+
     // ── Ajout ───────────────────────────────────────────────────────────────
 
     [Fact]
