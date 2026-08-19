@@ -45,6 +45,10 @@
                 <a href="/referentiel" class="flyout-item" @onclick="CloseFlyout">
                     <span class="flyout-icon">📄</span> @Lang.T("nav.referents")
                 </a>
+                @* Corrections personnelles du calendrier des congés scolaires *@
+                <a href="/conges" class="flyout-item" @onclick="CloseFlyout">
+                    <span class="flyout-icon">🏖️</span> Congés
+                </a>
                 @if (isAdmin)
                 {
                     <a href="/admin" class="flyout-item" @onclick="CloseFlyout">

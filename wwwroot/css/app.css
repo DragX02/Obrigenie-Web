@@ -1294,3 +1294,56 @@ h1:focus { outline: none; }
     .calendar-header { margin: 0 0 6mm !important; }
     .week-title { font-size: 1.1rem !important; }
 }
+
+/* ===== PAGE CONGES ===== */
+.conges-page { display: flex; justify-content: center; padding: 1.5rem 1rem; }
+
+.conges-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 900px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+.conges-title { margin: 0 0 0.35rem; color: var(--text); }
+.conges-intro { margin: 0 0 1.2rem; font-size: 0.85rem; color: var(--text-muted); }
+.conges-loading, .conges-vide { font-size: 0.85rem; color: var(--text-muted); padding: 0.5rem 0; }
+
+.conges-section-title {
+    margin: 1.4rem 0 0.5rem;
+    font-weight: 600; font-size: 0.9rem; color: var(--text);
+    border-bottom: 1px solid var(--border); padding-bottom: 0.35rem;
+}
+
+/* Une ligne = un conge : nom, plage de dates, actions */
+.conge-row {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+    padding: 0.5rem; margin-bottom: 0.4rem;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg-main);
+}
+/* Un conge masque reste visible ici, mais efface pour montrer qu'il ne sortira pas au calendrier */
+.conge-row-masquee { opacity: 0.55; }
+
+.conge-nom {
+    flex: 1 1 220px; min-width: 160px;
+    padding: 4px 7px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg-card); color: var(--text); font-size: 0.88rem;
+}
+.conge-dates { display: flex; align-items: center; gap: 0.35rem; }
+.conge-dates label { font-size: 0.8rem; color: var(--text-muted); }
+.conge-actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+
+.btn-conge {
+    padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg-card); color: var(--text); font-size: 0.8rem; cursor: pointer;
+    transition: background 0.15s;
+}
+.btn-conge:hover { background: var(--row-hover); }
+.btn-conge:disabled { opacity: 0.5; cursor: default; }
+.btn-conge-reset { color: #dc3545; }
+
+.conge-etat { font-size: 0.72rem; color: var(--text-muted); }

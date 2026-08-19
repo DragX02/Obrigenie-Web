@@ -87,6 +87,70 @@ namespace Obrigenie.Services
             return GenerateOfflineCalendar();
         }
 
+        // Applique les corrections personnelles de l'utilisateur au calendrier officiel.
+        //
+        // Le calendrier officiel est commun à tous et alimenté automatiquement ; ses dates
+        // sont parfois inexactes. Chaque correction cible un congé officiel par son Id
+        // (dates rectifiées ou congé masqué) ou ajoute un congé absent du calendrier.
+        // Une correction qui ne correspond plus à aucun congé officiel — le calendrier
+        // ayant pu être reconstruit côté serveur — est ignorée plutôt qu'affichée en double.
+        //
+        // Les marqueurs de Rentrée ne sont jamais masqués : ils servent d'ancre au calcul
+        // des semaines scolaires, et les faire disparaître décalerait toute la numérotation.
+        public static SchoolYearCalendar AppliquerCorrections(SchoolYearCalendar calendrier,
+                                                             IReadOnlyList<UserConge> corrections)
+        {
+            if (corrections.Count == 0) return calendrier;
+
+            // Corrections rattachées à un congé officiel, indexées par son identifiant
+            var parCalendrier = corrections
+                .Where(c => c.IdCalendrierFk is > 0)
+                .GroupBy(c => c.IdCalendrierFk!.Value)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var resultat = new List<Holiday>();
+
+            foreach (var conge in calendrier.Holidays)
+            {
+                // Congé officiel sans correction, ou marqueur de Rentrée : conservé tel quel
+                if (conge.Id <= 0 || !parCalendrier.TryGetValue(conge.Id, out var correction)
+                    || conge.Name.Contains("Rentree", StringComparison.OrdinalIgnoreCase))
+                {
+                    resultat.Add(conge);
+                    continue;
+                }
+
+                // Congé masqué par l'utilisateur : il disparaît de son calendrier
+                if (correction.Masque) continue;
+
+                // Congé corrigé : les dates et le nom de l'utilisateur remplacent l'officiel
+                resultat.Add(new Holiday
+                {
+                    Id        = conge.Id,
+                    Name      = correction.Nom,
+                    StartDate = correction.DateDebut.Date,
+                    EndDate   = correction.DateFin.Date,
+                });
+            }
+
+            // Congés ajoutés par l'utilisateur (sans congé officiel de référence)
+            foreach (var ajout in corrections.Where(c => c.IdCalendrierFk is null or 0 && !c.Masque))
+            {
+                resultat.Add(new Holiday
+                {
+                    Name      = ajout.Nom,
+                    StartDate = ajout.DateDebut.Date,
+                    EndDate   = ajout.DateFin.Date,
+                });
+            }
+
+            return new SchoolYearCalendar
+            {
+                SchoolYearStart = calendrier.SchoolYearStart,
+                Holidays        = resultat.OrderBy(h => h.StartDate).ToList(),
+            };
+        }
+
         // Convertit une liste de DTO bruts du calendrier API en modèle SchoolYearCalendar de l'application.
         // Lors de la conversion :
         //   - L'événement "Rentrée" de l'année scolaire courante est utilisé pour définir SchoolYearStart.
@@ -114,6 +178,7 @@ namespace Obrigenie.Services
                 // Ajouter chaque événement (congé ou Rentrée) à la liste des vacances
                 allHolidays.Add(new Holiday
                 {
+                    Id        = item.idCalendrier,
                     Name      = item.nomEvenement ?? "Conge",
                     StartDate = item.dateDebut.ToDateTime(TimeOnly.MinValue),
                     EndDate   = item.dateFin.ToDateTime(TimeOnly.MinValue)
@@ -377,6 +442,10 @@ namespace Obrigenie.Services
     // dans la base de données du serveur.
     public class ApiCalendrierDto
     {
+        // La clé primaire de l'entrée en base (colonne id_calendrier). Sert de référence
+        // stable aux corrections personnelles enregistrées par l'utilisateur.
+        public int idCalendrier { get; set; }
+
         // Le nom de l'événement du calendrier scolaire (ex. : "Conge d'automne (Toussaint)",
         // "Rentree scolaire"). Utilisé pour classer les événements et générer des étiquettes d'affichage courtes.
         public string? nomEvenement { get; set; }

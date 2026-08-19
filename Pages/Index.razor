@@ -865,7 +865,11 @@
         {
             // Charge les données de vacances (API → cache localStorage → fallback hors ligne)
             var calendarData = await CalendarSvc.GetCalendarData();
-            cachedHolidays = calendarData.Holidays;
+
+            // Applique par-dessus les corrections de congés propres à l'utilisateur
+            // (dates rectifiées, congés masqués ou ajoutés depuis la page Congés)
+            var corrections = await Api.GetCongesAsync();
+            cachedHolidays = CalendarService.AppliquerCorrections(calendarData, corrections).Holidays;
         }
         catch
         {

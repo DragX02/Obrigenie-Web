@@ -1,0 +1,260 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   CongesPage.razor — Corrections personnelles du calendrier des congés.
+
+   Le calendrier officiel (api/values) est commun à tous et alimenté
+   automatiquement ; certaines dates y sont inexactes. Cette page permet à chaque
+   utilisateur de le rectifier pour lui seul :
+     • corriger les dates ou le nom d'un congé officiel
+     • masquer un congé officiel qui ne le concerne pas
+     • ajouter un congé absent du calendrier officiel
+   Les corrections sont stockées côté serveur (table user_conge) et appliquées à
+   l'affichage du calendrier par CalendarService.AppliquerCorrections.
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@page "/conges"
+
+@inject ApiService Api
+@inject CalendarService CalendarSvc
+@inject NavigationManager Nav
+
+<div class="conges-page">
+    <div class="conges-card">
+
+        <h2 class="conges-title">Mes congés</h2>
+        <p class="conges-intro">
+            Les dates ci-dessous viennent du calendrier scolaire officiel. Corrige-les si elles
+            ne correspondent pas à ton école : tes modifications ne s'appliquent qu'à ton calendrier.
+        </p>
+
+        @if (chargement)
+        {
+            <div class="conges-loading">Chargement…</div>
+        }
+        else
+        {
+            @* Message d'erreur du serveur (dates invalides, nom vide, table absente…) *@
+            @if (erreur != null)
+            {
+                <p class="modal-error">@erreur</p>
+            }
+
+            @* ── Congés officiels, avec leurs corrections éventuelles ────────── *@
+            <div class="conges-section-title">Calendrier officiel</div>
+
+            @if (congesOfficiels.Count == 0)
+            {
+                <div class="conges-vide">Aucun congé officiel n'a pu être chargé.</div>
+            }
+
+            @foreach (var conge in congesOfficiels)
+            {
+                @* Capture pour les fermetures des gestionnaires de clic *@
+                var id = conge.Id;
+                var ligne = Ligne(id);
+
+                <div class="conge-row @(ligne.Masque ? "conge-row-masquee" : "")">
+                    <input class="conge-nom" @bind="ligne.Nom" />
+
+                    <div class="conge-dates">
+                        <label>Du</label>
+                        <input type="date" class="date-box" @bind="ligne.DateDebut" @bind:format="yyyy-MM-dd" />
+                        <label>au</label>
+                        <input type="date" class="date-box" @bind="ligne.DateFin" @bind:format="yyyy-MM-dd" />
+                    </div>
+
+                    <div class="conge-actions">
+                        <button class="btn-conge" @onclick="() => Enregistrer(ligne)">Enregistrer</button>
+
+                        @* Masquer / réafficher : un congé masqué disparaît du calendrier *@
+                        <button class="btn-conge" @onclick="() => BasculerMasque(ligne)">
+                            @(ligne.Masque ? "Réafficher" : "Masquer")
+                        </button>
+
+                        @* Réinitialiser n'apparaît que si une correction existe côté serveur *@
+                        @if (ligne.Id > 0)
+                        {
+                            <button class="btn-conge btn-conge-reset" @onclick="() => Reinitialiser(ligne)">
+                                Rétablir l'officiel
+                            </button>
+                        }
+                    </div>
+
+                    @if (ligne.Id > 0)
+                    {
+                        <div class="conge-etat">@(ligne.Masque ? "Masqué" : "Corrigé")</div>
+                    }
+                </div>
+            }
+
+            @* ── Congés ajoutés par l'utilisateur ────────────────────────────── *@
+            <div class="conges-section-title">Congés ajoutés</div>
+
+            @if (congesAjoutes.Count == 0)
+            {
+                <div class="conges-vide">Aucun congé ajouté.</div>
+            }
+
+            @foreach (var ajout in congesAjoutes)
+            {
+                var ligne = ajout;
+
+                <div class="conge-row">
+                    <input class="conge-nom" @bind="ligne.Nom" />
+
+                    <div class="conge-dates">
+                        <label>Du</label>
+                        <input type="date" class="date-box" @bind="ligne.DateDebut" @bind:format="yyyy-MM-dd" />
+                        <label>au</label>
+                        <input type="date" class="date-box" @bind="ligne.DateFin" @bind:format="yyyy-MM-dd" />
+                    </div>
+
+                    <div class="conge-actions">
+                        <button class="btn-conge" @onclick="() => Enregistrer(ligne)">Enregistrer</button>
+                        <button class="btn-conge btn-conge-reset" @onclick="() => Supprimer(ligne)">Supprimer</button>
+                    </div>
+                </div>
+            }
+
+            @* ── Formulaire d'ajout ──────────────────────────────────────────── *@
+            <div class="conges-section-title">Ajouter un congé</div>
+
+            <div class="conge-row">
+                <input class="conge-nom" @bind="nouveauNom" placeholder="Nom du congé" />
+
+                <div class="conge-dates">
+                    <label>Du</label>
+                    <input type="date" class="date-box" @bind="nouveauDebut" @bind:format="yyyy-MM-dd" />
+                    <label>au</label>
+                    <input type="date" class="date-box" @bind="nouveauFin" @bind:format="yyyy-MM-dd" />
+                </div>
+
+                <div class="conge-actions">
+                    <button class="btn-conge" @onclick="Ajouter"
+                            disabled="@string.IsNullOrWhiteSpace(nouveauNom)">Ajouter</button>
+                </div>
+            </div>
+        }
+
+        <button class="btn-account-back" @onclick='() => Nav.NavigateTo("/")'>← Retour au calendrier</button>
+    </div>
+</div>
+
+@code {
+    @* Congés du calendrier officiel, tels que renvoyés par l'API (sans corrections appliquées) *@
+    private List<Holiday> congesOfficiels = new();
+
+    @* Corrections de l'utilisateur, indexées par identifiant de congé officiel *@
+    private Dictionary<int, UserConge> corrections = new();
+
+    @* Congés créés de toutes pièces par l'utilisateur *@
+    private List<UserConge> congesAjoutes = new();
+
+    @* Champs du formulaire d'ajout *@
+    private string   nouveauNom   = "";
+    private DateTime nouveauDebut = DateTime.Today;
+    private DateTime nouveauFin   = DateTime.Today;
+
+    private bool    chargement = true;
+    private string? erreur     = null;
+
+    protected override async Task OnInitializedAsync() => await Recharger();
+
+    // Recharge le calendrier officiel et les corrections de l'utilisateur.
+    private async Task Recharger()
+    {
+        chargement = true;
+
+        var calendrier = await CalendarSvc.GetCalendarData();
+
+        // Les marqueurs de Rentrée ancrent la numérotation des semaines scolaires :
+        // ils ne sont pas corrigeables ici pour éviter de décaler tout le calendrier.
+        congesOfficiels = calendrier.Holidays
+            .Where(h => h.Id > 0 && !h.Name.Contains("Rentree", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(h => h.StartDate)
+            .ToList();
+
+        var toutes = await Api.GetCongesAsync();
+
+        corrections   = toutes.Where(c => c.IdCalendrierFk is > 0)
+                              .GroupBy(c => c.IdCalendrierFk!.Value)
+                              .ToDictionary(g => g.Key, g => g.First());
+        congesAjoutes = toutes.Where(c => c.IdCalendrierFk is null or 0).ToList();
+
+        chargement = false;
+    }
+
+    // Retourne la ligne éditable d'un congé officiel : sa correction si elle existe,
+    // sinon une correction non encore enregistrée pré-remplie avec les valeurs officielles.
+    private UserConge Ligne(int idCalendrier)
+    {
+        if (corrections.TryGetValue(idCalendrier, out var existante)) return existante;
+
+        var officiel = congesOfficiels.First(h => h.Id == idCalendrier);
+        var ligne = new UserConge
+        {
+            IdCalendrierFk = idCalendrier,
+            Nom            = officiel.Name,
+            DateDebut      = officiel.StartDate,
+            DateFin        = officiel.EndDate,
+        };
+
+        // Mémorisée pour que les champs liés gardent la saisie entre deux rendus
+        corrections[idCalendrier] = ligne;
+        return ligne;
+    }
+
+    // Enregistre une correction (création ou mise à jour) et recharge la liste.
+    private async Task Enregistrer(UserConge ligne)
+    {
+        erreur = null;
+
+        var (ok, message) = await Api.SaveCongeAsync(ligne);
+        if (!ok) { erreur = message; return; }
+
+        await Recharger();
+    }
+
+    // Masque ou réaffiche un congé officiel, puis enregistre immédiatement :
+    // le bouton reflète ainsi toujours l'état réellement stocké.
+    private async Task BasculerMasque(UserConge ligne)
+    {
+        ligne.Masque = !ligne.Masque;
+        await Enregistrer(ligne);
+    }
+
+    // Supprime la correction : le congé officiel réapparaît avec ses dates d'origine.
+    private async Task Reinitialiser(UserConge ligne)
+    {
+        erreur = null;
+
+        await Api.DeleteCongeAsync(ligne.Id);
+        await Recharger();
+    }
+
+    // Supprime un congé ajouté par l'utilisateur.
+    private async Task Supprimer(UserConge ligne)
+    {
+        erreur = null;
+
+        if (ligne.Id > 0) await Api.DeleteCongeAsync(ligne.Id);
+        await Recharger();
+    }
+
+    // Ajoute un congé absent du calendrier officiel.
+    private async Task Ajouter()
+    {
+        erreur = null;
+
+        var (ok, message) = await Api.SaveCongeAsync(new UserConge
+        {
+            Nom       = nouveauNom.Trim(),
+            DateDebut = nouveauDebut.Date,
+            DateFin   = nouveauFin.Date,
+        });
+
+        if (!ok) { erreur = message; return; }
+
+        nouveauNom = "";
+        await Recharger();
+    }
+}

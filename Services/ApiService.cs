@@ -361,6 +361,55 @@ namespace Obrigenie.Services
         }
 
         // ──────────────────────────────────────────────────────────────────
+        // CONGÉS — CORRECTIONS PERSONNELLES DU CALENDRIER SCOLAIRE
+        // ──────────────────────────────────────────────────────────────────
+
+        // Récupère les corrections de congés de l'utilisateur courant.
+        // Endpoint : GET api/conges
+        // Retourne une liste vide en cas d'erreur réseau : le calendrier officiel
+        // reste alors affiché tel quel plutôt que de faire échouer le chargement.
+        public async Task<List<UserConge>> GetCongesAsync()
+        {
+            try
+            {
+                return await _httpClient.GetFromJsonAsync<List<UserConge>>("api/conges") ?? new();
+            }
+            catch
+            {
+                return new();
+            }
+        }
+
+        // Crée ou met à jour une correction de congé (déterminé par UserConge.Id valant 0 ou non).
+        // Endpoint : POST api/conges
+        // Retourne (true, null) en cas de succès ; (false, messageErreur) sinon, pour que
+        // l'interface puisse afficher le refus du serveur inline.
+        public async Task<(bool Success, string? Error)> SaveCongeAsync(UserConge conge)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/conges", conge);
+
+                if (response.IsSuccessStatusCode) return (true, null);
+
+                var body = await response.Content.ReadAsStringAsync();
+                return (false, $"Error {(int)response.StatusCode}: {body}");
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
+        }
+
+        // Supprime une correction : le congé officiel correspondant réapparaît tel quel,
+        // et un congé ajouté par l'utilisateur disparaît de son calendrier.
+        // Endpoint : DELETE api/conges/{id}
+        public async Task DeleteCongeAsync(int id)
+        {
+            await _httpClient.DeleteAsync($"api/conges/{id}");
+        }
+
+        // ──────────────────────────────────────────────────────────────────
         // LICENCE — VALIDATION ET VÉRIFICATION
         // ──────────────────────────────────────────────────────────────────
 
