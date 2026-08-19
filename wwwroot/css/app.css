@@ -521,25 +521,47 @@ h1:focus { outline: none; }
 .day-name { display: block; text-transform: capitalize; color: var(--text-muted); }
 .day-number { display: block; font-size: 3rem; font-weight: bold; color: var(--text); }
 
-.time-grid { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-card); }
+/* Grille horaire : colonne 1 = etiquettes d'heure, colonne 2 = cellules de contenu.
+   Une cellule peut couvrir plusieurs lignes (grid-row: N / span X) : les heures
+   couvertes par une meme note sont ainsi fusionnees en une seule cellule. */
+.time-grid {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    grid-auto-rows: minmax(60px, auto);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-card);
+}
 
-.time-row {
+.time-label {
+    grid-column: 1;
+    padding: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--time-label-color);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px dashed var(--border);
+}
+
+.time-cell {
+    grid-column: 2;
     display: flex;
-    min-height: 60px;
+    flex-direction: column;
+    padding: 0.25rem 0.5rem;
     border-bottom: 1px dashed var(--border);
     cursor: pointer;
     transition: background 0.15s;
+    position: relative;
 }
-.time-row:hover { background: var(--row-hover); }
-
-.time-label { width: 60px; padding: 0.5rem; font-size: 0.8rem; color: var(--time-label-color); border-right: 1px solid var(--border); flex-shrink: 0; }
-.time-content { flex: 1; padding: 0.25rem 0.5rem; position: relative; }
+.time-cell:hover { background: var(--row-hover); }
 
 .course-block { padding: 0.5rem; border-radius: 6px; color: white; margin-bottom: 2px; }
 .course-name { font-weight: bold; font-size: 0.9rem; display: block; }
 .course-time { font-size: 0.75rem; opacity: 0.85; display: block; }
 
-.note-block { background: #FFF3E0; border: 1px solid #FF9800; border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.8rem; color: #E65100; cursor: pointer; }
+/* flex: 1 fait remplir au bloc toute la hauteur de la cellule, y compris quand
+   celle-ci est fusionnee sur plusieurs heures (note de 09:00 a 11:00, etc.) */
+.note-block { flex: 1; background: #FFF3E0; border: 1px solid #FF9800; border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.8rem; color: #E65100; cursor: pointer; }
 .dark .note-block { background: #2d1f0a; border-color: #FF9800; color: #FFB74D; }
 
 /* Grid */
@@ -696,8 +718,6 @@ h1:focus { outline: none; }
 /* Note dans la grille horaire */
 .note-time { display: block; font-size: 0.7rem; font-weight: 600; opacity: 0.75; margin-bottom: 2px; }
 .note-visee { display: block; font-size: 0.72rem; font-weight: 600; color: #4CAF50; margin-bottom: 2px; white-space: pre-line; line-height: 1.35; }
-.time-row-covered { background: rgba(255, 152, 0, 0.04); }
-.dark .time-row-covered { background: rgba(255, 152, 0, 0.06); }
 
 /* ===== TRIMESTRE VIEW ===== */
 .trim-loading {

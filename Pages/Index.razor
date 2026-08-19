@@ -97,38 +97,49 @@
             <span class="day-number">@currentDay.DayOfMonth</span>
         </div>
 
-        @* Grille horaire de 08:00 à 18:00 *@
+        @* Grille horaire de 08:00 à 18:00.
+           Mise en page en CSS grid : colonne 1 = étiquettes d'heure, colonne 2 = contenu.
+           Une note qui s'étend sur plusieurs heures fusionne les cellules de contenu
+           correspondantes (grid-row: N / span X), à la manière d'un "rowspan" de tableau. *@
         <div class="time-grid">
-            @for (int h = 8; h <= 17; h++)
+            @* Blocs fusionnés du jour : chacun couvre une plage d'heures et porte les notes
+               qui s'y trouvent (plusieurs notes lorsqu'elles se chevauchent) *@
+            @{ var noteBlocks = BuildNoteBlocks(currentDay); }
+
+            @for (int h = GridStartHour; h < GridEndHour; h++)
             {
                 @* Capture la variable de boucle pour que la fermeture lambda capture la bonne valeur *@
                 var hour = h;
+                @* Index de ligne CSS (1-based) correspondant à cette heure *@
+                var row = hour - GridStartHour + 1;
 
-                @* Recherche un cours dont la plage horaire couvre ce créneau *@
-                var course = currentDay.Courses.FirstOrDefault(c =>
-                    c.StartTime.Hours <= hour && c.EndTime.Hours > hour);
+                @* Bloc dont cette heure est le début : c'est lui qui portera la cellule fusionnée *@
+                var block = noteBlocks.FirstOrDefault(b => b.Start == hour);
 
-                @* Recherche une note qui commence exactement à cette heure (affichée uniquement sur sa ligne de départ) *@
-                var noteHere = currentDay.Notes.FirstOrDefault(n => n.Hour == hour);
+                @* Cette heure est-elle déjà absorbée par un bloc commencé plus tôt ?
+                   Si oui, aucune cellule n'est émise : la cellule fusionnée occupe déjà la place *@
+                var covered = noteBlocks.Any(b => b.Start < hour && b.End > hour);
 
-                @* Recherche une note dont la plage couvre cette heure mais qui a commencé plus tôt
-                   (utilisée pour ajouter une classe CSS bloquant le clic de création) *@
-                var noteCovering = currentDay.Notes.FirstOrDefault(n =>
-                    n.Hour < hour && (n.EndHour > 0 ? n.EndHour : n.Hour + 1) > hour);
+                @* Colonne de gauche : l'étiquette de l'heure (ex. "08:00"), toujours présente
+                   même quand la cellule de droite est fusionnée, pour garder la règle horaire lisible *@
+                <div class="time-label" style="grid-row: @row;">@($"{hour:D2}:00")</div>
 
-                @* Chaque ligne horaire couvre une heure ; cliquer dessus ouvre la modale de note pour cette heure.
-                   Si une note couvre déjà cette ligne (noteCovering), on ajoute la classe "time-row-covered"
-                   pour indiquer que le clic modifiera la note existante plutôt qu'en créer une nouvelle. *@
-                <div class="time-row @(noteCovering != null ? "time-row-covered" : "")"
-                     @onclick="() => OnTimeSlotClicked(hour)">
+                @if (!covered)
+                {
+                    @* Nombre de lignes couvertes par la cellule (1 en l'absence de bloc) *@
+                    var span = block != null ? block.End - hour : 1;
 
-                    @* Côté gauche : l'étiquette de l'heure (ex. "08:00") *@
-                    <div class="time-label">@($"{hour:D2}:00")</div>
+                    @* Cours qui chevauchent la plage couverte par la cellule *@
+                    var courses = currentDay.Courses.Where(c =>
+                        c.StartTime.Hours < hour + span && c.EndTime.Hours > hour).ToList();
 
-                    @* Côté droit : bloc de cours et/ou bloc de note pour cette heure *@
-                    <div class="time-content">
-                        @* Affiche le bloc de cours si un cours couvre cette heure *@
-                        @if (course != null)
+                    @* Cliquer sur la cellule ouvre la modale de note pour cette heure ; sur une cellule
+                       fusionnée, cela revient à modifier la note qui l'occupe *@
+                    <div class="time-cell" style="grid-row: @row / span @span;"
+                         @onclick="() => OnTimeSlotClicked(hour)">
+
+                        @* Affiche les blocs de cours couvrant la plage de la cellule *@
+                        @foreach (var course in courses)
                         {
                             <div class="course-block" style="background-color: @course.Color;">
                                 <span class="course-name">@course.Name</span>
@@ -137,33 +148,34 @@
                             </div>
                         }
 
-                        @* Affiche le bloc de note uniquement sur la ligne de l'heure de début.
-                           Les notes qui s'étendent sur plusieurs heures sont visuellement ancrées ici. *@
-                        @if (noteHere != null)
+                        @* Blocs de note : ils remplissent toute la hauteur de la cellule fusionnée *@
+                        @foreach (var note in block?.Notes ?? Enumerable.Empty<Note>())
                         {
-                            @* Calcule l'heure de fin ; revient à hour+1 quand EndHour vaut 0 *@
-                            var endH = noteHere.EndHour > 0 ? noteHere.EndHour : noteHere.Hour + 1;
+                            @* Calcule l'heure de fin ; revient à Hour+1 quand EndHour vaut 0 *@
+                            var endH = note.EndHour > 0 ? note.EndHour : note.Hour + 1;
                             @* Minute de fin correspondante (0 quand l'heure de fin n'était pas définie) *@
-                            var endM = noteHere.EndHour > 0 ? noteHere.EndMinute : 0;
+                            var endM = note.EndHour > 0 ? note.EndMinute : 0;
+                            @* Heure à ouvrir dans la modale au clic sur ce bloc précis *@
+                            var noteHour = note.Hour;
 
-                            @* stopPropagation empêche le onclick de la ligne de se déclencher à nouveau
+                            @* stopPropagation empêche le onclick de la cellule de se déclencher à nouveau
                                quand l'utilisateur clique directement sur le bloc de note *@
                             <div class="note-block"
                                  @onclick:stopPropagation="true"
-                                 @onclick="() => OnTimeSlotClicked(hour)">
+                                 @onclick="() => OnTimeSlotClicked(noteHour)">
                                 @* Affiche la plage horaire de la note *@
-                                <span class="note-time">@($"{noteHere.Hour:D2}:{noteHere.Minute:D2} → {endH:D2}:{endM:D2}")</span>
+                                <span class="note-time">@($"{note.Hour:D2}:{note.Minute:D2} → {endH:D2}:{endM:D2}")</span>
                                 @* Contexte complet de la cascade (Année → Visée à maîtriser) *@
-                                @if (!string.IsNullOrEmpty(noteHere.ViseeContexte))
+                                @if (!string.IsNullOrEmpty(note.ViseeContexte))
                                 {
-                                    <span class="note-visee">🎯 @noteHere.ViseeContexte</span>
+                                    <span class="note-visee">🎯 @note.ViseeContexte</span>
                                 }
                                 @* Contenu textuel de la note (optionnel) *@
-                                @noteHere.Content
+                                @note.Content
                             </div>
                         }
                     </div>
-                </div>
+                }
             }
         </div>
     }
@@ -509,6 +521,62 @@
 
     @* La note en cours de modification, ou null lors de la création d'une nouvelle note *@
     private Note? editingNote = null;
+
+    @* ── Bornes de la grille horaire de la vue jour ──
+       La journée affichée va de 08:00 (GridStartHour) à 18:00 (GridEndHour, exclusive) :
+       la dernière ligne est donc 17:00 → 18:00. *@
+    private const int GridStartHour = 8;
+    private const int GridEndHour   = 18;
+
+    // Première heure NON couverte par la note, c.-à-d. le nombre de lignes qu'elle occupe
+    // dans la grille. Une fin à 11:00 s'arrête à la ligne 10:00 ; une fin à 11:15 déborde
+    // sur la ligne 11:00 et l'occupe donc entièrement. Minimum : une ligne.
+    private static int NoteRowEnd(Note n)
+    {
+        int endH = n.EndHour > 0 ? n.EndHour : n.Hour + 1;
+        int endM = n.EndHour > 0 ? n.EndMinute : 0;
+        if (endM > 0) endH++;
+        return Math.Max(n.Hour + 1, endH);
+    }
+
+    // Une plage d'heures de la grille rendue comme une seule cellule fusionnée.
+    // Start est inclusif, End exclusif (une note 09:00→11:00 donne Start=9, End=11).
+    private sealed class NoteBlock
+    {
+        public int Start;
+        public int End;
+        public List<Note> Notes = new();
+    }
+
+    // Regroupe les notes du jour en blocs à fusionner dans la grille.
+    // Les notes qui se chevauchent partagent le même bloc : sans cela, la note commençant
+    // à l'intérieur d'une autre tomberait sur une ligne déjà absorbée et ne serait pas rendue.
+    // Les notes débordant de la grille sont rognées sur [GridStartHour, GridEndHour[ ;
+    // celles qui tombent entièrement hors de la grille sont ignorées.
+    private static List<NoteBlock> BuildNoteBlocks(Day day)
+    {
+        var blocks = new List<NoteBlock>();
+
+        foreach (var n in day.Notes.OrderBy(n => n.Hour))
+        {
+            int start = Math.Max(n.Hour, GridStartHour);
+            int end   = Math.Min(NoteRowEnd(n), GridEndHour);
+            if (end <= start) continue;
+
+            // Chevauchement avec le bloc précédent : on l'étend au lieu d'en créer un nouveau
+            if (blocks.Count > 0 && start < blocks[^1].End)
+            {
+                blocks[^1].End = Math.Max(blocks[^1].End, end);
+                blocks[^1].Notes.Add(n);
+            }
+            else
+            {
+                blocks.Add(new NoteBlock { Start = start, End = end, Notes = { n } });
+            }
+        }
+
+        return blocks;
+    }
 
     @* Heure de début sélectionnée dans le champ "De" de la modale (heures + minutes) *@
     private TimeOnly noteStart = new(8, 0);
