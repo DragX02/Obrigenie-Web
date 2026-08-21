@@ -249,6 +249,36 @@ public class PdfExportTests
     }
 
     [Fact]
+    public void EnTete_ContientLeLogoEnImageJpeg()
+    {
+        // Le logo est embarqué en JPEG et recopié tel quel dans le PDF : sa présence
+        // ajoute un objet image au document, dont la table xref doit rester juste.
+        var octets = CalendarPdfExporter.Jour("lundi", DayWith(Note(9, 0, 10, 0)), 8, 18);
+
+        AssertPdfValide(octets);
+
+        var texte = Encoding.Latin1.GetString(octets);
+        Assert.Contains("/Subtype /Image", texte);
+        Assert.Contains("/Filter /DCTDecode", texte);
+        Assert.Contains("/XObject << /Im1", texte);
+        Assert.Contains("/Im1 Do", texte);
+    }
+
+    [Fact]
+    public void Logo_EstUnJpegValide()
+    {
+        // Un JPEG commence par le marqueur SOI (FF D8) et se termine par EOI (FF D9) :
+        // le PDF ne décode pas l'image, un fichier tronqué passerait donc inaperçu.
+        var jpeg = LogoObrigenie.Jpeg;
+
+        Assert.True(jpeg.Length > 500);
+        Assert.Equal(0xFF, jpeg[0]);
+        Assert.Equal(0xD8, jpeg[1]);
+        Assert.Equal(0xFF, jpeg[^2]);
+        Assert.Equal(0xD9, jpeg[^1]);
+    }
+
+    [Fact]
     public void Periode_ProducesAStructurallyValidPdf()
     {
         var semaines = new List<CalendarPdfExporter.PeriodeSemaine>

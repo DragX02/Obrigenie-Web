@@ -1294,7 +1294,7 @@ h1:focus { outline: none; }
     .print-header {
         display: flex !important;
         justify-content: space-between;
-        align-items: baseline;
+        align-items: center;
         gap: 1rem;
         margin-bottom: 3mm;
         padding-bottom: 1.5mm;
@@ -1302,6 +1302,11 @@ h1:focus { outline: none; }
         font-size: 9pt;
     }
     .print-header-app { font-weight: 700; font-size: 11pt; }
+    /* Logo a gauche du nom de l'application ; il doit s'imprimer en couleur */
+    .print-header-logo {
+        height: 11mm; width: auto; margin-right: 2mm; vertical-align: middle;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
     .print-header-identite { font-weight: 600; }
 
     /* Texte des notes agrandi de 2 points sur le papier, comme dans les exports PDF */

@@ -40,6 +40,28 @@ namespace Obrigenie.Services
         // Ajoute une page vierge et poursuit le dessin dessus.
         public void NewPage() => pages.Add(new StringBuilder());
 
+        // Image JPEG partagée par toutes les pages, ou null quand le document n'en a pas.
+        // Le PDF affiche un JPEG sans le décoder (filtre DCTDecode) : ses octets sont
+        // recopiés tels quels, ce qui évite d'embarquer un décodeur d'image.
+        private byte[]? imageJpeg;
+        private int imageLargeurPx;
+        private int imageHauteurPx;
+
+        // Dessine le JPEG donné dans le rectangle indiqué, (x, y) étant son coin
+        // supérieur gauche. Un seul JPEG par document : c'est tout ce dont l'en-tête
+        // a besoin, et la table des objets reste simple.
+        public void Image(float x, float y, float largeur, float hauteur,
+                          byte[] jpeg, int largeurPx, int hauteurPx)
+        {
+            imageJpeg      = jpeg;
+            imageLargeurPx = largeurPx;
+            imageHauteurPx = hauteurPx;
+
+            // L'opérateur cm porte la taille puis le coin inférieur gauche de l'image ;
+            // q/Q isolent cette transformation du reste de la page.
+            Page.Append($"q {N(largeur)} 0 0 {N(hauteur)} {N(x)} {N(Y(y + hauteur))} cm /Im1 Do Q\n");
+        }
+
         // Convertit une ordonnée "depuis le haut" en ordonnée PDF "depuis le bas".
         private float Y(float y) => PageHeight - y;
 
@@ -164,14 +186,29 @@ namespace Obrigenie.Services
 
             Ecrire("%PDF-1.4\n");
 
-            // Les identifiants des pages et de leurs flux se suivent : 5, 6, 7, 8, ...
+            // Objets 1 à 4 : catalogue, arbre des pages et les deux polices. Vient
+            // ensuite l'image si le document en contient une, puis les pages et leurs flux.
+            int prochainId = 5;
+            int idImage = imageJpeg != null ? prochainId++ : 0;
+
             var idsPages = new List<int>();
-            for (int i = 0; i < pages.Count; i++) idsPages.Add(5 + i * 2);
+            for (int i = 0; i < pages.Count; i++) { idsPages.Add(prochainId); prochainId += 2; }
 
             Objet(1, "<< /Type /Catalog /Pages 2 0 R >>");
             Objet(2, $"<< /Type /Pages /Kids [{string.Join(" ", idsPages.Select(id => $"{id} 0 R"))}] /Count {pages.Count} >>");
             Objet(3, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
             Objet(4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+
+            // Image : les octets JPEG sont écrits bruts, sans passer par l'encodage texte
+            if (imageJpeg != null)
+            {
+                positions[idImage] = ms.Length;
+                Ecrire($"{idImage} 0 obj\n<< /Type /XObject /Subtype /Image /Width {imageLargeurPx} " +
+                       $"/Height {imageHauteurPx} /ColorSpace /DeviceRGB /BitsPerComponent 8 " +
+                       $"/Filter /DCTDecode /Length {imageJpeg.Length} >>\nstream\n");
+                ms.Write(imageJpeg, 0, imageJpeg.Length);
+                Ecrire("\nendstream\nendobj\n");
+            }
 
             for (int i = 0; i < pages.Count; i++)
             {
@@ -179,16 +216,19 @@ namespace Obrigenie.Services
                 int idContenu = idPage + 1;
                 var contenu   = pages[i].ToString();
 
+                // L'image n'est déclarée dans les ressources que si le document en porte une
+                var ressourceImage = imageJpeg != null ? $" /XObject << /Im1 {idImage} 0 R >>" : "";
+
                 Objet(idPage,
                     $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {N(PageWidth)} {N(PageHeight)}] " +
-                    $"/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents {idContenu} 0 R >>");
+                    $"/Resources << /Font << /F1 3 0 R /F2 4 0 R >>{ressourceImage} >> /Contents {idContenu} 0 R >>");
 
                 positions[idContenu] = ms.Length;
                 Ecrire($"{idContenu} 0 obj\n<< /Length {enc.GetByteCount(contenu)} >>\nstream\n{contenu}endstream\nendobj\n");
             }
 
             // Table des références croisées : position de chaque objet dans le fichier
-            int nbObjets  = 4 + pages.Count * 2;
+            int nbObjets  = prochainId - 1;
             long debutXref = ms.Length;
 
             Ecrire($"xref\n0 {nbObjets + 1}\n0000000000 65535 f \n");

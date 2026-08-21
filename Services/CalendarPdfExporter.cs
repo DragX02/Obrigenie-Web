@@ -390,7 +390,12 @@ namespace Obrigenie.Services
         private static void Titre(PdfWriter pdf, string titre,
                                   string? identite = null, string? anneeScolaire = null)
         {
-            pdf.Text(Marge, 14f, 11f, "Obrigenie", true);
+            // Logo à gauche, puis le nom de l'application aligné sur son milieu
+            const float tailleLogo = 20f;
+            pdf.Image(Marge, 6f, tailleLogo, tailleLogo,
+                      LogoObrigenie.Jpeg, LogoObrigenie.Largeur, LogoObrigenie.Hauteur);
+
+            pdf.Text(Marge + tailleLogo + 5f, 12f, 11f, "Obrigenie", true);
 
             var texte = PdfWriter.Nettoyer(titre);
             float largeur = PdfWriter.LargeurApprox(texte, 14f);
