@@ -161,6 +161,34 @@ public class PdfExportTests
     }
 
     [Fact]
+    public void Semaine_AvecIdentite_EcritLEnTeteDuDocument()
+    {
+        // L'identité saisie avant l'impression doit figurer en tête du document,
+        // avec le nom de l'application et l'année scolaire.
+        var octets = CalendarPdfExporter.Semaine("Semaine 24/08 - 28/08",
+                                                 new List<Day> { DayWith() }, 8, 18,
+                                                 "Jean Dupont - instituteur", "2026-2027");
+
+        AssertPdfValide(octets);
+
+        var texte = Encoding.Latin1.GetString(octets);
+        Assert.Contains("(Obrigenie) Tj", texte);
+        Assert.Contains("(Jean Dupont - instituteur) Tj", texte);
+        Assert.Contains("(Annee scolaire 2026-2027) Tj", texte);
+    }
+
+    [Fact]
+    public void Semaine_SansIdentite_NEcritPasDeLigneVide()
+    {
+        // Sans saisie, l'en-tête se limite au nom de l'application et au titre.
+        var texte = Encoding.Latin1.GetString(
+            CalendarPdfExporter.Semaine("Semaine", new List<Day> { DayWith() }, 8, 18));
+
+        Assert.Contains("(Obrigenie) Tj", texte);
+        Assert.DoesNotContain("Annee scolaire", texte);
+    }
+
+    [Fact]
     public void Periode_ProducesAStructurallyValidPdf()
     {
         var semaines = new List<CalendarPdfExporter.PeriodeSemaine>

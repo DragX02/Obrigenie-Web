@@ -14,7 +14,7 @@ namespace Obrigenie.Services
     {
         // Marges de page et couleurs, communes à toutes les vues
         private const float Marge      = 24f;
-        private const float HautGrille = 52f;
+        private const float HautGrille = 58f;
         private const string GrisTrait = "0.65 0.65 0.65";
         private const string GrisTexte = "0.35 0.35 0.35";
         private const string VertCours = "0.11 0.37 0.13";
@@ -24,17 +24,18 @@ namespace Obrigenie.Services
 
         // Grille horaire d'une journée : colonne d'heures à gauche, notes fusionnées
         // à droite sur toute leur durée, comme à l'écran.
-        public static byte[] Jour(string titre, Day jour, int heureDebut, int heureFin)
+        public static byte[] Jour(string titre, Day jour, int heureDebut, int heureFin,
+                                  string? identite = null, string? anneeScolaire = null)
         {
             var pdf = new PdfWriter(landscape: false);
-            Titre(pdf, titre);
+            Titre(pdf, titre, identite, anneeScolaire);
 
             // Conge couvrant la journee, rappele sous le titre dans sa couleur
             if (!string.IsNullOrEmpty(jour.HolidayName))
             {
                 var conge = PdfWriter.Nettoyer(jour.HolidayName);
                 float largeur = PdfWriter.LargeurApprox(conge, 9f);
-                pdf.Text(Math.Max(Marge, (pdf.PageWidth - largeur) / 2), 38f, 9f, conge, true,
+                pdf.Text(Math.Max(Marge, (pdf.PageWidth - largeur) / 2), 46f, 9f, conge, true,
                          HolidayColors.VersPdf(jour.HolidayName));
             }
 
@@ -66,7 +67,7 @@ namespace Obrigenie.Services
                 float h = (bloc.End - bloc.Start) * hLigne;
 
                 pdf.Rect(xContenu + 3, y + 3, largeurCont - 6, h - 6, 0.8f, "0.85 0.55 0.1");
-                DessinerNotes(pdf, bloc.Notes, xContenu + 8, y + 8, largeurCont - 16, h - 16, 8.5f, complet: true);
+                DessinerNotes(pdf, bloc.Notes, xContenu + 8, y + 8, largeurCont - 16, h - 16, 10.5f, complet: true);
             }
 
             return pdf.Build();
@@ -76,10 +77,11 @@ namespace Obrigenie.Services
 
         // Emploi du temps de la semaine : colonne d'heures à gauche, un jour par
         // colonne, et chaque note placée dans son créneau en couvrant toute sa durée.
-        public static byte[] Semaine(string titre, IReadOnlyList<Day> jours, int heureDebut, int heureFin)
+        public static byte[] Semaine(string titre, IReadOnlyList<Day> jours, int heureDebut, int heureFin,
+                                     string? identite = null, string? anneeScolaire = null)
         {
             var pdf = new PdfWriter(landscape: true);
-            Titre(pdf, titre);
+            Titre(pdf, titre, identite, anneeScolaire);
 
             if (jours.Count == 0) return pdf.Build();
 
@@ -156,7 +158,7 @@ namespace Obrigenie.Services
 
                     pdf.FillRect(x + 2, y + 2, lCol - 4, h - 4, "1 1 1");
                     pdf.Rect(x + 2, y + 2, lCol - 4, h - 4, 0.7f, "0.85 0.55 0.1");
-                    DessinerNotes(pdf, bloc.Notes, x + 5, y + 5, lCol - 10, h - 10, 7f, complet: true);
+                    DessinerNotes(pdf, bloc.Notes, x + 5, y + 5, lCol - 10, h - 10, 9f, complet: true);
                 }
             }
 
@@ -167,10 +169,11 @@ namespace Obrigenie.Services
 
         // Grille de jours en cellules : une case par jour, sur `colonnes` colonnes.
         // Utilisée pour la vue mois, où une grille horaire n'aurait pas de sens.
-        public static byte[] Grille(string titre, IReadOnlyList<Day> jours, int colonnes)
+        public static byte[] Grille(string titre, IReadOnlyList<Day> jours, int colonnes,
+                                    string? identite = null, string? anneeScolaire = null)
         {
             var pdf = new PdfWriter(landscape: true);
-            Titre(pdf, titre);
+            Titre(pdf, titre, identite, anneeScolaire);
 
             if (jours.Count == 0 || colonnes <= 0) return pdf.Build();
 
@@ -220,7 +223,7 @@ namespace Obrigenie.Services
 
                 // Notes du jour
                 var notes = jour.Notes.OrderBy(n => n.Hour).ThenBy(n => n.Minute).ToList();
-                DessinerNotes(pdf, notes, x + 5, yTexte, lCell - 10, y + hCell - yTexte - 3, 7.5f, complet: detail);
+                DessinerNotes(pdf, notes, x + 5, yTexte, lCell - 10, y + hCell - yTexte - 3, 9.5f, complet: detail);
             }
 
             return pdf.Build();
@@ -250,10 +253,11 @@ namespace Obrigenie.Services
 
         // Tableau semaines (colonnes) × jours Lun–Ven (lignes).
         public static byte[] Periode(string titre, IReadOnlyList<PeriodeSemaine> semaines,
-                                     IReadOnlyList<string> nomsJours)
+                                     IReadOnlyList<string> nomsJours,
+                                     string? identite = null, string? anneeScolaire = null)
         {
             var pdf = new PdfWriter(landscape: true);
-            Titre(pdf, titre);
+            Titre(pdf, titre, identite, anneeScolaire);
 
             if (semaines.Count == 0) return pdf.Build();
 
@@ -330,12 +334,31 @@ namespace Obrigenie.Services
 
         // ── Éléments communs ─────────────────────────────────────────────────
 
-        // Titre centré en haut de la première page.
-        private static void Titre(PdfWriter pdf, string titre)
+        // En-tête de la page : nom de l'application à gauche, titre de la période au centre,
+        // année scolaire à droite, puis l'identité de l'enseignant sous le titre.
+        // Identité et année sont saisies avant l'impression ; vides, leur ligne est omise.
+        private static void Titre(PdfWriter pdf, string titre,
+                                  string? identite = null, string? anneeScolaire = null)
         {
+            pdf.Text(Marge, 14f, 11f, "Obrigenie", true);
+
             var texte = PdfWriter.Nettoyer(titre);
             float largeur = PdfWriter.LargeurApprox(texte, 14f);
-            pdf.Text(Math.Max(Marge, (pdf.PageWidth - largeur) / 2), 22f, 14f, texte, true);
+            pdf.Text(Math.Max(Marge, (pdf.PageWidth - largeur) / 2), 12f, 14f, texte, true);
+
+            if (!string.IsNullOrWhiteSpace(anneeScolaire))
+            {
+                var annee = PdfWriter.Nettoyer($"Annee scolaire {anneeScolaire}");
+                pdf.Text(pdf.PageWidth - Marge - PdfWriter.LargeurApprox(annee, 9f), 15f, 9f,
+                         annee, false, GrisTexte);
+            }
+
+            if (!string.IsNullOrWhiteSpace(identite))
+            {
+                var ligne = PdfWriter.Nettoyer(identite);
+                pdf.Text(Math.Max(Marge, (pdf.PageWidth - PdfWriter.LargeurApprox(ligne, 9.5f)) / 2),
+                         32f, 9.5f, ligne, false, GrisTexte);
+            }
         }
 
         // Écrit une liste de notes dans le rectangle donné, en s'arrêtant dès que la

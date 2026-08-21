@@ -527,6 +527,18 @@ h1:focus { outline: none; }
 .print-btn:hover { background: var(--row-hover); }
 .print-hint { font-size: 0.75rem; color: var(--text-muted); }
 
+/* Modale d'identite affichee avant impression / export PDF */
+.identite-modal { max-width: 420px; }
+.identite-champ { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem; }
+.identite-champ label { width: 70px; font-size: 0.85rem; color: var(--text-muted); }
+.identite-champ input {
+    flex: 1; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg-main); color: var(--text); font-size: 0.9rem;
+}
+
+/* En-tete reserve au papier : invisible a l'ecran, affiche a l'impression */
+.print-header { display: none; }
+
 /* Bandeau du conge couvrant la journee, dans la vue jour.
    Les couleurs (fond, bordure, texte) sont posees en style inline par la page :
    chaque conge a la sienne, deduite de son nom. */
@@ -1277,6 +1289,24 @@ h1:focus { outline: none; }
     /* Masque tout ce qui n'a pas de sens sur papier : navigation, boutons, modale */
     .flyout, .flyout-overlay, .top-bar, .view-mode-bar, .print-bar,
     .nav-btn, .modal-overlay, #blazor-error-ui { display: none !important; }
+
+    /* En-tete du document : application, identite saisie, annee scolaire */
+    .print-header {
+        display: flex !important;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 1rem;
+        margin-bottom: 3mm;
+        padding-bottom: 1.5mm;
+        border-bottom: 1px solid #999999;
+        font-size: 9pt;
+    }
+    .print-header-app { font-weight: 700; font-size: 11pt; }
+    .print-header-identite { font-weight: 600; }
+
+    /* Texte des notes agrandi de 2 points sur le papier, comme dans les exports PDF */
+    .note-block, .note-mini { font-size: 11pt !important; }
+    .note-time, .note-visee, .mini-time, .mini-course, .mini-text { font-size: 10.5pt !important; }
 
     /* Le calendrier occupe toute la page, sans marge ni contrainte de hauteur */
     #app-root, .main-wrapper, .content-area, .calendar-container {

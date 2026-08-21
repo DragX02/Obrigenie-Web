@@ -41,6 +41,9 @@
 @* Injection de IJSRuntime pour déclencher l'impression du calendrier depuis le navigateur *@
 @inject IJSRuntime JS
 
+@* Injection du stockage local pour conserver l'identité saisie avant impression *@
+@inject ILocalStorageService LocalStorage
+
 @* ── Barre d'outils du mode d'affichage ──────────────────────────────────── *@
 <div class="calendar-container">
     <div class="view-mode-bar">
@@ -63,11 +66,50 @@
        Le PDF passe par la même boîte de dialogue : le navigateur propose
        "Enregistrer au format PDF" comme destination d'impression. *@
     <div class="print-bar">
-        <button class="print-btn" @onclick="ImprimerCalendrier"
+        <button class="print-btn" @onclick="() => OuvrirIdentite(false)"
                 title="Imprimer la vue affichée (@OrientationImpression)">🖨 Imprimer</button>
-        <button class="print-btn" @onclick="ExporterPdf"
+        <button class="print-btn" @onclick="() => OuvrirIdentite(true)"
                 title="Télécharger directement @NomFichierPdf()">📄 PDF</button>
         <span class="print-hint">@(printHint ?? $"Orientation : {OrientationImpression}")</span>
+    </div>
+
+    @* ── Modale d'identité, affichée avant l'impression et avant l'export PDF ──
+       Les trois champs alimentent l'en-tête du document produit. Ils sont conservés
+       dans le navigateur pour ne pas être ressaisis à chaque impression. *@
+    @if (showIdentiteModal)
+    {
+        <div class="modal-overlay" @onclick="FermerIdentite">
+            <div class="modal-content identite-modal" @onclick:stopPropagation="true">
+                <h3>@(identitePourPdf ? "Exporter en PDF" : "Imprimer")</h3>
+                <p class="modal-date">Ces informations apparaîtront en tête du document.</p>
+
+                <div class="identite-champ">
+                    <label>Nom</label>
+                    <input @bind="identiteNom" placeholder="Nom" />
+                </div>
+                <div class="identite-champ">
+                    <label>Prénom</label>
+                    <input @bind="identitePrenom" placeholder="Prénom" />
+                </div>
+                <div class="identite-champ">
+                    <label>Fonction</label>
+                    <input @bind="identiteFonction" placeholder="Fonction (ex. instituteur, direction)" />
+                </div>
+
+                <div class="modal-buttons">
+                    <button class="btn-save" @onclick="ValiderIdentite">Valider</button>
+                    <button class="btn-cancel" @onclick="FermerIdentite">Annuler</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* En-tête réservé au papier : logo, identité saisie et année scolaire.
+       Masqué à l'écran, il n'apparaît que dans la fenêtre d'impression. *@
+    <div class="print-header">
+        <span class="print-header-app">Obrigenie</span>
+        <span class="print-header-identite">@LigneIdentite</span>
+        <span class="print-header-annee">Année scolaire @AnneeScolaireAffichee</span>
     </div>
 
     @* ── En-tête de navigation ─────────────────────────────────────────────── *@
@@ -910,6 +952,9 @@
             // En cas d'échec, cachedHolidays reste vide ; le calendrier s'affiche sans les informations de vacances
         }
 
+        // Restaure l'identité saisie lors de la précédente impression
+        try { await ChargerIdentite(); } catch { /* stockage indisponible : champs vides */ }
+
         // Affiche la vue semaine par défaut pour aujourd'hui
         await UpdateCalendarView();
     }
@@ -962,12 +1007,15 @@
         int delta = System.DayOfWeek.Monday - currentDate.DayOfWeek;
         if (delta > 0) delta -= 7;  // si aujourd'hui est avant lundi (ex. dimanche), recule
         DateTime monday = currentDate.AddDays(delta);
-        DateTime sunday = monday.AddDays(6);
-
-        weekTitle = $"{Lang.T("cal.week")} {monday:dd/MM} – {sunday:dd/MM}";
 
         // 5 jours en mode Semaine, 7 en mode WeekAndWeekend
         int daysToShow = viewMode == CalendarViewMode.Week ? 5 : 7;
+
+        // Le titre annonce la plage réellement affichée : en mode Semaine il s'arrêtait
+        // au dimanche alors que seuls lundi à vendredi sont montrés.
+        DateTime dernierJour = monday.AddDays(daysToShow - 1);
+        weekTitle = $"{Lang.T("cal.week")} {monday:dd/MM} – {dernierJour:dd/MM}";
+
         days = new List<Day>();
         for (int i = 0; i < daysToShow; i++)
             days.Add(CreateDayModel(monday.AddDays(i)));
@@ -1454,6 +1502,72 @@
     @* Message affiché à côté des boutons d'impression (null = affiche l'orientation) *@
     private string? printHint = null;
 
+    @* ── Identité imprimée en tête du document ──
+       Saisie dans une modale avant chaque impression ou export, et conservée dans le
+       navigateur pour ne pas être retapée à chaque fois. *@
+    private bool   showIdentiteModal = false;
+    private bool   identitePourPdf   = false;
+    private string identiteNom       = "";
+    private string identitePrenom    = "";
+    private string identiteFonction  = "";
+
+    @* Clés de conservation des champs dans le stockage local du navigateur *@
+    private const string CleNom      = "ImpressionNom";
+    private const string ClePrenom   = "ImpressionPrenom";
+    private const string CleFonction = "ImpressionFonction";
+
+    // "Prénom Nom — Fonction", en sautant les parties non renseignées.
+    private string LigneIdentite
+    {
+        get
+        {
+            var nom = $"{identitePrenom} {identiteNom}".Trim();
+            if (string.IsNullOrWhiteSpace(identiteFonction)) return nom;
+            return string.IsNullOrEmpty(nom) ? identiteFonction : $"{nom} — {identiteFonction}";
+        }
+    }
+
+    // Année scolaire de la période affichée, au format "2026-2027".
+    private string AnneeScolaireAffichee
+    {
+        get
+        {
+            int debut = CalendarService.AnneeScolaire(currentDate);
+            return $"{debut}-{debut + 1}";
+        }
+    }
+
+    // Ouvre la modale d'identité ; l'impression ou l'export ne part qu'après validation.
+    private void OuvrirIdentite(bool pourPdf)
+    {
+        identitePourPdf   = pourPdf;
+        printHint         = null;
+        showIdentiteModal = true;
+    }
+
+    private void FermerIdentite() => showIdentiteModal = false;
+
+    // Mémorise les champs saisis puis lance l'action demandée.
+    private async Task ValiderIdentite()
+    {
+        await LocalStorage.SetItemAsStringAsync(CleNom,      identiteNom);
+        await LocalStorage.SetItemAsStringAsync(ClePrenom,   identitePrenom);
+        await LocalStorage.SetItemAsStringAsync(CleFonction, identiteFonction);
+
+        showIdentiteModal = false;
+
+        if (identitePourPdf) await ExporterPdf();
+        else                 await ImprimerCalendrier();
+    }
+
+    // Recharge l'identité mémorisée lors du précédent passage.
+    private async Task ChargerIdentite()
+    {
+        identiteNom      = await LocalStorage.GetItemAsStringAsync(CleNom)      ?? "";
+        identitePrenom   = await LocalStorage.GetItemAsStringAsync(ClePrenom)   ?? "";
+        identiteFonction = await LocalStorage.GetItemAsStringAsync(CleFonction) ?? "";
+    }
+
     // Orientation du papier déduite de la vue : la vue jour est une colonne verticale,
     // toutes les autres sont des grilles larges qui ne tiennent qu'en paysage.
     private string OrientationImpression =>
@@ -1479,16 +1593,20 @@
         var octets = viewMode switch
         {
             CalendarViewMode.SingleDay =>
-                CalendarPdfExporter.Jour(weekTitle, currentDay ?? new Day(), GridStartHour, GridEndHour),
+                CalendarPdfExporter.Jour(weekTitle, currentDay ?? new Day(), GridStartHour, GridEndHour,
+                                         LigneIdentite, AnneeScolaireAffichee),
 
             CalendarViewMode.SchoolPeriod =>
-                CalendarPdfExporter.Periode(weekTitle, ProjeterPeriodePdf(), NomsJoursSemaine()),
+                CalendarPdfExporter.Periode(weekTitle, ProjeterPeriodePdf(), NomsJoursSemaine(),
+                                            LigneIdentite, AnneeScolaireAffichee),
 
             CalendarViewMode.Month =>
-                CalendarPdfExporter.Grille(weekTitle, days, gridSpan),
+                CalendarPdfExporter.Grille(weekTitle, days, gridSpan,
+                                           LigneIdentite, AnneeScolaireAffichee),
 
             // Semaine et semaine+ : emploi du temps avec la colonne des heures
-            _ => CalendarPdfExporter.Semaine(weekTitle, days, GridStartHour, GridEndHour),
+            _ => CalendarPdfExporter.Semaine(weekTitle, days, GridStartHour, GridEndHour,
+                                             LigneIdentite, AnneeScolaireAffichee),
         };
 
         await JS.InvokeVoidAsync("telechargerFichier", NomFichierPdf(), octets, "application/pdf");
