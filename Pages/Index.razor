@@ -1014,7 +1014,8 @@
         // Le titre annonce la plage réellement affichée : en mode Semaine il s'arrêtait
         // au dimanche alors que seuls lundi à vendredi sont montrés.
         DateTime dernierJour = monday.AddDays(daysToShow - 1);
-        weekTitle = $"{Lang.T("cal.week")} {monday:dd/MM} – {dernierJour:dd/MM}";
+        weekTitle = $"{Lang.T("cal.week")} {Lang.T("cal.week.from")} {monday:dd/MM} "
+                  + $"{Lang.T("cal.week.to")} {dernierJour:dd/MM}";
 
         days = new List<Day>();
         for (int i = 0; i < daysToShow; i++)

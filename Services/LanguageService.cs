@@ -78,6 +78,9 @@ namespace Obrigenie.Services
             ["cal.view.period"] = new() { ["FR"] = "Trimestre",      ["EN"] = "Period",       ["NL"] = "Periode"        },
             // Calendrier — titres de navigation
             ["cal.week"]        = new() { ["FR"] = "Semaine",        ["EN"] = "Week",         ["NL"] = "Week"           },
+            // Titre de la vue semaine : "Semaine du 24/08 au 28/08"
+            ["cal.week.from"]   = new() { ["FR"] = "du",             ["EN"] = "from",         ["NL"] = "van"            },
+            ["cal.week.to"]     = new() { ["FR"] = "au",             ["EN"] = "to",           ["NL"] = "tot"            },
             ["cal.loading"]     = new() { ["FR"] = "Chargement de la période...", ["EN"] = "Loading period...", ["NL"] = "Periode laden..." },
             // Calendrier — abréviations des jours (vue Trimestre)
             ["cal.day.mon"]     = new() { ["FR"] = "Lun",            ["EN"] = "Mon",          ["NL"] = "Ma"             },
