@@ -44,27 +44,31 @@ namespace Obrigenie.Services
             float xContenu     = Marge + largeurLabel;
             float largeurCont  = pdf.PageWidth - Marge - xContenu;
 
-            int nbLignes    = Math.Max(1, heureFin - heureDebut);
+            // Seules les heures qui portent une note ou un cours sont imprimées :
+            // les créneaux vides gaspillaient la page en lignes blanches.
+            var heures = HeuresOccupees(new[] { jour }, heureDebut, heureFin);
+            var ligneDe = IndexerLignes(heures);
+
             float hauteur   = pdf.PageHeight - HautGrille - Marge;
-            float hLigne    = hauteur / nbLignes;
+            float hLigne    = hauteur / heures.Count;
 
             // Cadre extérieur de la grille
             pdf.Rect(xGrille, HautGrille, pdf.PageWidth - 2 * Marge, hauteur, 0.8f, GrisTrait);
             pdf.Line(xContenu, HautGrille, xContenu, HautGrille + hauteur, 0.8f, GrisTrait);
 
             // Étiquettes d'heure + séparateurs de lignes
-            for (int h = heureDebut; h < heureFin; h++)
+            for (int i = 0; i < heures.Count; i++)
             {
-                float y = HautGrille + (h - heureDebut) * hLigne;
-                if (h > heureDebut) pdf.Line(xGrille, y, pdf.PageWidth - Marge, y, 0.4f, GrisTrait);
-                pdf.Text(xGrille + 5, y + 5, 8.5f, $"{h:D2}:00", false, GrisTexte);
+                float y = HautGrille + i * hLigne;
+                if (i > 0) pdf.Line(xGrille, y, pdf.PageWidth - Marge, y, 0.4f, GrisTrait);
+                pdf.Text(xGrille + 5, y + 5, 8.5f, $"{heures[i]:D2}:00", false, GrisTexte);
             }
 
             // Blocs de notes fusionnés sur leur durée
             foreach (var bloc in NoteLayout.Blocs(jour.Notes, heureDebut, heureFin))
             {
-                float y = HautGrille + (bloc.Start - heureDebut) * hLigne;
-                float h = (bloc.End - bloc.Start) * hLigne;
+                float y = HautGrille + ligneDe[bloc.Start] * hLigne;
+                float h = (ligneDe[bloc.End - 1] - ligneDe[bloc.Start] + 1) * hLigne;
 
                 pdf.Rect(xContenu + 3, y + 3, largeurCont - 6, h - 6, 0.8f, "0.85 0.55 0.1");
                 DessinerNotes(pdf, bloc.Notes, xContenu + 8, y + 8, largeurCont - 16, h - 16, 10.5f, complet: true);
@@ -92,8 +96,12 @@ namespace Obrigenie.Services
             float hauteur = pdf.PageHeight - HautGrille - Marge;
             float lCol    = (pdf.PageWidth - Marge - xJours) / jours.Count;
 
-            int nbLignes = Math.Max(1, heureFin - heureDebut);
-            float hLigne = (hauteur - hEntete) / nbLignes;
+            // Une heure n'est imprimée que si au moins un jour de la semaine y a
+            // quelque chose : sinon la ligne reste blanche sur toute la largeur.
+            var heures = HeuresOccupees(jours, heureDebut, heureFin);
+            var ligneDe = IndexerLignes(heures);
+
+            float hLigne = (hauteur - hEntete) / heures.Count;
 
             // Cadre extérieur et séparation de la colonne des heures
             pdf.Rect(Marge, HautGrille, pdf.PageWidth - 2 * Marge, hauteur, 0.8f, GrisTrait);
@@ -101,11 +109,11 @@ namespace Obrigenie.Services
             pdf.Line(Marge, HautGrille + hEntete, pdf.PageWidth - Marge, HautGrille + hEntete, 0.8f, GrisTrait);
 
             // Étiquettes d'heure et lignes horizontales, sur toute la largeur
-            for (int h = heureDebut; h < heureFin; h++)
+            for (int i = 0; i < heures.Count; i++)
             {
-                float y = HautGrille + hEntete + (h - heureDebut) * hLigne;
-                if (h > heureDebut) pdf.Line(Marge, y, pdf.PageWidth - Marge, y, 0.4f, GrisTrait);
-                pdf.Text(Marge + 4, y + 4, 8f, $"{h:D2}:00", false, GrisTexte);
+                float y = HautGrille + hEntete + i * hLigne;
+                if (i > 0) pdf.Line(Marge, y, pdf.PageWidth - Marge, y, 0.4f, GrisTrait);
+                pdf.Text(Marge + 4, y + 4, 8f, $"{heures[i]:D2}:00", false, GrisTexte);
             }
 
             for (int i = 0; i < jours.Count; i++)
@@ -139,8 +147,8 @@ namespace Obrigenie.Services
                     int fin   = Math.Min(cours.EndTime.Minutes > 0 ? cours.EndTime.Hours + 1 : cours.EndTime.Hours, heureFin);
                     if (fin <= debut) continue;
 
-                    float yc = yGrille + (debut - heureDebut) * hLigne;
-                    float hc = (fin - debut) * hLigne;
+                    float yc = yGrille + ligneDe[debut] * hLigne;
+                    float hc = (ligneDe[fin - 1] - ligneDe[debut] + 1) * hLigne;
 
                     pdf.FillRect(x + 1, yc + 1, lCol - 2, hc - 2, "0.93 0.93 0.93");
                     pdf.Text(x + 4, yc + 3, 7f,
@@ -153,8 +161,8 @@ namespace Obrigenie.Services
                 // proprement une éventuelle bande de cours
                 foreach (var bloc in NoteLayout.Blocs(jour.Notes, heureDebut, heureFin))
                 {
-                    float y = yGrille + (bloc.Start - heureDebut) * hLigne;
-                    float h = (bloc.End - bloc.Start) * hLigne;
+                    float y = yGrille + ligneDe[bloc.Start] * hLigne;
+                    float h = (ligneDe[bloc.End - 1] - ligneDe[bloc.Start] + 1) * hLigne;
 
                     pdf.FillRect(x + 2, y + 2, lCol - 4, h - 4, "1 1 1");
                     pdf.Rect(x + 2, y + 2, lCol - 4, h - 4, 0.7f, "0.85 0.55 0.1");
@@ -330,6 +338,48 @@ namespace Obrigenie.Services
             }
 
             return pdf.Build();
+        }
+
+        // ── Choix des heures imprimées ───────────────────────────────────────
+
+        // Heures de la grille portant une note ou un cours, dans l'ordre croissant.
+        // Les heures vides ne sont pas imprimées : sur une journée de 08:00 à 18:00,
+        // elles occupaient la moitié de la page sans rien apporter.
+        // Quand rien n'est planifié, la grille complète est conservée : une page
+        // entièrement vide serait plus déroutante qu'un horaire vierge.
+        private static List<int> HeuresOccupees(IEnumerable<Day> jours, int heureDebut, int heureFin)
+        {
+            var occupees = new SortedSet<int>();
+
+            foreach (var jour in jours)
+            {
+                foreach (var bloc in NoteLayout.Blocs(jour.Notes, heureDebut, heureFin))
+                {
+                    for (int h = bloc.Start; h < bloc.End; h++) occupees.Add(h);
+                }
+
+                foreach (var cours in jour.Courses)
+                {
+                    int debut = Math.Max(cours.StartTime.Hours, heureDebut);
+                    int fin   = Math.Min(cours.EndTime.Minutes > 0 ? cours.EndTime.Hours + 1 : cours.EndTime.Hours,
+                                         heureFin);
+                    for (int h = debut; h < fin; h++) occupees.Add(h);
+                }
+            }
+
+            return occupees.Count > 0
+                ? occupees.ToList()
+                : Enumerable.Range(heureDebut, Math.Max(1, heureFin - heureDebut)).ToList();
+        }
+
+        // Position de chaque heure retenue dans la grille imprimée.
+        // Les heures d'un même bloc étant toutes retenues, leurs positions restent
+        // consécutives : un bloc reste d'un seul tenant après suppression des lignes vides.
+        private static Dictionary<int, int> IndexerLignes(List<int> heures)
+        {
+            var index = new Dictionary<int, int>();
+            for (int i = 0; i < heures.Count; i++) index[heures[i]] = i;
+            return index;
         }
 
         // ── Éléments communs ─────────────────────────────────────────────────

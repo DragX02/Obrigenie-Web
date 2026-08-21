@@ -189,9 +189,14 @@
                    Si oui, aucune cellule n'est émise : la cellule fusionnée occupe déjà la place *@
                 var covered = noteBlocks.Any(b => b.Start < hour && b.End > hour);
 
+                @* Heure sans note ni cours : conservée à l'écran pour pouvoir cliquer dessus,
+                   mais retirée à l'impression, où les lignes blanches gaspillent la page *@
+                var heureVide = block == null && !covered
+                             && !currentDay.Courses.Any(c => c.StartTime.Hours <= hour && c.EndTime.Hours > hour);
+
                 @* Colonne de gauche : l'étiquette de l'heure (ex. "08:00"), toujours présente
                    même quand la cellule de droite est fusionnée, pour garder la règle horaire lisible *@
-                <div class="time-label" style="grid-row: @row;">@($"{hour:D2}:00")</div>
+                <div class="time-label @(heureVide ? "time-row-vide" : "")" style="grid-row: @row;">@($"{hour:D2}:00")</div>
 
                 @if (!covered)
                 {
@@ -204,7 +209,8 @@
 
                     @* Cliquer sur la cellule ouvre la modale de note pour cette heure ; sur une cellule
                        fusionnée, cela revient à modifier la note qui l'occupe *@
-                    <div class="time-cell" style="grid-row: @row / span @span;"
+                    <div class="time-cell @(heureVide ? "time-row-vide" : "")"
+                         style="grid-row: @row / span @span;"
                          @onclick="() => OnTimeSlotClicked(hour)">
 
                         @* Affiche les blocs de cours couvrant la plage de la cellule *@

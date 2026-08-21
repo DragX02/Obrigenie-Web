@@ -153,10 +153,11 @@ public class PdfExportTests
 
         AssertPdfValide(octets);
 
-        // La colonne des heures doit couvrir toute la grille, et chaque note garder sa plage
+        // La colonne des heures couvre les créneaux occupés, et chaque note garde sa plage.
+        // Les heures vides ne sont plus imprimées : seules 09:00 et 10:00 subsistent ici.
         var texte = Encoding.Latin1.GetString(octets);
-        Assert.Contains("(08:00) Tj", texte);
-        Assert.Contains("(17:00) Tj", texte);
+        Assert.Contains("(09:00) Tj", texte);
+        Assert.Contains("(10:00) Tj", texte);
         Assert.Contains("(09:00 -> 11:00) Tj", texte);
     }
 
@@ -186,6 +187,65 @@ public class PdfExportTests
 
         Assert.Contains("(Obrigenie) Tj", texte);
         Assert.DoesNotContain("Annee scolaire", texte);
+    }
+
+    [Fact]
+    public void Jour_HeuresSansNote_NeSontPasImprimees()
+    {
+        // Une journée avec une seule note ne doit pas sortir avec neuf lignes blanches.
+        var texte = Encoding.Latin1.GetString(
+            CalendarPdfExporter.Jour("lundi", DayWith(Note(9, 0, 11, 0)), 8, 18));
+
+        Assert.Contains("(09:00) Tj", texte);
+        Assert.Contains("(10:00) Tj", texte);   // couverte par la note
+        Assert.DoesNotContain("(08:00) Tj", texte);
+        Assert.DoesNotContain("(14:00) Tj", texte);
+    }
+
+    [Fact]
+    public void Jour_SansAucuneNote_ConserveLaGrilleComplete()
+    {
+        // Rien de planifié : mieux vaut un horaire vierge qu'une page blanche.
+        var texte = Encoding.Latin1.GetString(CalendarPdfExporter.Jour("mardi", DayWith(), 8, 18));
+
+        Assert.Contains("(08:00) Tj", texte);
+        Assert.Contains("(17:00) Tj", texte);
+    }
+
+    [Fact]
+    public void Semaine_HeureVideChezTousLesJours_EstRetiree()
+    {
+        // L'heure n'est retirée que si aucun jour de la semaine n'y a quelque chose.
+        var jours = new List<Day>
+        {
+            DayWith(Note(9, 0, 10, 0)),
+            DayWith(Note(14, 0, 15, 0)),
+            DayWith(),
+        };
+
+        var texte = Encoding.Latin1.GetString(
+            CalendarPdfExporter.Semaine("Semaine", jours, 8, 18));
+
+        Assert.Contains("(09:00) Tj", texte);
+        Assert.Contains("(14:00) Tj", texte);
+        Assert.DoesNotContain("(11:00) Tj", texte);
+        Assert.DoesNotContain("(17:00) Tj", texte);
+    }
+
+    [Fact]
+    public void Semaine_NoteFusionnee_ResteDUnSeulTenant()
+    {
+        // Les heures d'une même note sont toutes conservées : le bloc ne peut pas
+        // se retrouver coupé par une ligne supprimée entre son début et sa fin.
+        var jours = new List<Day> { DayWith(Note(9, 0, 12, 0)) };
+        var octets = CalendarPdfExporter.Semaine("Semaine", jours, 8, 18);
+
+        AssertPdfValide(octets);
+
+        var texte = Encoding.Latin1.GetString(octets);
+        Assert.Contains("(09:00) Tj", texte);
+        Assert.Contains("(10:00) Tj", texte);
+        Assert.Contains("(11:00) Tj", texte);
     }
 
     [Fact]

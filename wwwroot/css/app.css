@@ -1323,6 +1323,12 @@ h1:focus { outline: none; }
     /* La vue trimestre defile horizontalement a l'ecran : tout doit etre visible a l'impression */
     .trimestre-scroll { overflow: visible !important; }
 
+    /* Heures sans note ni cours : retirees du papier.
+       grid-auto-rows repasse en "auto" pour que la ligne liberee se referme,
+       sinon la hauteur minimale de 60px laisserait un blanc a la place. */
+    .time-row-vide { display: none !important; }
+    .time-grid { grid-auto-rows: auto !important; }
+
     /* Notes et cellules en clair, avec un contour visible sur papier */
     .note-block, .note-mini { background: #ffffff !important; color: #000000 !important; border: 1px solid #999999 !important; }
     .mini-course, .note-visee { color: #1b5e20 !important; }
