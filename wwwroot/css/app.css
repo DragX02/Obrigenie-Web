@@ -527,6 +527,92 @@ h1:focus { outline: none; }
 .print-btn:hover { background: var(--row-hover); }
 .print-hint { font-size: 0.75rem; color: var(--text-muted); }
 
+/* ── Report de lecons ──────────────────────────────────────────────────────
+   Le violet distingue le report des actions d'impression (neutres) et des
+   notes (orange) : on repere d'un coup d'oeil ce qui a ete reporte. */
+.report-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.report-btn {
+    padding: 0.3rem 0.75rem; border: 1px solid #7E57C2; border-radius: 6px;
+    background: var(--bg-card); color: #7E57C2; font-size: 0.85rem; font-weight: 600;
+    cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.report-btn:hover:not(:disabled) { background: #7E57C2; color: #fff; }
+.report-btn:disabled { opacity: 0.45; cursor: default; }
+.report-hint { font-size: 0.75rem; color: var(--text-muted); }
+
+/* Compte rendu du dernier report, au-dessus de la grille */
+.report-flash {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+    padding: 0.4rem 0.7rem; margin-bottom: 0.75rem;
+    border: 1px solid #7E57C2; border-left: 4px solid #7E57C2; border-radius: 6px;
+    background: rgba(126, 87, 194, 0.12); color: var(--text); font-size: 0.85rem;
+}
+.report-flash-close {
+    border: none; background: transparent; color: var(--text-muted);
+    cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0 2px;
+}
+.report-flash-close:hover { color: var(--text); }
+
+/* Panneau de report replie dans la modale de note */
+.modal-report {
+    display: flex; flex-direction: column; gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+.btn-report-toggle {
+    align-self: flex-start;
+    padding: 0.3rem 0.7rem; border: 1px solid #7E57C2; border-radius: 6px;
+    background: transparent; color: #7E57C2; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+}
+.btn-report-toggle:hover { background: rgba(126, 87, 194, 0.15); }
+.report-deja { font-size: 0.75rem; color: #7E57C2; font-weight: 600; }
+.report-panel {
+    display: flex; flex-direction: column; gap: 0.4rem;
+    padding: 0.5rem; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg-main);
+}
+.report-cible { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.report-cible label { font-size: 0.85rem; color: var(--text-muted); }
+.report-cible-lundi { font-size: 0.75rem; color: var(--text-muted); }
+.report-raccourcis { display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }
+.report-raccourcis-label { font-size: 0.75rem; color: var(--text-muted); margin-right: 0.15rem; }
+.report-warn {
+    margin: 0; font-size: 0.78rem; color: #E65100;
+    background: rgba(255, 152, 0, 0.12); border-radius: 6px; padding: 0.3rem 0.5rem;
+}
+.dark .report-warn { color: #FFB74D; }
+.btn-report { align-self: flex-start; }
+
+/* Modale de report de la semaine : liste des lecons a recopier */
+.report-modal { max-width: 520px; }
+.report-liste {
+    max-height: 40vh; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 0.5rem;
+    margin: 0.5rem 0; padding-right: 2px;
+}
+.report-jour { display: flex; flex-direction: column; gap: 2px; }
+.report-jour-titre {
+    font-size: 0.78rem; font-weight: 700; color: var(--text);
+    text-transform: capitalize;
+}
+.report-jour-fleche { font-weight: 400; color: #7E57C2; margin-left: 0.3rem; }
+.report-ligne {
+    display: flex; align-items: baseline; gap: 0.4rem;
+    padding: 2px 4px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;
+}
+.report-ligne:hover { background: var(--row-hover); }
+.report-ligne-heure { color: #E65100; font-weight: 600; white-space: nowrap; }
+.dark .report-ligne-heure { color: #FFB74D; }
+.report-ligne-texte { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Marque portee par la lecon d'origine, dans chaque vue du calendrier */
+.note-reporte {
+    display: block; font-size: 0.72rem; font-weight: 700; color: #7E57C2; margin-bottom: 2px;
+}
+.note-block-reporte { border-left: 4px solid #7E57C2; }
+.mini-reporte { display: block; font-weight: 700; color: #7E57C2; }
+.note-mini-reporte { border-left: 3px solid #7E57C2; }
+.dark .note-reporte, .dark .mini-reporte, .dark .report-deja, .dark .report-jour-fleche { color: #B39DDB; }
+
 /* Modale d'identite affichee avant impression / export PDF */
 .identite-modal { max-width: 420px; }
 .identite-champ { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem; }
@@ -1288,6 +1374,7 @@ h1:focus { outline: none; }
 
     /* Masque tout ce qui n'a pas de sens sur papier : navigation, boutons, modale */
     .flyout, .flyout-overlay, .top-bar, .view-mode-bar, .print-bar,
+    .report-bar, .report-flash,
     .nav-btn, .modal-overlay, #blazor-error-ui { display: none !important; }
 
     /* En-tete du document : application, identite saisie, annee scolaire */
@@ -1311,7 +1398,8 @@ h1:focus { outline: none; }
 
     /* Texte des notes agrandi de 2 points sur le papier, comme dans les exports PDF */
     .note-block, .note-mini { font-size: 11pt !important; }
-    .note-time, .note-visee, .mini-time, .mini-course, .mini-text { font-size: 10.5pt !important; }
+    .note-time, .note-visee, .mini-time, .mini-course, .mini-text,
+    .note-reporte, .mini-reporte { font-size: 10.5pt !important; }
 
     /* Le calendrier occupe toute la page, sans marge ni contrainte de hauteur */
     #app-root, .main-wrapper, .content-area, .calendar-container {
@@ -1337,6 +1425,9 @@ h1:focus { outline: none; }
     /* Notes et cellules en clair, avec un contour visible sur papier */
     .note-block, .note-mini { background: #ffffff !important; color: #000000 !important; border: 1px solid #999999 !important; }
     .mini-course, .note-visee { color: #1b5e20 !important; }
+
+    /* Mention de report : en gras sur papier, la couleur ne suffisant pas a la distinguer */
+    .note-reporte, .mini-reporte { color: #000000 !important; font-weight: 700 !important; }
 
     /* Les puces de cours identifient un cours par leur couleur : on la conserve */
     .course-block, .course-mini { -webkit-print-color-adjust: exact; print-color-adjust: exact; }

@@ -435,6 +435,16 @@ namespace Obrigenie.Services
                 pdf.Text(x, yCourant, taille, NoteLayout.PlageHoraire(note), true, OrangeNote);
                 yCourant += interligne;
 
+                // Mention de report : sur papier aussi, une leçon recopiée ailleurs
+                // annonce sa nouvelle date juste sous son horaire.
+                if (ReportNote.Cible(note.Content) is DateTime cibleReport)
+                {
+                    if (yCourant + interligne > yMax) return;
+                    pdf.Text(x, yCourant, taille - 0.5f,
+                             PdfWriter.Nettoyer($"-> Reporte au {cibleReport:dd/MM/yyyy}"), false, OrangeNote);
+                    yCourant += interligne;
+                }
+
                 // Contexte de cascade : toutes les lignes si la place le permet,
                 // sinon uniquement le cours
                 var contexte = complet
@@ -448,8 +458,8 @@ namespace Obrigenie.Services
                     yCourant += interligne;
                 }
 
-                // Texte libre de la note
-                foreach (var ligne in PdfWriter.Decouper(PdfWriter.Nettoyer(note.Content), taille - 0.5f, largeur))
+                // Texte libre de la note, sans la ligne de marqueur déjà rendue au-dessus
+                foreach (var ligne in PdfWriter.Decouper(PdfWriter.Nettoyer(ReportNote.Texte(note.Content)), taille - 0.5f, largeur))
                 {
                     if (yCourant + interligne > yMax) return;
                     pdf.Text(x, yCourant, taille - 0.5f, ligne);

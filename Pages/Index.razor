@@ -73,6 +73,33 @@
         <span class="print-hint">@(printHint ?? $"Orientation : {OrientationImpression}")</span>
     </div>
 
+    @* ── Barre de report ─────────────────────────────────────────────────────
+       En vue semaine, recopie d'un coup les leçons affichées vers une semaine
+       ultérieure. Chaque leçon d'origine garde la mention de sa date de report. *@
+    @if (viewMode == CalendarViewMode.Week || viewMode == CalendarViewMode.WeekAndWeekend)
+    {
+        <div class="report-bar">
+            <button class="report-btn" @onclick="OuvrirReportSemaine"
+                    disabled="@(!days.SelectMany(d => d.Notes).Any())"
+                    title="Recopier les leçons de cette semaine sur une autre semaine">
+                ↪ Reporter la semaine
+            </button>
+            <span class="report-hint">
+                @{ var nbSemaine = days.Sum(d => d.Notes.Count); }
+                @(nbSemaine == 0 ? "Aucune leçon à reporter cette semaine" : $"{nbSemaine} leçon(s) dans la semaine affichée")
+            </span>
+        </div>
+    }
+
+    @* Résultat du dernier report, refermable par l'utilisateur *@
+    @if (reportInfo != null)
+    {
+        <div class="report-flash">
+            <span>@reportInfo</span>
+            <button class="report-flash-close" @onclick="() => reportInfo = null" title="Masquer">✕</button>
+        </div>
+    }
+
     @* ── Modale d'identité, affichée avant l'impression et avant l'export PDF ──
        Les trois champs alimentent l'en-tête du document produit. Ils sont conservés
        dans le navigateur pour ne pas être ressaisis à chaque impression. *@
@@ -234,20 +261,30 @@
                             @* Heure à ouvrir dans la modale au clic sur ce bloc précis *@
                             var noteHour = note.Hour;
 
+                            @* Texte de la note séparé de sa mention de report : la mention
+                               s'affiche en tête de la case, pas noyée dans le texte libre *@
+                            var (texteNote, cibleReport) = ReportNote.Lire(note.Content);
+
                             @* stopPropagation empêche le onclick de la cellule de se déclencher à nouveau
                                quand l'utilisateur clique directement sur le bloc de note *@
-                            <div class="note-block"
+                            <div class="note-block @(cibleReport != null ? "note-block-reporte" : "")"
+                                 title="@ReportNote.Infobulle(note)"
                                  @onclick:stopPropagation="true"
                                  @onclick="() => OnTimeSlotClicked(noteHour)">
                                 @* Affiche la plage horaire de la note *@
                                 <span class="note-time">@($"{note.Hour:D2}:{note.Minute:D2} → {endH:D2}:{endM:D2}")</span>
+                                @* Mention de report : la leçon a été recopiée sur une autre date *@
+                                @if (cibleReport is DateTime dateReport)
+                                {
+                                    <span class="note-reporte">@ReportNote.Libelle(dateReport)</span>
+                                }
                                 @* Contexte complet de la cascade (Année → Visée à maîtriser) *@
                                 @if (!string.IsNullOrEmpty(note.ViseeContexte))
                                 {
                                     <span class="note-visee">🎯 @note.ViseeContexte</span>
                                 }
                                 @* Contenu textuel de la note (optionnel) *@
-                                @note.Content
+                                @texteNote
                             </div>
                         }
                     </div>
@@ -421,15 +458,23 @@
                             @* Nom du cours extrait de la ligne "Cours : ..." du contexte de cascade *@
                             var cours = NoteLayout.CourseLabel(note);
 
-                            <div class="note-mini note-mini-week">
+                            @* Texte libre et mention de report, séparés pour être affichés distinctement *@
+                            var (texteNote, cibleReport) = ReportNote.Lire(note.Content);
+
+                            <div class="note-mini note-mini-week @(cibleReport != null ? "note-mini-reporte" : "")"
+                                 title="@ReportNote.Infobulle(note)">
                                 <span class="mini-time">@($"{note.Hour:D2}:{note.Minute:D2} → {endH:D2}:{endM:D2}")</span>
+                                @if (cibleReport is DateTime dateReport)
+                                {
+                                    <span class="mini-reporte">↪ Reporté au @dateReport.ToString("dd/MM")</span>
+                                }
                                 @if (!string.IsNullOrEmpty(cours))
                                 {
                                     <span class="mini-course">📘 @cours</span>
                                 }
-                                @if (!string.IsNullOrEmpty(note.Content))
+                                @if (!string.IsNullOrEmpty(texteNote))
                                 {
-                                    <span class="mini-text">📝 @note.Content</span>
+                                    <span class="mini-text">📝 @texteNote</span>
                                 }
                             </div>
                         }
@@ -440,12 +485,22 @@
                            Si la note n'a pas de texte, on affiche le libellé de la visée liée. *@
                         @foreach (var note in day.Notes.Take(2))
                         {
+                            @* Texte libre séparé de la mention de report, qui a son propre aperçu *@
+                            var (texteNote, cibleReport) = ReportNote.Lire(note.Content);
+
                             @* Texte de la note si présent, sinon contexte de cascade condensé sur une ligne *@
-                            var raw = !string.IsNullOrEmpty(note.Content)
-                                ? note.Content
+                            var raw = !string.IsNullOrEmpty(texteNote)
+                                ? texteNote
                                 : (note.ViseeContexte ?? "").Replace("\n", " · ");
-                            var icon = !string.IsNullOrEmpty(note.Content) ? "📝" : "🎯";
+                            var icon = !string.IsNullOrEmpty(texteNote) ? "📝" : "🎯";
                             var preview = raw.Length > 16 ? raw[..16] + "…" : raw;
+
+                            @* La mention de report passe avant l'aperçu : dans une cellule de mois,
+                               savoir que la leçon est repartie ailleurs prime sur son texte *@
+                            @if (cibleReport is DateTime dateReport)
+                            {
+                                <div class="note-mini note-mini-reporte" title="@ReportNote.Infobulle(note)">↪ @dateReport.ToString("dd/MM")</div>
+                            }
                             @if (!string.IsNullOrEmpty(preview))
                             {
                                 <div class="note-mini">@icon @preview</div>
@@ -562,6 +617,73 @@
                 </div>
             }
 
+            @* Report d'une leçon seule — uniquement en modification : la leçon est recopiée
+               sur la date choisie et l'originale garde la mention "Reporté au …". *@
+            @if (editingNote != null)
+            {
+                <div class="modal-report">
+                    <button type="button" class="btn-report-toggle" @onclick="ToggleReportPanel">
+                        ↪ Reporter cette leçon @(showReportPanel ? "▴" : "▾")
+                    </button>
+
+                    @* Mention déjà portée par la leçon, visible même panneau fermé *@
+                    @if (editingNoteReport is DateTime dejaReporte)
+                    {
+                        <span class="report-deja">Déjà reportée au @dejaReporte.ToString("dd/MM/yyyy")</span>
+                    }
+
+                    @if (showReportPanel)
+                    {
+                        <div class="report-panel">
+                            <div class="report-cible">
+                                <label>Vers le</label>
+                                <input type="date" class="date-box" @bind="reportNoteCible" @bind:format="yyyy-MM-dd" />
+                            </div>
+
+                            @* Raccourcis de décalage à partir du jour affiché *@
+                            <div class="report-raccourcis">
+                                <button type="button" class="dow-btn" @onclick="() => DecalerReportNote(1)">Demain</button>
+                                <button type="button" class="dow-btn" @onclick="() => DecalerReportNote(7)">+1 semaine</button>
+                                <button type="button" class="dow-btn" @onclick="() => DecalerReportNote(14)">+2 semaines</button>
+                            </div>
+
+                            @* Jour précis de la semaine suivante *@
+                            <div class="report-raccourcis">
+                                <span class="report-raccourcis-label">Semaine suivante :</span>
+                                @foreach (var (jour, libelle) in RepeatDayButtons)
+                                {
+                                    var j = jour;
+                                    var dateJour = JourDeLaSemaineSuivante(j);
+                                    <button type="button"
+                                            class="dow-btn @(reportNoteCible.Date == dateJour ? "active" : "")"
+                                            @onclick="() => reportNoteCible = dateJour">@libelle</button>
+                                }
+                            </div>
+
+                            @* Congé sur la date visée : signalé, mais le report reste possible *@
+                            @if (AvertissementConge(reportNoteCible) is string avertNote)
+                            {
+                                <p class="report-warn">⚠ @avertNote</p>
+                            }
+
+                            <button class="btn-save btn-report" @onclick="ReporterNote"
+                                    disabled="@(reportEnCours || reportNoteCible.Date == currentDate.Date)">
+                                @(reportEnCours ? "Report en cours…" : $"Reporter au {reportNoteCible:dd/MM/yyyy}")
+                            </button>
+
+                            @if (reportNoteCible.Date == currentDate.Date)
+                            {
+                                <p class="modal-error">Choisis une date différente du jour affiché.</p>
+                            }
+                            @if (reportErreur != null)
+                            {
+                                <p class="modal-error">@reportErreur</p>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
             @* Zone de texte de la note : 2000 caractères maximum, un placeholder guide l'utilisateur *@
             <textarea @bind="noteContent" placeholder="Saisissez votre note ici..." rows="4" maxlength="2000"></textarea>
 
@@ -638,6 +760,85 @@
             </div>
         }
 
+        </div>
+    </div>
+}
+
+@* ════════════════════════════════════════════════════════════════════════════
+   MODALE DE REPORT DE LA SEMAINE — recopie les leçons vers une semaine ultérieure
+   ════════════════════════════════════════════════════════════════════════════ *@
+@if (showReportModal)
+{
+    <div class="modal-overlay" @onclick="FermerReportSemaine">
+        <div class="modal-content report-modal" @onclick:stopPropagation="true">
+            <h3>Reporter la semaine</h3>
+            <p class="modal-date">
+                Semaine du @LundiAffiche.ToString("dd/MM/yyyy") — @reportSource.Count leçon(s)
+            </p>
+
+            @* Semaine visée : n'importe quelle date, ramenée au lundi de sa semaine *@
+            <div class="report-cible">
+                <label>Vers la semaine du</label>
+                <input type="date" class="date-box" @bind="reportCible" @bind:format="yyyy-MM-dd" />
+                <span class="report-cible-lundi">(lundi @LundiDe(reportCible).ToString("dd/MM/yyyy"))</span>
+            </div>
+
+            @* Raccourcis les plus courants *@
+            <div class="report-raccourcis">
+                <button type="button" class="dow-btn @(ReportDeltaJours == 7  ? "active" : "")" @onclick="() => DecalerReportSemaine(1)">+1 semaine</button>
+                <button type="button" class="dow-btn @(ReportDeltaJours == 14 ? "active" : "")" @onclick="() => DecalerReportSemaine(2)">+2 semaines</button>
+                <button type="button" class="dow-btn @(ReportDeltaJours == 21 ? "active" : "")" @onclick="() => DecalerReportSemaine(3)">+3 semaines</button>
+            </div>
+
+            @* Congés touchés par le report : signalés, sans bloquer la validation *@
+            @if (AvertissementReportSemaine() is string avertSemaine)
+            {
+                <p class="report-warn">⚠ @avertSemaine</p>
+            }
+
+            @* Leçons de la semaine affichée, toutes cochées au départ *@
+            <div class="report-liste">
+                @foreach (var jour in reportSource.GroupBy(x => x.Jour.Date).OrderBy(g => g.Key))
+                {
+                    <div class="report-jour">
+                        <div class="report-jour-titre">
+                            @jour.First().Jour.DayOfWeek @jour.Key.ToString("dd/MM")
+                            <span class="report-jour-fleche">→ @jour.Key.AddDays(ReportDeltaJours).ToString("dd/MM")</span>
+                        </div>
+
+                        @foreach (var (_, note) in jour.OrderBy(x => x.Note.Hour).ThenBy(x => x.Note.Minute))
+                        {
+                            var id = note.Id;
+                            var libelle = LibelleLecon(note);
+                            <label class="report-ligne">
+                                <input type="checkbox" checked="@reportChoisies.Contains(id)"
+                                       @onchange="e => BasculerLecon(id, e)" />
+                                <span class="report-ligne-heure">@NoteLayout.PlageHoraire(note)</span>
+                                <span class="report-ligne-texte">@libelle</span>
+                            </label>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="modal-repeat-count">
+                @(ReportDeltaJours == 0
+                    ? "Choisis une semaine différente de celle affichée."
+                    : $"{reportChoisies.Count} leçon(s) seront recopiées vers la semaine du {LundiDe(reportCible):dd/MM/yyyy}. Les originales resteront en place, marquées « Reporté au … ».")
+            </div>
+
+            <div class="modal-buttons">
+                <button class="btn-save" @onclick="ReporterSemaine"
+                        disabled="@(reportEnCours || ReportDeltaJours == 0 || reportChoisies.Count == 0)">
+                    @(reportEnCours ? "Report en cours…" : "Reporter")
+                </button>
+                <button class="btn-cancel" @onclick="FermerReportSemaine">Annuler</button>
+            </div>
+
+            @if (reportErreur != null)
+            {
+                <p class="modal-error">@reportErreur</p>
+            }
         </div>
     </div>
 }
@@ -801,6 +1002,43 @@
 
     @* Message d'erreur de l'API si l'enregistrement de la note échoue ; null quand aucune erreur *@
     private string? noteSaveError = null;
+
+    @* ── État du report de leçons ──
+       Reporter recopie une leçon (ou toute une semaine) sur une date ultérieure et
+       laisse sur l'originale la mention « Reporté au … », portée par son texte
+       (voir ReportNote). Rien n'est déplacé ni supprimé. *@
+
+    @* Modale "reporter la semaine" affichée par le bouton de la barre de report *@
+    private bool showReportModal = false;
+
+    @* Panneau "reporter cette leçon" déplié dans la modale de note *@
+    private bool showReportPanel = false;
+
+    @* Date de report choisie pour la leçon ouverte dans la modale *@
+    private DateTime reportNoteCible = DateTime.Today.AddDays(7);
+
+    @* Date choisie pour le report de semaine ; ramenée au lundi de sa semaine à l'usage *@
+    private DateTime reportCible = DateTime.Today.AddDays(7);
+
+    @* Leçons de la semaine affichée, avec le jour auquel chacune appartient *@
+    private List<(Day Jour, Note Note)> reportSource = new();
+
+    @* Identifiants des leçons cochées dans la modale de report de semaine *@
+    private HashSet<int> reportChoisies = new();
+
+    @* Vrai pendant les appels API du report (évite un double clic) *@
+    private bool reportEnCours = false;
+
+    @* Erreur du dernier report, affichée dans la modale concernée *@
+    private string? reportErreur = null;
+
+    @* Compte rendu du dernier report, affiché en bandeau au-dessus du calendrier *@
+    private string? reportInfo = null;
+
+    @* Date de report déjà portée par la note ouverte en modification.
+       Retirée du texte à l'ouverture et réécrite à l'enregistrement, pour que
+       l'utilisateur ne voie jamais la ligne de marqueur dans la zone de saisie. *@
+    private DateTime? editingNoteReport = null;
 
     @* ══════════════════════════════════════════════════════════════════════════
        NUMÉROTATION DES SEMAINES SCOLAIRES
@@ -1346,8 +1584,16 @@
         editingNote = currentDay?.Notes.FirstOrDefault(n =>
             hour >= n.Hour && hour < (n.EndHour > 0 ? n.EndHour : n.Hour + 1));
 
-        // Pré-remplit les champs de la modale depuis la note existante (mode modif) ou les valeurs par défaut (mode création)
-        noteContent = editingNote?.Content ?? "";
+        // Pré-remplit les champs de la modale depuis la note existante (mode modif) ou les valeurs par défaut (mode création).
+        // La mention de report est retirée du texte affiché : elle a sa propre ligne dans la modale.
+        var (texteSansMarqueur, cibleDejaReportee) = ReportNote.Lire(editingNote?.Content);
+        noteContent       = texteSansMarqueur;
+        editingNoteReport = cibleDejaReportee;
+
+        // Panneau de report replié, visant par défaut le même jour la semaine suivante
+        showReportPanel = false;
+        reportNoteCible = currentDate.Date.AddDays(7);
+        reportErreur    = null;
         noteStart   = editingNote != null
             ? new TimeOnly(editingNote.Hour, editingNote.Minute)
             : new TimeOnly(hour, 0);
@@ -1383,6 +1629,12 @@
         if (editingNote != null)
         {
             ApplyFormTo(editingNote);
+
+            // Le texte saisi ne contient pas la mention de report : on la réécrit,
+            // sinon modifier une leçon reportée effacerait la trace du report.
+            if (editingNoteReport is DateTime dejaReporte)
+                editingNote.Content = ReportNote.Marquer(editingNote.Content, dejaReporte);
+
             var (ok, err) = await Api.SaveNoteAsync(editingNote);
             if (!ok) { noteSaveError = err; return; }
         }
@@ -1470,7 +1722,9 @@
     {
         showNoteModal = false;
         showCascadePanel = false;
+        showReportPanel = false;
         cascadeSelection = null;
+        reportErreur = null;
     }
 
     // Affiche / masque le panneau latéral de sélection en cascade.
@@ -1501,6 +1755,219 @@
         Ajouter("Visée à maîtriser", s.NomViseesMaitriser);
 
         return string.Join("\n", lignes);
+    }
+
+    @* ══════════════════════════════════════════════════════════════════════════
+       REPORT DE LEÇONS
+       Reporter recopie une leçon sur une date ultérieure sans rien retaper, et
+       marque l'originale « Reporté au … » pour qu'on retrouve où elle est repartie.
+       L'originale n'est jamais supprimée ni déplacée.
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    // Lundi de la semaine contenant la date donnée.
+    private static DateTime LundiDe(DateTime date)
+    {
+        int delta = (int)System.DayOfWeek.Monday - (int)date.DayOfWeek;
+        if (delta > 0) delta -= 7;   // dimanche appartient à la semaine qui vient de s'écouler
+        return date.Date.AddDays(delta);
+    }
+
+    // Lundi de la semaine actuellement affichée dans la grille.
+    private DateTime LundiAffiche => days.Count > 0 ? LundiDe(days[0].Date) : LundiDe(currentDate);
+
+    // Nombre de jours séparant la semaine affichée de la semaine visée (multiple de 7).
+    private int ReportDeltaJours => (LundiDe(reportCible) - LundiAffiche).Days;
+
+    // Date du jour de semaine demandé dans la semaine qui suit celle affichée.
+    private DateTime JourDeLaSemaineSuivante(DayOfWeek jour)
+    {
+        int offset = ((int)jour - (int)System.DayOfWeek.Monday + 7) % 7;
+        return LundiDe(currentDate).AddDays(7 + offset);
+    }
+
+    // Décale la date de report d'une leçon de N jours à partir du jour affiché.
+    private void DecalerReportNote(int jours) => reportNoteCible = currentDate.Date.AddDays(jours);
+
+    // Vise la semaine située N semaines après celle affichée.
+    private void DecalerReportSemaine(int semaines) => reportCible = LundiAffiche.AddDays(7 * semaines);
+
+    // Déplie / replie le panneau de report dans la modale de note.
+    private void ToggleReportPanel()
+    {
+        showReportPanel = !showReportPanel;
+        reportErreur = null;
+    }
+
+    // Message d'avertissement quand la date visée tombe un jour de congé, sinon null.
+    // Le report reste possible : c'est un signalement, pas un blocage.
+    private string? AvertissementConge(DateTime date)
+    {
+        var jour = CreateDayModel(date.Date);
+        if (!jour.IsHoliday) return null;
+
+        var nom = string.IsNullOrEmpty(jour.ShortHolidayName) ? "congé" : jour.ShortHolidayName;
+        return $"Le {date:dd/MM/yyyy} tombe en congé ({nom}). Tu peux quand même reporter.";
+    }
+
+    // Même signalement, pour l'ensemble des leçons cochées dans le report de semaine.
+    private string? AvertissementReportSemaine()
+    {
+        int delta = ReportDeltaJours;
+        if (delta == 0) return null;
+
+        // Jours de destination distincts qui tombent en congé
+        var enConge = reportSource
+            .Where(x => reportChoisies.Contains(x.Note.Id))
+            .Select(x => x.Note.Date.Date.AddDays(delta))
+            .Distinct()
+            .Select(d => CreateDayModel(d))
+            .Where(j => j.IsHoliday)
+            .ToList();
+
+        if (enConge.Count == 0) return null;
+
+        var noms = string.Join(", ", enConge.Select(j => j.ShortHolidayName)
+                                            .Where(n => !string.IsNullOrEmpty(n))
+                                            .Distinct());
+        var suffixe = string.IsNullOrEmpty(noms) ? "" : $" ({noms})";
+
+        return $"{enConge.Count} jour(s) de destination tombent en congé{suffixe}. Tu peux quand même reporter.";
+    }
+
+    // Libellé court d'une leçon dans la liste de la modale : le cours de la cascade,
+    // à défaut le texte libre, à défaut la visée. Tronqué pour tenir sur une ligne.
+    private static string LibelleLecon(Note note)
+    {
+        var cours = NoteLayout.CourseLabel(note);
+        var texte = ReportNote.Texte(note.Content);
+
+        var brut = !string.IsNullOrWhiteSpace(cours) ? cours
+                 : !string.IsNullOrWhiteSpace(texte) ? texte
+                 : (note.ViseeContexte ?? "");
+
+        brut = brut.Replace("\n", " · ").Trim();
+        if (string.IsNullOrEmpty(brut)) return "(leçon sans intitulé)";
+        return brut.Length > 60 ? brut[..60] + "…" : brut;
+    }
+
+    // Coche / décoche une leçon dans la liste du report de semaine.
+    private void BasculerLecon(int id, ChangeEventArgs e)
+    {
+        if (e.Value is bool coche && coche) reportChoisies.Add(id);
+        else                                reportChoisies.Remove(id);
+    }
+
+    // Ouvre la modale de report de semaine, toutes les leçons affichées cochées.
+    private void OuvrirReportSemaine()
+    {
+        reportSource = days
+            .SelectMany(d => d.Notes.Select(n => (Jour: d, Note: n)))
+            .OrderBy(x => x.Jour.Date).ThenBy(x => x.Note.Hour).ThenBy(x => x.Note.Minute)
+            .ToList();
+
+        reportChoisies  = reportSource.Select(x => x.Note.Id).ToHashSet();
+        reportCible     = LundiAffiche.AddDays(7);
+        reportErreur    = null;
+        reportInfo      = null;
+        reportEnCours   = false;
+        showReportModal = true;
+    }
+
+    // Ferme la modale de report de semaine sans rien recopier.
+    private void FermerReportSemaine()
+    {
+        showReportModal = false;
+        reportErreur    = null;
+    }
+
+    // Recopie les leçons cochées sur la semaine visée et marque chaque originale.
+    // La copie est créée d'abord : si le marquage échoue, la leçon est reportée
+    // quand même et le compte rendu le signale.
+    private async Task ReporterSemaine()
+    {
+        if (reportEnCours) return;
+
+        int delta = ReportDeltaJours;
+        if (delta == 0) { reportErreur = "Choisis une semaine différente de celle affichée."; return; }
+
+        var choisies = reportSource.Where(x => reportChoisies.Contains(x.Note.Id)).ToList();
+        if (choisies.Count == 0) { reportErreur = "Aucune leçon cochée."; return; }
+
+        reportEnCours = true;
+        reportErreur  = null;
+
+        int copiees = 0, marquees = 0;
+
+        foreach (var (_, note) in choisies)
+        {
+            var cible = note.Date.Date.AddDays(delta);
+
+            var (ok, err) = await Api.SaveNoteAsync(ReportNote.Copier(note, cible));
+            if (!ok)
+            {
+                reportEnCours = false;
+                reportErreur  = copiees == 0
+                    ? (err ?? "Le report a échoué.")
+                    : $"{copiees} leçon(s) reportée(s), puis erreur : {err}";
+                await UpdateCalendarView();
+                return;
+            }
+            copiees++;
+
+            // Marque l'originale ; un échec ici ne remet pas la copie en cause
+            note.Content = ReportNote.Marquer(note.Content, cible);
+            var (okMarque, _) = await Api.SaveNoteAsync(note);
+            if (okMarque) marquees++;
+        }
+
+        reportEnCours   = false;
+        showReportModal = false;
+
+        reportInfo = marquees == copiees
+            ? $"{copiees} leçon(s) reportée(s) vers la semaine du {LundiDe(reportCible):dd/MM/yyyy}."
+            : $"{copiees} leçon(s) reportée(s), mais {copiees - marquees} mention(s) « Reporté au … » n'ont pas pu être enregistrées.";
+
+        await UpdateCalendarView();
+    }
+
+    // Recopie la leçon ouverte dans la modale sur la date choisie et marque l'originale.
+    // Le texte et l'horaire pris en compte sont ceux affichés dans la modale, pour que
+    // les retouches faites juste avant le report partent avec la copie.
+    private async Task ReporterNote()
+    {
+        if (editingNote == null || reportEnCours) return;
+        if (reportNoteCible.Date == currentDate.Date) { reportErreur = "Choisis une date différente du jour affiché."; return; }
+
+        reportEnCours = true;
+        reportErreur  = null;
+
+        // Reprend les valeurs de la modale sur la note d'origine avant de la copier
+        ApplyFormTo(editingNote);
+
+        var (ok, err) = await Api.SaveNoteAsync(ReportNote.Copier(editingNote, reportNoteCible));
+        if (!ok)
+        {
+            reportEnCours = false;
+            reportErreur  = err ?? "Le report a échoué.";
+            return;
+        }
+
+        // Marque l'originale de sa nouvelle date de report
+        editingNote.Content = ReportNote.Marquer(editingNote.Content, reportNoteCible);
+        var (okMarque, errMarque) = await Api.SaveNoteAsync(editingNote);
+
+        reportEnCours     = false;
+        showNoteModal     = false;
+        showReportPanel   = false;
+        showCascadePanel  = false;
+        cascadeSelection  = null;
+        editingNoteReport = null;
+
+        reportInfo = okMarque
+            ? $"Leçon reportée au {reportNoteCible:dd/MM/yyyy}."
+            : $"Leçon reportée au {reportNoteCible:dd/MM/yyyy}, mais la mention « Reporté au … » n'a pas pu être enregistrée ({errMarque}).";
+
+        await UpdateCalendarView();
     }
 
     @* ══════════════════════════════════════════════════════════════════════════
