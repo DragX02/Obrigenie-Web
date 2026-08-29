@@ -147,6 +147,49 @@ public class ReportNoteTests
     }
 
     [Fact]
+    public void DateCopie_PorteeJournee_MeneDroitALaDateChoisie()
+    {
+        // Copier une leçon ou une journée prend le jour lui-même comme référence :
+        // la leçon atterrit exactement sur la date cochée, quel que soit son jour de semaine.
+        var note = new Note { Date = new DateTime(2025, 9, 29) };   // lundi
+
+        var arrivee = ReportNote.DateCopie(note, new DateTime(2025, 9, 29), new DateTime(2025, 10, 9));
+
+        Assert.Equal(new DateTime(2025, 10, 9), arrivee);           // jeudi
+    }
+
+    [Theory]
+    // Une semaine copiee trois semaines plus loin : chaque lecon garde son jour de semaine.
+    [InlineData("2025-09-29", "2025-10-20")]   // lundi   -> lundi
+    [InlineData("2025-10-01", "2025-10-22")]   // mercredi -> mercredi
+    [InlineData("2025-10-03", "2025-10-24")]   // vendredi -> vendredi
+    public void DateCopie_PorteeSemaine_ConserveLeJourDeSemaine(string depart, string arrivee)
+    {
+        var lundiSource = new DateTime(2025, 9, 29);
+        var lundiCible  = new DateTime(2025, 10, 20);
+        var note = new Note { Date = DateTime.Parse(depart) };
+
+        var obtenue = ReportNote.DateCopie(note, lundiSource, lundiCible);
+
+        Assert.Equal(DateTime.Parse(arrivee), obtenue);
+        Assert.Equal(note.Date.DayOfWeek, obtenue.DayOfWeek);
+    }
+
+    [Fact]
+    public void DateCopie_IgnoreLHeureDesDates()
+    {
+        // Les dates transitent avec une composante horaire selon leur provenance :
+        // elle ne doit jamais faire glisser une copie sur le jour voisin.
+        var note = new Note { Date = new DateTime(2025, 9, 29, 23, 30, 0) };
+
+        var arrivee = ReportNote.DateCopie(note,
+            new DateTime(2025, 9, 29, 22, 0, 0),
+            new DateTime(2025, 10, 6, 1, 0, 0));
+
+        Assert.Equal(new DateTime(2025, 10, 6), arrivee);
+    }
+
+    [Fact]
     public void Infobulle_SuitLaPresenceDuMarqueur()
     {
         var reportee = new Note { Content = ReportNote.Marquer("Dictée", Cible) };

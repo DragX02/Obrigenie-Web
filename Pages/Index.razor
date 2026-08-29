@@ -73,20 +73,40 @@
         <span class="print-hint">@(printHint ?? $"Orientation : {OrientationImpression}")</span>
     </div>
 
-    @* ── Barre de report ─────────────────────────────────────────────────────
-       En vue semaine, recopie d'un coup les leçons affichées vers une semaine
-       ultérieure. Chaque leçon d'origine garde la mention de sa date de report. *@
+    @* ── Barre de report et de copie ─────────────────────────────────────────
+       Reporter déplace le travail vers une seule semaine et marque les leçons
+       d'origine ; copier les duplique vers autant de dates que voulu, sans rien
+       marquer. Les deux vivent côte à côte : reporter un cours annulé et
+       recopier une séance qui revient chaque semaine ne sont pas le même geste. *@
     @if (viewMode == CalendarViewMode.Week || viewMode == CalendarViewMode.WeekAndWeekend)
     {
         <div class="report-bar">
             <button class="report-btn" @onclick="OuvrirReportSemaine"
                     disabled="@(!days.SelectMany(d => d.Notes).Any())"
-                    title="Recopier les leçons de cette semaine sur une autre semaine">
+                    title="Recopier les leçons de cette semaine sur une autre semaine, en marquant les originales">
                 ↪ Reporter la semaine
+            </button>
+            <button class="copie-btn" @onclick="OuvrirCopieSemaine"
+                    disabled="@(!days.SelectMany(d => d.Notes).Any())"
+                    title="Copier les leçons de cette semaine vers une ou plusieurs semaines">
+                ⧉ Copier la semaine
             </button>
             <span class="report-hint">
                 @{ var nbSemaine = days.Sum(d => d.Notes.Count); }
-                @(nbSemaine == 0 ? "Aucune leçon à reporter cette semaine" : $"{nbSemaine} leçon(s) dans la semaine affichée")
+                @(nbSemaine == 0 ? "Aucune leçon dans la semaine affichée" : $"{nbSemaine} leçon(s) dans la semaine affichée")
+            </span>
+        </div>
+    }
+    else if (viewMode == CalendarViewMode.SingleDay && currentDay != null)
+    {
+        <div class="report-bar">
+            <button class="copie-btn" @onclick="OuvrirCopieJournee"
+                    disabled="@(currentDay.Notes.Count == 0)"
+                    title="Copier les leçons de cette journée vers une ou plusieurs dates">
+                ⧉ Copier la journée
+            </button>
+            <span class="report-hint">
+                @(currentDay.Notes.Count == 0 ? "Aucune leçon ce jour" : $"{currentDay.Notes.Count} leçon(s) ce jour")
             </span>
         </div>
     }
@@ -622,9 +642,17 @@
             @if (editingNote != null)
             {
                 <div class="modal-report">
-                    <button type="button" class="btn-report-toggle" @onclick="ToggleReportPanel">
-                        ↪ Reporter cette leçon @(showReportPanel ? "▴" : "▾")
-                    </button>
+                    <div class="modal-report-actions">
+                        <button type="button" class="btn-report-toggle" @onclick="ToggleReportPanel">
+                            ↪ Reporter cette leçon @(showReportPanel ? "▴" : "▾")
+                        </button>
+
+                        @* Copier ouvre sa propre fenêtre : la liste des dates retenues
+                           demande plus de place que le panneau replié du report. *@
+                        <button type="button" class="btn-copie-toggle" @onclick="OuvrirCopieLecon">
+                            ⧉ Copier vers d'autres dates
+                        </button>
+                    </div>
 
                     @* Mention déjà portée par la leçon, visible même panneau fermé *@
                     @if (editingNoteReport is DateTime dejaReporte)
@@ -843,6 +871,125 @@
     </div>
 }
 
+@* ════════════════════════════════════════════════════════════════════════════
+   MODALE DE COPIE — duplique une leçon, une journée ou une semaine vers
+   autant de dates que voulu. Les originales ne sont ni modifiées ni marquées :
+   copier n'est pas reporter, la leçon d'origine a toujours lieu.
+   ════════════════════════════════════════════════════════════════════════════ *@
+@if (showCopieModal)
+{
+    <div class="modal-overlay" @onclick="FermerCopie">
+        <div class="modal-content copie-modal" @onclick:stopPropagation="true">
+            <h3>@TitreCopie</h3>
+            <p class="modal-date">@SousTitreCopie</p>
+
+            @* ── Choix des dates de destination ──
+               Une date à la fois, ajoutée à une liste : c'est ce qui permet des
+               destinations quelconques (trois mardis puis un jeudi) là où une
+               plage de dates imposerait un rythme régulier. *@
+            <div class="copie-ajout">
+                <label>@(CopieParSemaine ? "Semaine du" : "Date")</label>
+                <input type="date" class="date-box" @bind="copieDateSaisie" @bind:format="yyyy-MM-dd" />
+                <button type="button" class="dow-btn" @onclick="() => AjouterCibleCopie(copieDateSaisie)">+ Ajouter</button>
+            </div>
+
+            @* Ajouts rapides à partir de la source *@
+            <div class="report-raccourcis">
+                <span class="report-raccourcis-label">Ajout rapide :</span>
+                @if (!CopieParSemaine)
+                {
+                    <button type="button" class="dow-btn" @onclick="() => AjouterCibleCopie(copieSourceDate.AddDays(1))">Demain</button>
+                }
+                <button type="button" class="dow-btn" @onclick="() => AjouterCibleCopie(copieSourceDate.AddDays(7))">+1 sem.</button>
+                <button type="button" class="dow-btn" @onclick="() => AjouterCibleCopie(copieSourceDate.AddDays(14))">+2 sem.</button>
+                <button type="button" class="dow-btn" @onclick="() => AjouterCibleCopie(copieSourceDate.AddDays(21))">+3 sem.</button>
+                <button type="button" class="dow-btn" @onclick="AjouterQuatreSemaines">Les 4 prochaines</button>
+            </div>
+
+            @* Jour précis de la semaine suivante — sans objet quand on copie semaine par semaine *@
+            @if (!CopieParSemaine)
+            {
+                <div class="report-raccourcis">
+                    <span class="report-raccourcis-label">Semaine suivante :</span>
+                    @foreach (var (jour, libelle) in RepeatDayButtons)
+                    {
+                        var j = jour;
+                        <button type="button" class="dow-btn" @onclick="() => AjouterCibleCopie(JourDeLaSemaineSuivante(j))">@libelle</button>
+                    }
+                </div>
+            }
+
+            @* Dates retenues, chacune retirable ; celles en congé sont teintées *@
+            <div class="copie-chips">
+                @if (copieCibles.Count == 0)
+                {
+                    <span class="copie-vide">Aucune date choisie pour l'instant.</span>
+                }
+                @foreach (var cible in copieCibles.ToList())
+                {
+                    var d = cible;
+                    var jourCible = CreateDayModel(d);
+                    <span class="copie-chip @(jourCible.IsHoliday ? "copie-chip-conge" : "")"
+                          title="@(jourCible.IsHoliday ? $"En congé : {jourCible.ShortHolidayName}" : null)">
+                        @(CopieParSemaine ? $"semaine du {d:dd/MM/yyyy}" : d.ToString("ddd dd/MM/yyyy", LangCulture))
+                        <button type="button" class="copie-chip-x" @onclick="() => copieCibles.Remove(d)" title="Retirer">✕</button>
+                    </span>
+                }
+            </div>
+
+            @* Congés parmi les destinations : signalés, sans bloquer la copie *@
+            @if (AvertissementCopie() is string avertCopie)
+            {
+                <p class="report-warn">⚠ @avertCopie</p>
+            }
+
+            @* Leçons à copier — masqué quand il n'y en a qu'une, il n'y a rien à choisir *@
+            @if (copieSource.Count > 1)
+            {
+                <div class="report-liste">
+                    @foreach (var groupe in copieSource.GroupBy(x => x.Jour.Date).OrderBy(g => g.Key))
+                    {
+                        <div class="report-jour">
+                            <div class="report-jour-titre">
+                                @groupe.First().Jour.DayOfWeek @groupe.Key.ToString("dd/MM")
+                            </div>
+
+                            @foreach (var (_, note) in groupe.OrderBy(x => x.Note.Hour).ThenBy(x => x.Note.Minute))
+                            {
+                                var id = note.Id;
+                                <label class="report-ligne">
+                                    <input type="checkbox" checked="@copieChoisies.Contains(id)"
+                                           @onchange="e => BasculerCopieLecon(id, e)" />
+                                    <span class="report-ligne-heure">@NoteLayout.PlageHoraire(note)</span>
+                                    <span class="report-ligne-texte">@LibelleLecon(note)</span>
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="modal-repeat-count">
+                @(NbCopies == 0
+                    ? "Choisis au moins une date de destination et une leçon."
+                    : $"{NbLeconsCopiees} leçon(s) × {copieCibles.Count} date(s) = {NbCopies} copie(s). Les leçons d'origine ne sont pas modifiées.")
+            </div>
+
+            <div class="modal-buttons">
+                <button class="btn-save" @onclick="LancerCopie" disabled="@(copieEnCours || NbCopies == 0)">
+                    @(copieEnCours ? "Copie en cours…" : "Copier")
+                </button>
+                <button class="btn-cancel" @onclick="FermerCopie">Annuler</button>
+            </div>
+
+            @if (copieErreur != null)
+            {
+                <p class="modal-error">@copieErreur</p>
+            }
+        </div>
+    </div>
+}
+
 @code {
     @* ── État de la vue ──────────────────────────────────────────────────────── *@
 
@@ -1039,6 +1186,41 @@
        Retirée du texte à l'ouverture et réécrite à l'enregistrement, pour que
        l'utilisateur ne voie jamais la ligne de marqueur dans la zone de saisie. *@
     private DateTime? editingNoteReport = null;
+
+    @* ── État de la copie de leçons ──
+       Copier duplique une leçon, une journée ou une semaine vers autant de dates
+       que voulu. Contrairement au report, les originales ne sont ni modifiées ni
+       marquées : la leçon copiée a toujours lieu à sa date. *@
+
+    @* Ce que la fenêtre de copie est en train de dupliquer *@
+    private enum PorteeCopie { Lecon, Journee, Semaine }
+    private PorteeCopie copiePortee = PorteeCopie.Lecon;
+
+    @* Fenêtre de copie affichée *@
+    private bool showCopieModal = false;
+
+    @* Leçons candidates, avec le jour auquel chacune appartient *@
+    private List<(Day Jour, Note Note)> copieSource = new();
+
+    @* Identifiants des leçons cochées (sans objet quand il n'y en a qu'une) *@
+    private HashSet<int> copieChoisies = new();
+
+    @* Date de référence de la source : le jour copié, ou le lundi de la semaine copiée.
+       Toutes les destinations se calculent en décalage par rapport à elle, ce qui fait
+       tenir les trois portées dans un seul calcul. *@
+    private DateTime copieSourceDate = DateTime.Today;
+
+    @* Destinations retenues : des dates en portée leçon/journée, des lundis en portée semaine *@
+    private SortedSet<DateTime> copieCibles = new();
+
+    @* Date affichée dans le champ d'ajout de la fenêtre de copie *@
+    private DateTime copieDateSaisie = DateTime.Today;
+
+    @* Vrai pendant les appels API de la copie (évite un double clic) *@
+    private bool copieEnCours = false;
+
+    @* Erreur de la dernière copie, affichée dans la fenêtre *@
+    private string? copieErreur = null;
 
     @* ══════════════════════════════════════════════════════════════════════════
        NUMÉROTATION DES SEMAINES SCOLAIRES
@@ -1966,6 +2148,209 @@
         reportInfo = okMarque
             ? $"Leçon reportée au {reportNoteCible:dd/MM/yyyy}."
             : $"Leçon reportée au {reportNoteCible:dd/MM/yyyy}, mais la mention « Reporté au … » n'a pas pu être enregistrée ({errMarque}).";
+
+        await UpdateCalendarView();
+    }
+
+    @* ══════════════════════════════════════════════════════════════════════════
+       COPIE DE LEÇONS
+       Duplique une leçon, une journée ou une semaine vers une ou plusieurs dates.
+       Les trois portées partagent un seul calcul : chaque destination est un
+       décalage en jours par rapport à la date de référence de la source. En
+       portée journée ou leçon ce décalage donne directement la date choisie ;
+       en portée semaine, c'est un multiple de 7 qui conserve le jour de semaine.
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    @* Vrai quand les destinations sont des semaines entières et non des dates isolées *@
+    private bool CopieParSemaine => copiePortee == PorteeCopie.Semaine;
+
+    @* Leçons effectivement retenues : toutes quand il n'y a rien à cocher *@
+    private IEnumerable<Note> CopieLeconsRetenues => copieSource.Count <= 1
+        ? copieSource.Select(x => x.Note)
+        : copieSource.Where(x => copieChoisies.Contains(x.Note.Id)).Select(x => x.Note);
+
+    private int NbLeconsCopiees => CopieLeconsRetenues.Count();
+    private int NbCopies        => NbLeconsCopiees * copieCibles.Count;
+
+    private string TitreCopie => copiePortee switch
+    {
+        PorteeCopie.Semaine => "Copier la semaine",
+        PorteeCopie.Journee => "Copier la journée",
+        _                   => "Copier la leçon"
+    };
+
+    private string SousTitreCopie => copiePortee switch
+    {
+        PorteeCopie.Semaine => $"Semaine du {copieSourceDate:dd/MM/yyyy} — {copieSource.Count} leçon(s)",
+        PorteeCopie.Journee => $"{copieSourceDate.ToString("dddd dd MMMM yyyy", LangCulture)} — {copieSource.Count} leçon(s)",
+        _                   => $"{copieSourceDate.ToString("dddd dd MMMM yyyy", LangCulture)} — "
+                             + (copieSource.Count > 0 ? NoteLayout.PlageHoraire(copieSource[0].Note) : "")
+    };
+
+    // Ajoute une destination à la liste. En portée semaine, la date est ramenée au
+    // lundi de sa semaine : c'est la semaine entière qui est visée, pas un jour précis.
+    // La date de la source est refusée — se copier sur soi-même ne ferait que des doublons.
+    private void AjouterCibleCopie(DateTime date)
+    {
+        var cible = CopieParSemaine ? LundiDe(date) : date.Date;
+        copieErreur = null;
+
+        if (cible == copieSourceDate.Date)
+        {
+            copieErreur = CopieParSemaine
+                ? "C'est la semaine d'origine : choisis-en une autre."
+                : "C'est la date d'origine : choisis-en une autre.";
+            return;
+        }
+
+        copieCibles.Add(cible);
+        copieDateSaisie = cible;
+    }
+
+    // Ajoute d'un coup les quatre semaines suivant la source : le cas le plus courant
+    // quand une même séance revient chaque semaine jusqu'aux congés.
+    private void AjouterQuatreSemaines()
+    {
+        for (int i = 1; i <= 4; i++) AjouterCibleCopie(copieSourceDate.AddDays(7 * i));
+    }
+
+    // Coche / décoche une leçon dans la liste de la fenêtre de copie.
+    private void BasculerCopieLecon(int id, ChangeEventArgs e)
+    {
+        if (e.Value is bool coche && coche) copieChoisies.Add(id);
+        else                                copieChoisies.Remove(id);
+    }
+
+    // Signale les destinations qui tombent en congé, sans bloquer la copie.
+    private string? AvertissementCopie()
+    {
+        // Dates réellement écrites : chaque leçon retenue décalée sur chaque destination
+        var enConge = copieCibles
+            .SelectMany(c => CopieLeconsRetenues.Select(n => ReportNote.DateCopie(n, copieSourceDate, c)))
+            .Distinct()
+            .Select(d => CreateDayModel(d))
+            .Where(j => j.IsHoliday)
+            .ToList();
+
+        if (enConge.Count == 0) return null;
+
+        var noms = string.Join(", ", enConge.Select(j => j.ShortHolidayName)
+                                            .Where(n => !string.IsNullOrEmpty(n))
+                                            .Distinct());
+        var suffixe = string.IsNullOrEmpty(noms) ? "" : $" ({noms})";
+
+        return $"{enConge.Count} jour(s) de destination tombent en congé{suffixe}. Tu peux quand même copier.";
+    }
+
+    // Prépare la fenêtre de copie commune aux trois portées.
+    private void PreparerCopie(PorteeCopie portee, DateTime reference, List<(Day Jour, Note Note)> source)
+    {
+        copiePortee     = portee;
+        copieSourceDate = reference.Date;
+        copieSource     = source;
+        copieChoisies   = source.Select(x => x.Note.Id).ToHashSet();
+        copieCibles     = new SortedSet<DateTime>();
+        // Le champ d'ajout part sur la semaine suivante : la destination la plus courante
+        copieDateSaisie = reference.Date.AddDays(7);
+        copieErreur     = null;
+        copieEnCours    = false;
+        reportInfo      = null;
+        showCopieModal  = true;
+    }
+
+    // Copie la leçon ouverte dans la modale de note, avec les valeurs actuellement
+    // affichées : ce que l'utilisateur voit est ce qui part dans les copies.
+    // La note d'origine n'est pas enregistrée — copier ne modifie rien.
+    private void OuvrirCopieLecon()
+    {
+        if (editingNote == null || currentDay == null) return;
+
+        // Modèle détaché : ApplyFormTo travaille sur la copie, jamais sur l'originale
+        var modele = ReportNote.Copier(editingNote, currentDate);
+        ApplyFormTo(modele);
+
+        // La modale de note se ferme entièrement : laisser la sélection de cascade
+        // en place la ferait ressurgir sur la prochaine note ouverte.
+        showNoteModal    = false;
+        showReportPanel  = false;
+        showCascadePanel = false;
+        cascadeSelection = null;
+
+        PreparerCopie(PorteeCopie.Lecon, currentDate, new List<(Day, Note)> { (currentDay, modele) });
+    }
+
+    // Copie toutes les leçons du jour affiché.
+    private void OuvrirCopieJournee()
+    {
+        if (currentDay == null) return;
+
+        var source = currentDay.Notes
+            .OrderBy(n => n.Hour).ThenBy(n => n.Minute)
+            .Select(n => (Jour: currentDay, Note: n))
+            .ToList();
+
+        PreparerCopie(PorteeCopie.Journee, currentDate, source);
+    }
+
+    // Copie toutes les leçons de la semaine affichée, vers d'autres semaines.
+    private void OuvrirCopieSemaine()
+    {
+        var source = days
+            .SelectMany(d => d.Notes.Select(n => (Jour: d, Note: n)))
+            .OrderBy(x => x.Jour.Date).ThenBy(x => x.Note.Hour).ThenBy(x => x.Note.Minute)
+            .ToList();
+
+        PreparerCopie(PorteeCopie.Semaine, LundiAffiche, source);
+    }
+
+    // Ferme la fenêtre de copie sans rien dupliquer.
+    private void FermerCopie()
+    {
+        showCopieModal = false;
+        copieErreur    = null;
+    }
+
+    // Écrit les copies : une par leçon retenue et par destination.
+    // Chaque copie repart sans mention de report — c'est une nouvelle occurrence,
+    // pas la trace d'un déplacement.
+    private async Task LancerCopie()
+    {
+        if (copieEnCours) return;
+
+        var lecons = CopieLeconsRetenues.ToList();
+        if (lecons.Count == 0)       { copieErreur = "Aucune leçon cochée."; return; }
+        if (copieCibles.Count == 0)  { copieErreur = "Aucune date de destination choisie."; return; }
+
+        copieEnCours = true;
+        copieErreur  = null;
+
+        int faites = 0;
+
+        foreach (var cible in copieCibles)
+        {
+            foreach (var note in lecons)
+            {
+                var (ok, err) = await Api.SaveNoteAsync(
+                    ReportNote.Copier(note, ReportNote.DateCopie(note, copieSourceDate, cible)));
+                if (!ok)
+                {
+                    copieEnCours = false;
+                    copieErreur  = faites == 0
+                        ? (err ?? "La copie a échoué.")
+                        : $"{faites} copie(s) faite(s), puis erreur : {err}";
+                    await UpdateCalendarView();
+                    return;
+                }
+                faites++;
+            }
+        }
+
+        copieEnCours   = false;
+        showCopieModal = false;
+
+        reportInfo = CopieParSemaine
+            ? $"{faites} copie(s) créée(s) sur {copieCibles.Count} semaine(s)."
+            : $"{faites} copie(s) créée(s) sur {copieCibles.Count} date(s).";
 
         await UpdateCalendarView();
     }

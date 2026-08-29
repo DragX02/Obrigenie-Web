@@ -123,6 +123,15 @@ namespace Obrigenie.Services
             ViseeContexte = source.ViseeContexte,
         };
 
+        // Date à laquelle une leçon atterrit quand on copie sa source vers `cible`.
+        //
+        // Toute la copie tient dans ce décalage. Copier une leçon ou une journée prend
+        // le jour lui-même comme référence : le décalage mène droit à la date choisie.
+        // Copier une semaine prend son lundi comme référence : le décalage vaut alors un
+        // multiple de 7, et chaque leçon garde son jour de semaine dans la semaine visée.
+        public static DateTime DateCopie(Note note, DateTime reference, DateTime cible)
+            => note.Date.Date.AddDays((cible.Date - reference.Date).Days);
+
         // Reconnaît une ligne de marqueur et en extrait la date, ou null si la ligne
         // est du texte ordinaire.
         private static DateTime? DateMarqueur(string ligne)

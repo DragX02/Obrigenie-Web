@@ -604,6 +604,50 @@ h1:focus { outline: none; }
 .dark .report-ligne-heure { color: #FFB74D; }
 .report-ligne-texte { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* ── Copie de lecons ───────────────────────────────────────────────────────
+   Le bleu-vert distingue la copie (duplication) du report (violet) : les deux
+   boutons se cotoient dans la meme barre, la couleur evite de les confondre. */
+.copie-btn {
+    padding: 0.3rem 0.75rem; border: 1px solid #00897B; border-radius: 6px;
+    background: var(--bg-card); color: #00897B; font-size: 0.85rem; font-weight: 600;
+    cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.copie-btn:hover:not(:disabled) { background: #00897B; color: #fff; }
+.copie-btn:disabled { opacity: 0.45; cursor: default; }
+
+.modal-report-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.btn-copie-toggle {
+    padding: 0.3rem 0.7rem; border: 1px solid #00897B; border-radius: 6px;
+    background: transparent; color: #00897B; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+}
+.btn-copie-toggle:hover { background: rgba(0, 137, 123, 0.15); }
+
+.copie-modal { max-width: 560px; }
+.copie-ajout { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
+.copie-ajout label { font-size: 0.85rem; color: var(--text-muted); }
+
+/* Dates retenues, sous forme d'etiquettes retirables */
+.copie-chips {
+    display: flex; flex-wrap: wrap; gap: 0.3rem;
+    margin: 0.5rem 0; padding: 0.4rem;
+    border: 1px dashed var(--border); border-radius: 8px; min-height: 2rem;
+}
+.copie-vide { font-size: 0.78rem; color: var(--text-muted); align-self: center; }
+.copie-chip {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 2px 6px 2px 9px; border-radius: 999px;
+    background: rgba(0, 137, 123, 0.15); border: 1px solid #00897B; color: #00897B;
+    font-size: 0.78rem; font-weight: 600; white-space: nowrap;
+}
+.copie-chip-conge { background: rgba(255, 152, 0, 0.18); border-color: #FB8C00; color: #E65100; }
+.dark .copie-chip { color: #4DB6AC; }
+.dark .copie-chip-conge { color: #FFB74D; }
+.copie-chip-x {
+    border: none; background: transparent; color: inherit;
+    cursor: pointer; font-size: 0.7rem; line-height: 1; padding: 0 1px;
+}
+.copie-chip-x:hover { color: #f44336; }
+
 /* Marque portee par la lecon d'origine, dans chaque vue du calendrier */
 .note-reporte {
     display: block; font-size: 0.72rem; font-weight: 700; color: #7E57C2; margin-bottom: 2px;
