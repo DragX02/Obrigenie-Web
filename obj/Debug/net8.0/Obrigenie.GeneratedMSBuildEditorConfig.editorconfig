@@ -60,6 +60,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ29uZmlybUVtYWlsLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[G:/csharpcallender/project_final_bac/Obrigenie/Pages/CongesPage.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ29uZ2VzUGFnZS5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [G:/csharpcallender/project_final_bac/Obrigenie/Pages/ForgotPassword.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRm9yZ290UGFzc3dvcmQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
