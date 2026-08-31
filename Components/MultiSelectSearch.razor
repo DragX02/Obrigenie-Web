@@ -1,0 +1,97 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   MultiSelectSearch.razor — Sélection multiple avec recherche.
+
+   Liste d'options que l'on coche en cliquant sur la ligne entière (pas de case
+   à cocher : la ligne sélectionnée est marquée d'un ✓ et surlignée). Au-dessus,
+   un champ de recherche filtre les libellés, en ignorant la casse et les accents
+   ("visee" trouve "Visée"), et les sélections en cours sont rappelées sous forme
+   d'étiquettes cliquables pour les retirer d'un clic.
+
+   Le champ de recherche n'apparaît qu'au-delà de SeuilRecherche options : pour
+   une liste courte (les aptitudes du français, par exemple), il n'apporte rien.
+
+   Utilisation :
+     <MultiSelectSearch Options="mesOptions" Selected="mesValeurs"
+                        OnToggle="Basculer" Placeholder="Rechercher…" />
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+<div class="ms-root">
+
+    @if (Options.Count() > SeuilRecherche)
+    {
+        <input type="text" class="ms-search" placeholder="@Placeholder"
+               value="@search" @oninput="OnInput" />
+    }
+
+    @* Rappel des sélections : une étiquette par valeur cochée, ✕ pour la retirer *@
+    @if (Selected.Count > 0)
+    {
+        <div class="ms-tags">
+            @foreach (var opt in Options.Where(o => Selected.Contains(o.Value)))
+            {
+                var valeur = opt.Value;
+                <button type="button" class="ms-tag" title="Retirer"
+                        @onclick="() => Basculer(valeur)">
+                    @opt.Label <span class="ms-tag-x">✕</span>
+                </button>
+            }
+        </div>
+    }
+
+    <div class="ms-list">
+        @if (Filtered.Count == 0)
+        {
+            <div class="ms-empty">Aucun résultat</div>
+        }
+        else
+        {
+            @foreach (var opt in Filtered)
+            {
+                var valeur = opt.Value;
+                var choisi = Selected.Contains(valeur);
+                <div class="ms-item @(choisi ? "ms-item-selected" : "")"
+                     @onclick="() => Basculer(valeur)">
+                    <span class="ms-check">@(choisi ? "✓" : "")</span>
+                    <span>@opt.Label</span>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>Options proposées (valeur technique + libellé affiché).</summary>
+    [Parameter] public IEnumerable<SearchableSelect.SelectOption> Options { get; set; }
+        = Array.Empty<SearchableSelect.SelectOption>();
+
+    /// <summary>Valeurs actuellement sélectionnées.</summary>
+    [Parameter] public IReadOnlyCollection<string> Selected { get; set; } = Array.Empty<string>();
+
+    /// <summary>Invoqué avec la valeur dont l'état bascule (cochée ↔ décochée).</summary>
+    [Parameter] public EventCallback<string> OnToggle { get; set; }
+
+    /// <summary>Texte du champ de recherche.</summary>
+    [Parameter] public string Placeholder { get; set; } = "Rechercher…";
+
+    /// <summary>Le champ de recherche n'apparaît qu'au-delà de ce nombre d'options.</summary>
+    [Parameter] public int SeuilRecherche { get; set; } = 6;
+
+    private string search = "";
+
+    private List<SearchableSelect.SelectOption> Filtered
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(search)) return Options.ToList();
+            var needle = SearchableSelect.Normalize(search);
+            return Options.Where(o => SearchableSelect.Normalize(o.Label).Contains(needle)).ToList();
+        }
+    }
+
+    private void OnInput(ChangeEventArgs e) => search = e.Value?.ToString() ?? "";
+
+    private async Task Basculer(string valeur)
+    {
+        if (OnToggle.HasDelegate) await OnToggle.InvokeAsync(valeur);
+    }
+}

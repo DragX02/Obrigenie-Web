@@ -9,11 +9,11 @@
      4. Domaine          → table sous_domaine, optionnel
      5. Compétences, savoirs, S-F → champ competence de la visée
      6. Visées           → NomVisée, filtrées par la compétence choisie —
-                           cases à cocher, plusieurs choix possibles
-     7. Visées à maîtriser → celles des visées cochées (fusionnées, dédoublonnées) —
-                           cases à cocher également
+                           sélection multiple avec recherche (MultiSelectSearch)
+     7. Visées à maîtriser → celles des visées retenues (fusionnées, dédoublonnées) —
+                           sélection multiple avec recherche également
 
-   Tout ce qui est coché aux étapes 6 et 7 est remonté au parent et finit dans le
+   Tout ce qui est retenu aux étapes 6 et 7 est remonté au parent et finit dans le
    texte affiché sur la note ; la clé étrangère de la note ne retient que la
    première visée cochée (la table note n'en référence qu'une).
 
@@ -103,57 +103,35 @@
             {
                 <div class="cascade-aptitudes">
                     <label>Aptitudes <span class="cascade-opt">(une ou plusieurs)</span></label>
-                    <div class="cascade-checks">
-                        @foreach (var apt in AptitudesFrancais)
-                        {
-                            var nom = apt;
-                            <label class="cascade-check">
-                                <input type="checkbox" checked="@selectedAptitudes.Contains(nom)"
-                                       @onchange="e => ToggleAptitude(nom, e.Value is bool b && b)" />
-                                <span>@nom</span>
-                            </label>
-                        }
-                    </div>
+                    <MultiSelectSearch Options="OptionsAptitudes"
+                                       Selected="@selectedAptitudes"
+                                       OnToggle="ToggleAptitude" />
                 </div>
             }
         </div>
     }
 
-    @* Étape 6 : visées (nom_visee) — cases à cocher, plusieurs choix possibles *@
+    @* Étape 6 : visées (nom_visee) — sélection multiple avec recherche *@
     @if (selectedIdCompetence > 0)
     {
         <div class="cascade-field">
-            <label>6. Visées <span class="cascade-opt">(coche ce qui va dans la note)</span></label>
-            <div class="cascade-checks">
-                @foreach (var nv in ListeNomVisees)
-                {
-                    var id = nv.Id;
-                    <label class="cascade-check">
-                        <input type="checkbox" checked="@selectedIdNomVisees.Contains(id)"
-                               @onchange="e => ToggleNomVisee(id, e.Value is bool b && b)" />
-                        <span>@nv.Nom</span>
-                    </label>
-                }
-            </div>
+            <label>6. Visées <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
+            <MultiSelectSearch Options="OptionsNomVisees"
+                               Selected="@ValeursNomVisees"
+                               OnToggle="ToggleNomVisee"
+                               Placeholder="Rechercher une visée…" />
         </div>
     }
 
-    @* Étape 7 : visées à maîtriser des visées cochées — cases à cocher également *@
+    @* Étape 7 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
     @if (selectedIdVisees.Count > 0 && listeViseesMaitriser.Count > 0)
     {
         <div class="cascade-field">
-            <label>7. Visées à maîtriser <span class="cascade-opt">(coche ce qui va dans la note)</span></label>
-            <div class="cascade-checks">
-                @foreach (var vm in listeViseesMaitriser)
-                {
-                    var id = vm.IdViseesMaitriser;
-                    <label class="cascade-check">
-                        <input type="checkbox" checked="@selectedIdVms.Contains(id)"
-                               @onchange="e => ToggleVm(id, e.Value is bool b && b)" />
-                        <span>@vm.NomViseesMaitriser</span>
-                    </label>
-                }
-            </div>
+            <label>7. Visées à maîtriser <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
+            <MultiSelectSearch Options="OptionsViseesMaitriser"
+                               Selected="@ValeursVms"
+                               OnToggle="ToggleVm"
+                               Placeholder="Rechercher une visée à maîtriser…" />
         </div>
     }
 </div>
@@ -233,6 +211,22 @@
     private IEnumerable<SearchableSelect.SelectOption> OptionsCompetences =>
         ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom));
 
+    private IEnumerable<SearchableSelect.SelectOption> OptionsAptitudes =>
+        AptitudesFrancais.Select(a => Opt(a, a));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsNomVisees =>
+        ListeNomVisees.Select(nv => Opt(nv.Id.ToString(), nv.Nom));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsViseesMaitriser =>
+        listeViseesMaitriser.Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser));
+
+    // ── Sélections vues comme des chaînes, pour MultiSelectSearch ──────────
+    private IReadOnlyCollection<string> ValeursNomVisees =>
+        selectedIdNomVisees.Select(i => i.ToString()).ToList();
+
+    private IReadOnlyCollection<string> ValeursVms =>
+        selectedIdVms.Select(i => i.ToString()).ToList();
+
     // ── Listes dérivées ────────────────────────────────────────────────────
     private IEnumerable<(int Id, string Nom)> ListeCompetences =>
         listeVisees.GroupBy(v => v.IdCompetence)
@@ -297,12 +291,12 @@
         await Notify();
     }
 
-    // Étape 6 : coche / décoche une visée. Les visées à maîtriser proposées sont
-    // celles de l'ensemble des visées cochées.
-    private async Task ToggleNomVisee(int idNomVisee, bool coche)
+    // Étape 6 : ajoute / retire une visée. Les visées à maîtriser proposées sont
+    // celles de l'ensemble des visées retenues.
+    private async Task ToggleNomVisee(string valeur)
     {
-        if (coche) selectedIdNomVisees.Add(idNomVisee);
-        else       selectedIdNomVisees.Remove(idNomVisee);
+        if (!int.TryParse(valeur, out var idNomVisee)) return;
+        if (!selectedIdNomVisees.Remove(idNomVisee)) selectedIdNomVisees.Add(idNomVisee);
 
         // Résoudre les IdVisée correspondants (couple compétence + nom_visee).
         selectedIdVisees.Clear();
@@ -317,19 +311,18 @@
         await Notify();
     }
 
-    // Aptitude (français) : coche / décoche une entrée de la liste figée.
-    private async Task ToggleAptitude(string nom, bool coche)
+    // Aptitude (français) : ajoute / retire une entrée de la liste figée.
+    private async Task ToggleAptitude(string nom)
     {
-        if (coche) selectedAptitudes.Add(nom);
-        else       selectedAptitudes.Remove(nom);
+        if (!selectedAptitudes.Remove(nom)) selectedAptitudes.Add(nom);
         await Notify();
     }
 
-    // Étape 7 : coche / décoche une visée à maîtriser.
-    private async Task ToggleVm(int idVm, bool coche)
+    // Étape 7 : ajoute / retire une visée à maîtriser.
+    private async Task ToggleVm(string valeur)
     {
-        if (coche) selectedIdVms.Add(idVm);
-        else       selectedIdVms.Remove(idVm);
+        if (!int.TryParse(valeur, out var idVm)) return;
+        if (!selectedIdVms.Remove(idVm)) selectedIdVms.Add(idVm);
         await Notify();
     }
 

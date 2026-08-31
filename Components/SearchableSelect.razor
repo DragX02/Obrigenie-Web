@@ -158,7 +158,8 @@
     }
 
     // Comparaison insensible à la casse et aux accents.
-    private static string Normalize(string s)
+    // Publique : MultiSelectSearch filtre ses options de la même façon.
+    public static string Normalize(string s)
     {
         var d = s.Normalize(NormalizationForm.FormD);
         var sb = new StringBuilder(d.Length);

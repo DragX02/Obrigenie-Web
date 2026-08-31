@@ -10,9 +10,9 @@
      5. Compétences, savoirs, S-F → le champ competence de la visée
                             (Savoirs / Savoir-faire / Attendus / Compétences ÉCOUTER…)
      6. Visées           → NomVisée, filtrées par la compétence choisie —
-                           cases à cocher, plusieurs choix possibles
-     7. Visées à maîtriser → celles des visées cochées (fusionnées, dédoublonnées) —
-                           cases à cocher également
+                           sélection multiple avec recherche (MultiSelectSearch)
+     7. Visées à maîtriser → celles des visées retenues (fusionnées, dédoublonnées) —
+                           sélection multiple avec recherche également
 
    NB : « Compétence/Attendu » et « Visée » proviennent tous deux de la même requête
    (api/ref/visees) ; leur ordre d'affichage (competence avant nom_visee) est purement
@@ -138,58 +138,36 @@ else
                         {
                             <div class="mt-2">
                                 <label class="form-label fw-bold">Aptitudes <span class="text-muted fw-normal">(une ou plusieurs)</span></label>
-                                <div class="cascade-checks">
-                                    @foreach (var apt in AptitudesFrancais)
-                                    {
-                                        var nom = apt;
-                                        <label class="cascade-check">
-                                            <input type="checkbox" checked="@selectedAptitudes.Contains(nom)"
-                                                   @onchange="e => ToggleAptitude(nom, e.Value is bool b && b)" />
-                                            <span>@nom</span>
-                                        </label>
-                                    }
-                                </div>
+                                <MultiSelectSearch Options="OptionsAptitudes"
+                                                   Selected="@selectedAptitudes"
+                                                   OnToggle="ToggleAptitude" />
                             </div>
                         }
                     </div>
                 }
 
                 @* Étape 6 : visées (nom_visee) filtrées par la compétence choisie —
-                   cases à cocher, plusieurs choix possibles *@
+                   sélection multiple avec recherche *@
                 @if (selectedIdCompetence > 0)
                 {
                     <div class="mb-3">
                         <label class="form-label fw-bold">6. Visées <span class="text-muted fw-normal">(plusieurs possibles)</span></label>
-                        <div class="cascade-checks">
-                            @foreach (var nv in ListeNomVisees)
-                            {
-                                var id = nv.Id;
-                                <label class="cascade-check">
-                                    <input type="checkbox" checked="@selectedIdNomVisees.Contains(id)"
-                                           @onchange="e => ToggleNomVisee(id, e.Value is bool b && b)" />
-                                    <span>@nv.Nom</span>
-                                </label>
-                            }
-                        </div>
+                        <MultiSelectSearch Options="OptionsNomVisees"
+                                           Selected="@ValeursNomVisees"
+                                           OnToggle="ToggleNomVisee"
+                                           Placeholder="Rechercher une visée…" />
                     </div>
                 }
 
-                @* Étape 7 : visées à maîtriser des visées cochées — cases à cocher également *@
+                @* Étape 7 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
                 @if (selectedIdVisees.Count > 0 && listeViseesMaitriser.Count > 0)
                 {
                     <div class="mb-3">
                         <label class="form-label fw-bold">7. Visées à maîtriser <span class="text-muted fw-normal">(plusieurs possibles)</span></label>
-                        <div class="cascade-checks">
-                            @foreach (var vm in listeViseesMaitriser)
-                            {
-                                var id = vm.IdViseesMaitriser;
-                                <label class="cascade-check">
-                                    <input type="checkbox" checked="@selectedIdVms.Contains(id)"
-                                           @onchange="e => ToggleVm(id, e.Value is bool b && b)" />
-                                    <span>@vm.NomViseesMaitriser</span>
-                                </label>
-                            }
-                        </div>
+                        <MultiSelectSearch Options="OptionsViseesMaitriser"
+                                           Selected="@ValeursVms"
+                                           OnToggle="ToggleVm"
+                                           Placeholder="Rechercher une visée à maîtriser…" />
                     </div>
                 }
 
@@ -323,7 +301,25 @@ else
             .Select(g => (Id: g.Key, Nom: g.First().NomVisee))
             .OrderBy(x => x.Nom);
 
-    // Récapitulatif : libellés cochés, dans l'ordre d'affichage des listes
+    // ── Options et sélections passées à MultiSelectSearch ─────────────────
+    private static SearchableSelect.SelectOption Opt(string value, string label) => new(value, label);
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsAptitudes =>
+        AptitudesFrancais.Select(a => Opt(a, a));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsNomVisees =>
+        ListeNomVisees.Select(nv => Opt(nv.Id.ToString(), nv.Nom));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsViseesMaitriser =>
+        listeViseesMaitriser.Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser));
+
+    private IReadOnlyCollection<string> ValeursNomVisees =>
+        selectedIdNomVisees.Select(i => i.ToString()).ToList();
+
+    private IReadOnlyCollection<string> ValeursVms =>
+        selectedIdVms.Select(i => i.ToString()).ToList();
+
+    // Récapitulatif : libellés retenus, dans l'ordre d'affichage des listes
     private List<string> NomsViseesCochees =>
         ListeNomVisees.Where(nv => selectedIdNomVisees.Contains(nv.Id))
                       .Select(nv => nv.Nom).ToList();
@@ -379,12 +375,12 @@ else
         ViderVisees();
     }
 
-    // Étape 6 : coche / décoche une visée. Les visées à maîtriser proposées sont
-    // celles de l'ensemble des visées cochées.
-    private async Task ToggleNomVisee(int idNomVisee, bool coche)
+    // Étape 6 : ajoute / retire une visée. Les visées à maîtriser proposées sont
+    // celles de l'ensemble des visées retenues.
+    private async Task ToggleNomVisee(string valeur)
     {
-        if (coche) selectedIdNomVisees.Add(idNomVisee);
-        else       selectedIdNomVisees.Remove(idNomVisee);
+        if (!int.TryParse(valeur, out var idNomVisee)) return;
+        if (!selectedIdNomVisees.Remove(idNomVisee)) selectedIdNomVisees.Add(idNomVisee);
 
         // Résoudre les IdVisée correspondants (couple compétence + nom_visee)
         selectedIdVisees.Clear();
@@ -398,18 +394,17 @@ else
         await ChargerViseesMaitriser();
     }
 
-    // Aptitude (français) : coche / décoche une entrée de la liste figée
-    private void ToggleAptitude(string nom, bool coche)
+    // Aptitude (français) : ajoute / retire une entrée de la liste figée
+    private void ToggleAptitude(string nom)
     {
-        if (coche) selectedAptitudes.Add(nom);
-        else       selectedAptitudes.Remove(nom);
+        if (!selectedAptitudes.Remove(nom)) selectedAptitudes.Add(nom);
     }
 
-    // Étape 7 : coche / décoche une visée à maîtriser
-    private void ToggleVm(int idVm, bool coche)
+    // Étape 7 : ajoute / retire une visée à maîtriser
+    private void ToggleVm(string valeur)
     {
-        if (coche) selectedIdVms.Add(idVm);
-        else       selectedIdVms.Remove(idVm);
+        if (!int.TryParse(valeur, out var idVm)) return;
+        if (!selectedIdVms.Remove(idVm)) selectedIdVms.Add(idVm);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
