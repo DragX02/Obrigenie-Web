@@ -511,7 +511,7 @@
                             @* Texte de la note si présent, sinon contexte de cascade condensé sur une ligne *@
                             var raw = !string.IsNullOrEmpty(texteNote)
                                 ? texteNote
-                                : (note.ViseeContexte ?? "").Replace("\n", " · ");
+                                : ContexteSurUneLigne(note.ViseeContexte);
                             var icon = !string.IsNullOrEmpty(texteNote) ? "📝" : "🎯";
                             var preview = raw.Length > 16 ? raw[..16] + "…" : raw;
 
@@ -1928,16 +1928,26 @@
             if (!string.IsNullOrWhiteSpace(valeur)) lignes.Add($"{label} : {valeur}");
         }
 
+        // Bloc à valeurs multiples : le libellé n'est écrit qu'une fois, les valeurs
+        // suivantes sont alignées dessous, sous la première (indentation conservée
+        // à l'affichage comme à l'impression).
+        void AjouterBloc(string label, IReadOnlyList<string> valeurs)
+        {
+            if (valeurs.Count == 0) return;
+            var marge = new string(' ', label.Length + 3);   // largeur de « label : »
+            lignes.Add($"{label} : {valeurs[0]}");
+            for (var i = 1; i < valeurs.Count; i++) lignes.Add(marge + valeurs[i]);
+        }
+
         Ajouter("Année", s.NomNiveau);
         Ajouter("Cours", s.NomCours);
         Ajouter("Langue", s.Langue);
         Ajouter("Domaine", s.NomDomaine);
         Ajouter("Sous-domaine", s.NomSousDomaine);
         Ajouter("Compétence", s.NomCompetence);
-        if (s.Aptitudes.Count > 0) Ajouter("Aptitudes", string.Join(", ", s.Aptitudes));
-        // Étapes 6 et 7 : une ligne par case cochée.
-        foreach (var visee in s.NomVisees) Ajouter("Visée", visee);
-        foreach (var vm in s.NomsViseesMaitriser) Ajouter("Visée à maîtriser", vm);
+        AjouterBloc("Visée", s.NomVisees);
+        AjouterBloc("Aptitudes", s.Aptitudes);
+        AjouterBloc("Visée à maîtriser", s.NomsViseesMaitriser);
 
         return string.Join("\n", lignes);
     }
@@ -2028,12 +2038,19 @@
 
         var brut = !string.IsNullOrWhiteSpace(cours) ? cours
                  : !string.IsNullOrWhiteSpace(texte) ? texte
-                 : (note.ViseeContexte ?? "");
+                 : ContexteSurUneLigne(note.ViseeContexte);
 
-        brut = brut.Replace("\n", " · ").Trim();
+        brut = brut.Trim();
         if (string.IsNullOrEmpty(brut)) return "(leçon sans intitulé)";
         return brut.Length > 60 ? brut[..60] + "…" : brut;
     }
+
+    // Contexte de cascade condensé sur une ligne (aperçus mois/semaine et listes).
+    // Les alignements en début de ligne sont retirés : ils n'ont de sens qu'en multi-lignes.
+    private static string ContexteSurUneLigne(string? contexte) =>
+        string.Join(" · ", (contexte ?? "").Split('\n')
+                                           .Select(l => l.Trim())
+                                           .Where(l => l.Length > 0));
 
     // Coche / décoche une leçon dans la liste du report de semaine.
     private void BasculerLecon(int id, ChangeEventArgs e)

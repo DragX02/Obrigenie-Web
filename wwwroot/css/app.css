@@ -942,7 +942,9 @@ h1:focus { outline: none; }
 .cascade-recap { margin-top: 0.9rem; padding: 0.5rem 0.6rem; border-radius: 6px; background: rgba(76,175,80,0.12); color: var(--text); font-size: 0.82rem; }
 .cascade-recap-muted { background: rgba(255,255,255,0.06); color: var(--text-muted); }
 .cascade-recap-titre { font-weight: 600; margin-bottom: 0.25rem; }
-.note-visee-recap { display: block; white-space: pre-line; line-height: 1.4; }
+/* pre-wrap (et non pre-line) : l'alignement des valeurs sous leur libellé
+   repose sur des espaces en début de ligne, que pre-line écraserait. */
+.note-visee-recap { display: block; white-space: pre-wrap; line-height: 1.4; }
 
 /* Empilage uniquement sur mobile étroit (sinon on garde côte à côte) */
 @media (max-width: 520px) {
@@ -953,7 +955,7 @@ h1:focus { outline: none; }
 
 /* Note dans la grille horaire */
 .note-time { display: block; font-size: 0.7rem; font-weight: 600; opacity: 0.75; margin-bottom: 2px; }
-.note-visee { display: block; font-size: 0.72rem; font-weight: 600; color: #4CAF50; margin-bottom: 2px; white-space: pre-line; line-height: 1.35; }
+.note-visee { display: block; font-size: 0.72rem; font-weight: 600; color: #4CAF50; margin-bottom: 2px; white-space: pre-wrap; line-height: 1.35; }
 
 /* ===== TRIMESTRE VIEW ===== */
 .trim-loading {

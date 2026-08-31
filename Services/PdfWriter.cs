@@ -126,28 +126,35 @@ namespace Obrigenie.Services
             // Chaque saut de ligne du texte source est respecté
             foreach (var paragraphe in texte.Replace("\r", "").Split('\n'))
             {
+                // L'indentation d'origine est conservée : elle aligne les valeurs
+                // sous leur libellé dans le contexte de cascade. Elle est réappliquée
+                // à chaque ligne produite et retranchée de la largeur disponible.
+                var contenu = paragraphe.TrimStart(' ');
+                var marge   = paragraphe[..(paragraphe.Length - contenu.Length)];
+                var largeurUtile = Math.Max(taille, largeurMax - LargeurApprox(marge, taille));
+
                 var courante = "";
 
-                foreach (var mot in paragraphe.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                foreach (var mot in contenu.Split(' ', StringSplitOptions.RemoveEmptyEntries))
                 {
                     var essai = courante.Length == 0 ? mot : courante + " " + mot;
 
-                    if (LargeurApprox(essai, taille) <= largeurMax) { courante = essai; continue; }
+                    if (LargeurApprox(essai, taille) <= largeurUtile) { courante = essai; continue; }
 
-                    if (courante.Length > 0) { lignes.Add(courante); courante = ""; }
+                    if (courante.Length > 0) { lignes.Add(marge + courante); courante = ""; }
 
                     // Mot seul trop long : on le coupe en morceaux de la largeur disponible
                     var reste = mot;
-                    while (LargeurApprox(reste, taille) > largeurMax && reste.Length > 1)
+                    while (LargeurApprox(reste, taille) > largeurUtile && reste.Length > 1)
                     {
-                        int coupe = Math.Max(1, (int)(largeurMax / (taille * 0.5f)));
-                        lignes.Add(reste[..Math.Min(coupe, reste.Length)]);
+                        int coupe = Math.Max(1, (int)(largeurUtile / (taille * 0.5f)));
+                        lignes.Add(marge + reste[..Math.Min(coupe, reste.Length)]);
                         reste = reste[Math.Min(coupe, reste.Length)..];
                     }
                     courante = reste;
                 }
 
-                lignes.Add(courante);
+                lignes.Add(marge + courante);
             }
 
             return lignes;
