@@ -5,9 +5,9 @@
    Flux de sélection en cascade réordonné (7 étapes) :
      1. Année            → Niveau (chargé en premier, tous niveaux ayant des visées)
      2. Cours            → tous les cours enseignés à ce niveau (ex : Français)
-     3. Domaine          → domaines de la combinaison cours + niveau
-     4. Sous-domaine     → optionnel
-     5. Compétence/Attendu → le champ competence de la visée
+     3. Champ            → table domaine, pour la combinaison cours + niveau
+     4. Domaine          → table sous_domaine, optionnel
+     5. Compétences, savoirs, S-F → le champ competence de la visée
                             (Savoirs / Savoir-faire / Attendus / Compétences ÉCOUTER…)
      6. Visées           → NomVisée, filtrées par la compétence choisie —
                            cases à cocher, plusieurs choix possibles
@@ -89,13 +89,13 @@ else
                     </div>
                 }
 
-                @* Étape 3 : domaine *@
+                @* Étape 3 : champ (table domaine du référentiel) *@
                 @if (!string.IsNullOrEmpty(selectedCours))
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">3. Domaine :</label>
+                        <label class="form-label fw-bold">3. Champ :</label>
                         <select class="form-select" value="@selectedIdDomaine" @onchange="OnDomaineChanged">
-                            <option value="0">-- Choisir un domaine --</option>
+                            <option value="0">-- Choisir un champ --</option>
                             @foreach (var d in domainesFiltres)
                             {
                                 <option value="@d.IdDom">@d.Nom</option>
@@ -104,11 +104,11 @@ else
                     </div>
                 }
 
-                @* Étape 4 : sous-domaine (optionnel) *@
+                @* Étape 4 : domaine (table sous_domaine du référentiel), optionnel *@
                 @if (selectedIdDomaine > 0 && listeSousDomaines.Count > 0)
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">4. Sous-domaine <span class="text-muted">(optionnel)</span></label>
+                        <label class="form-label fw-bold">4. Domaine <span class="text-muted">(optionnel)</span></label>
                         <select class="form-select" value="@selectedIdSousD" @onchange="OnSousDChanged">
                             <option value="0">-- Aucun --</option>
                             @foreach (var s in listeSousDomaines)
@@ -119,11 +119,11 @@ else
                     </div>
                 }
 
-                @* Étape 5 : compétence / attendu (champ competence de la visée) *@
+                @* Étape 5 : compétences, savoirs, savoir-faire (champ competence de la visée) *@
                 @if (selectedIdDomaine > 0 && listeVisees.Count > 0)
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">5. Compétence / Attendu :</label>
+                        <label class="form-label fw-bold">5. Compétences, savoirs, S-F :</label>
                         <select class="form-select" value="@selectedIdCompetence" @onchange="OnCompetenceChanged">
                             <option value="0">-- Choisir --</option>
                             @foreach (var c in ListeCompetences)
@@ -207,9 +207,9 @@ else
                             {
                                 <li class="text-warning"><strong>Langue :</strong> @(string.IsNullOrEmpty(selectedLangue) ? "..." : selectedLangue)</li>
                             }
-                            <li><strong>Domaine :</strong>    @(selectedIdDomaine == 0 ? "..." : (domainesFiltres.FirstOrDefault(d => d.IdDom == selectedIdDomaine)?.Nom ?? "..."))</li>
-                            <li><strong>Sous-dom. :</strong>  @(selectedIdSousD == 0 ? "—" : (listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp ?? "..."))</li>
-                            <li><strong>Compétence :</strong> @(selectedIdCompetence == 0 ? "..." : (listeVisees.FirstOrDefault(v => v.IdCompetence == selectedIdCompetence)?.NomCompetence ?? "..."))</li>
+                            <li><strong>Champ :</strong>      @(selectedIdDomaine == 0 ? "..." : (domainesFiltres.FirstOrDefault(d => d.IdDom == selectedIdDomaine)?.Nom ?? "..."))</li>
+                            <li><strong>Domaine :</strong>    @(selectedIdSousD == 0 ? "—" : (listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp ?? "..."))</li>
+                            <li><strong>Comp., savoirs, S-F :</strong> @(selectedIdCompetence == 0 ? "..." : (listeVisees.FirstOrDefault(v => v.IdCompetence == selectedIdCompetence)?.NomCompetence ?? "..."))</li>
                             @if (EstFrancais)
                             {
                                 <li><strong>Aptitudes :</strong> @(selectedAptitudes.Count == 0 ? "—" : string.Join(", ", AptitudesFrancais.Where(a => selectedAptitudes.Contains(a))))</li>

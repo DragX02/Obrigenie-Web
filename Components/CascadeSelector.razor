@@ -5,9 +5,9 @@
    composant compact, embarquable (ex : panneau latéral de la modale de note) :
      1. Année            → Niveau (tous niveaux ayant des visées)
      2. Cours            → tous les cours enseignés à ce niveau (toutes catégories)
-     3. Domaine          → domaines de la combinaison cours + niveau
-     4. Sous-domaine     → optionnel
-     5. Compétence/Attendu → champ competence de la visée
+     3. Champ            → table domaine, pour la combinaison cours + niveau
+     4. Domaine          → table sous_domaine, optionnel
+     5. Compétences, savoirs, S-F → champ competence de la visée
      6. Visées           → NomVisée, filtrées par la compétence choisie —
                            cases à cocher, plusieurs choix possibles
      7. Visées à maîtriser → celles des visées cochées (fusionnées, dédoublonnées) —
@@ -63,23 +63,23 @@
         </div>
     }
 
-    @* Étape 3 : domaine *@
+    @* Étape 3 : champ (table domaine du référentiel) *@
     @if (!string.IsNullOrEmpty(selectedCours))
     {
         <div class="cascade-field">
-            <label>3. Domaine</label>
+            <label>3. Champ</label>
             <SearchableSelect Value="@selectedIdDomaine.ToString()"
                               ValueChanged="OnDomaineChanged"
-                              Placeholder="-- Choisir un domaine --"
+                              Placeholder="-- Choisir un champ --"
                               Options="OptionsDomaines" EmptyValue="0" />
         </div>
     }
 
-    @* Étape 4 : sous-domaine (optionnel) *@
+    @* Étape 4 : domaine (table sous_domaine du référentiel), optionnel *@
     @if (selectedIdDomaine > 0 && listeSousDomaines.Count > 0)
     {
         <div class="cascade-field">
-            <label>4. Sous-domaine <span class="cascade-opt">(optionnel)</span></label>
+            <label>4. Domaine <span class="cascade-opt">(optionnel)</span></label>
             <SearchableSelect Value="@selectedIdSousD.ToString()"
                               ValueChanged="OnSousDChanged"
                               Placeholder="-- Aucun --"
@@ -87,11 +87,11 @@
         </div>
     }
 
-    @* Étape 5 : compétence / attendu *@
+    @* Étape 5 : compétences, savoirs, savoir-faire (champ competence de la visée) *@
     @if (selectedIdDomaine > 0 && listeVisees.Count > 0)
     {
         <div class="cascade-field">
-            <label>5. Compétence / Attendu</label>
+            <label>5. Compétences, savoirs, S-F</label>
             <SearchableSelect Value="@selectedIdCompetence.ToString()"
                               ValueChanged="OnCompetenceChanged"
                               Placeholder="-- Choisir --"
