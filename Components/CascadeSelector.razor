@@ -4,13 +4,12 @@
    Reprend le flux réordonné de la page /test (TestPage.razor) sous forme de
    composant compact, embarquable (ex : panneau latéral de la modale de note) :
      1. Année            → Niveau (tous niveaux ayant des visées)
-     2. Catégorie        → catégories ayant des cours à ce niveau
-     3. Cours            → cours de la catégorie enseignés à ce niveau
-     4. Domaine          → domaines de la combinaison cours + niveau
-     5. Sous-domaine     → optionnel
-     6. Compétence/Attendu → champ competence de la visée
-     7. Visée            → NomVisée, filtrée par la compétence choisie
-     8. Visée à maîtriser
+     2. Cours            → tous les cours enseignés à ce niveau (toutes catégories)
+     3. Domaine          → domaines de la combinaison cours + niveau
+     4. Sous-domaine     → optionnel
+     5. Compétence/Attendu → champ competence de la visée
+     6. Visée            → NomVisée, filtrée par la compétence choisie
+     7. Visée à maîtriser
 
    À chaque changement, OnSelectionChanged est invoqué avec l'état courant afin
    que le parent puisse (plus tard) associer la sélection à une note.
@@ -34,23 +33,11 @@
                           Options="OptionsNiveaux" EmptyValue="" />
     </div>
 
-    @* Étape 2 : catégorie *@
+    @* Étape 2 : cours (tous les cours du niveau, toutes catégories confondues) *@
     @if (!string.IsNullOrEmpty(selectedNiveau))
     {
         <div class="cascade-field">
-            <label>2. Catégorie</label>
-            <SearchableSelect Value="@selectedIdCat.ToString()"
-                              ValueChanged="OnCategorieChanged"
-                              Placeholder="-- Choisir une catégorie --"
-                              Options="OptionsCategories" EmptyValue="0" />
-        </div>
-    }
-
-    @* Étape 3 : cours *@
-    @if (selectedIdCat > 0)
-    {
-        <div class="cascade-field">
-            <label>3. Cours</label>
+            <label>2. Cours</label>
             <SearchableSelect Value="@selectedCours"
                               ValueChanged="OnCoursChanged"
                               Placeholder="-- Choisir un cours --"
@@ -70,11 +57,11 @@
         </div>
     }
 
-    @* Étape 4 : domaine *@
+    @* Étape 3 : domaine *@
     @if (!string.IsNullOrEmpty(selectedCours))
     {
         <div class="cascade-field">
-            <label>4. Domaine</label>
+            <label>3. Domaine</label>
             <SearchableSelect Value="@selectedIdDomaine.ToString()"
                               ValueChanged="OnDomaineChanged"
                               Placeholder="-- Choisir un domaine --"
@@ -82,11 +69,11 @@
         </div>
     }
 
-    @* Étape 5 : sous-domaine (optionnel) *@
+    @* Étape 4 : sous-domaine (optionnel) *@
     @if (selectedIdDomaine > 0 && listeSousDomaines.Count > 0)
     {
         <div class="cascade-field">
-            <label>5. Sous-domaine <span class="cascade-opt">(optionnel)</span></label>
+            <label>4. Sous-domaine <span class="cascade-opt">(optionnel)</span></label>
             <SearchableSelect Value="@selectedIdSousD.ToString()"
                               ValueChanged="OnSousDChanged"
                               Placeholder="-- Aucun --"
@@ -94,11 +81,11 @@
         </div>
     }
 
-    @* Étape 6 : compétence / attendu *@
+    @* Étape 5 : compétence / attendu *@
     @if (selectedIdDomaine > 0 && listeVisees.Count > 0)
     {
         <div class="cascade-field">
-            <label>6. Compétence / Attendu</label>
+            <label>5. Compétence / Attendu</label>
             <SearchableSelect Value="@selectedIdCompetence.ToString()"
                               ValueChanged="OnCompetenceChanged"
                               Placeholder="-- Choisir --"
@@ -106,11 +93,11 @@
         </div>
     }
 
-    @* Étape 7 : visée (nom_visee) *@
+    @* Étape 6 : visée (nom_visee) *@
     @if (selectedIdCompetence > 0)
     {
         <div class="cascade-field">
-            <label>7. Visée</label>
+            <label>6. Visée</label>
             <SearchableSelect Value="@selectedIdNomVisee.ToString()"
                               ValueChanged="OnNomViseeChanged"
                               Placeholder="-- Choisir une visée --"
@@ -118,11 +105,11 @@
         </div>
     }
 
-    @* Étape 8 : visée à maîtriser *@
+    @* Étape 7 : visée à maîtriser *@
     @if (selectedIdVisee > 0)
     {
         <div class="cascade-field">
-            <label>8. Visée à maîtriser</label>
+            <label>7. Visée à maîtriser</label>
             <SearchableSelect Value="@selectedIdVm.ToString()"
                               ValueChanged="OnVmChanged"
                               Placeholder="-- Choisir --"
@@ -146,7 +133,6 @@
 
     // ── Sélections courantes ───────────────────────────────────────────────
     private string selectedNiveau       = "";
-    private int    selectedIdCat        = 0;
     private string selectedCours        = "";
     private string selectedLangue       = "";
     private int    selectedIdDomaine    = 0;
@@ -158,7 +144,6 @@
 
     // ── Listes chargées ────────────────────────────────────────────────────
     private List<NiveauDto>             listeNiveaux         = new();
-    private List<CategorieDto>          listeCategories      = new();
     private List<CoursDto>              listeCours           = new();
     private List<DomaineDto>            domainesFiltres      = new();
     private List<SousDomaineRefDto>     listeSousDomaines    = new();
@@ -170,9 +155,6 @@
 
     private IEnumerable<SearchableSelect.SelectOption> OptionsNiveaux =>
         listeNiveaux.Select(n => Opt(n.CodeNiveau, n.NomNiveau));
-
-    private IEnumerable<SearchableSelect.SelectOption> OptionsCategories =>
-        listeCategories.Select(c => Opt(c.IdCat.ToString(), c.NomCat));
 
     private IEnumerable<SearchableSelect.SelectOption> OptionsCours =>
         listeCours.Select(c => Opt(c.CodeCours, c.NomCours));
@@ -217,26 +199,14 @@
     {
         selectedNiveau = value ?? "";
         ResetFrom(1);
-        if (!string.IsNullOrEmpty(selectedNiveau))
-            try { listeCategories = await Api.GetCategoriesByNiveauAsync(selectedNiveau); }
-            catch (Exception ex) { loadError = ex.Message; }
-        await Notify();
-    }
-
-    private async Task OnCategorieChanged(string? value)
-    {
-        selectedIdCat = int.TryParse(value, out var id) ? id : 0;
-        ResetFrom(2);
-        if (selectedIdCat > 0)
-            try { listeCours = await Api.GetCoursByCatNiveauAsync(selectedIdCat, selectedNiveau); }
-            catch (Exception ex) { loadError = ex.Message; }
+        await ChargerCours();
         await Notify();
     }
 
     private async Task OnCoursChanged(string? value)
     {
         selectedCours = value ?? "";
-        ResetFrom(3);
+        ResetFrom(2);
         await ChargerDomaines();
         await Notify();
     }
@@ -250,7 +220,7 @@
     private async Task OnDomaineChanged(string? value)
     {
         selectedIdDomaine = int.TryParse(value, out var v) ? v : 0;
-        ResetFrom(4);
+        ResetFrom(3);
         if (selectedIdDomaine > 0)
         {
             try { listeSousDomaines = await Api.GetSousDomainesRefAsync(selectedIdDomaine); }
@@ -263,7 +233,7 @@
     private async Task OnSousDChanged(string? value)
     {
         selectedIdSousD = int.TryParse(value, out var v) ? v : 0;
-        ResetFrom(5);
+        ResetFrom(4);
         await ChargerVisees();
         await Notify();
     }
@@ -301,15 +271,34 @@
 
     private void ResetFrom(int level)
     {
-        if (level <= 1) { selectedIdCat = 0; listeCategories.Clear(); }
-        if (level <= 2) { selectedCours = ""; listeCours.Clear(); selectedLangue = ""; }
-        if (level <= 3) { selectedIdDomaine = 0; domainesFiltres.Clear(); }
-        if (level <= 4) { selectedIdSousD = 0; listeSousDomaines.Clear(); }
+        if (level <= 1) { selectedCours = ""; listeCours.Clear(); selectedLangue = ""; }
+        if (level <= 2) { selectedIdDomaine = 0; domainesFiltres.Clear(); }
+        if (level <= 3) { selectedIdSousD = 0; listeSousDomaines.Clear(); }
         selectedIdCompetence = 0;
         selectedIdNomVisee   = 0;
         selectedIdVisee      = 0;
         listeVisees.Clear();
         selectedIdVm = 0; listeViseesMaitriser.Clear();
+    }
+
+    // Charge tous les cours enseignés au niveau choisi. Le référentiel n'expose les
+    // cours que catégorie par catégorie : on parcourt donc les catégories du niveau
+    // et on fusionne leurs cours, dédoublonnés par code (un cours peut être rattaché
+    // à plusieurs catégories).
+    private async Task ChargerCours()
+    {
+        listeCours.Clear();
+        if (string.IsNullOrEmpty(selectedNiveau)) return;
+        try
+        {
+            var categories = await Api.GetCategoriesByNiveauAsync(selectedNiveau);
+            var parCode = new Dictionary<string, CoursDto>();
+            foreach (var cat in categories)
+                foreach (var c in await Api.GetCoursByCatNiveauAsync(cat.IdCat, selectedNiveau))
+                    parCode[c.CodeCours] = c;
+            listeCours = parCode.Values.OrderBy(c => c.NomCours).ToList();
+        }
+        catch (Exception ex) { loadError = ex.Message; }
     }
 
     private async Task ChargerDomaines()
@@ -338,8 +327,6 @@
         {
             CodeNiveau      = selectedNiveau,
             NomNiveau       = listeNiveaux.FirstOrDefault(n => n.CodeNiveau == selectedNiveau)?.NomNiveau,
-            IdCat           = selectedIdCat,
-            NomCat          = listeCategories.FirstOrDefault(c => c.IdCat == selectedIdCat)?.NomCat,
             CodeCours       = selectedCours,
             NomCours        = listeCours.FirstOrDefault(c => c.CodeCours == selectedCours)?.NomCours,
             Langue          = selectedLangue,
@@ -362,8 +349,6 @@
     {
         public string? CodeNiveau { get; set; }
         public string? NomNiveau { get; set; }
-        public int     IdCat { get; set; }
-        public string? NomCat { get; set; }
         public string? CodeCours { get; set; }
         public string? NomCours { get; set; }
         public string? Langue { get; set; }

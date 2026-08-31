@@ -556,7 +556,7 @@
 
                 @* Bascule l'affichage du panneau de sélection en cascade *@
                 <button class="btn-cascade-toggle" @onclick="ToggleCascadePanel">
-                    @(showCascadePanel ? "Cascade ◂" : "Cascade ▸")
+                    @(showCascadePanel ? "Référentiel ◂" : "Référentiel ▸")
                 </button>
             </div>
 
@@ -1927,7 +1927,6 @@
         }
 
         Ajouter("Année", s.NomNiveau);
-        Ajouter("Catégorie", s.NomCat);
         Ajouter("Cours", s.NomCours);
         Ajouter("Langue", s.Langue);
         Ajouter("Domaine", s.NomDomaine);

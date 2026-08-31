@@ -2,16 +2,15 @@
 @* ─────────────────────────────────────────────────────────────────────────────
    TestPage.razor — Page de test de sélection en cascade.
 
-   Flux de sélection en cascade réordonné (8 niveaux) :
+   Flux de sélection en cascade réordonné (7 niveaux) :
      1. Année            → Niveau (chargé en premier, tous niveaux ayant des visées)
-     2. Catégorie        → catégories ayant des cours à ce niveau
-     3. Cours            → cours de la catégorie enseignés à ce niveau (ex : Français)
-     4. Domaine          → domaines de la combinaison cours + niveau
-     5. Sous-domaine     → optionnel
-     6. Compétence/Attendu → le champ competence de la visée
+     2. Cours            → tous les cours enseignés à ce niveau (ex : Français)
+     3. Domaine          → domaines de la combinaison cours + niveau
+     4. Sous-domaine     → optionnel
+     5. Compétence/Attendu → le champ competence de la visée
                             (Savoirs / Savoir-faire / Attendus / Compétences ÉCOUTER…)
-     7. Visée            → NomVisée, filtrée par la compétence choisie
-     8. Visée à maîtriser
+     6. Visée            → NomVisée, filtrée par la compétence choisie
+     7. Visée à maîtriser
 
    NB : « Compétence/Attendu » et « Visée » proviennent tous deux de la même requête
    (api/ref/visees) ; leur ordre d'affichage (competence avant nom_visee) est purement
@@ -59,26 +58,11 @@ else
                     </select>
                 </div>
 
-                @* Étape 2 : catégorie *@
+                @* Étape 2 : cours (tous les cours du niveau, toutes catégories confondues) *@
                 @if (!string.IsNullOrEmpty(selectedNiveau))
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">2. Catégorie :</label>
-                        <select class="form-select" value="@selectedIdCat" @onchange="OnCategorieChanged">
-                            <option value="0">-- Choisir une catégorie --</option>
-                            @foreach (var cat in listeCategories)
-                            {
-                                <option value="@cat.IdCat">@cat.NomCat</option>
-                            }
-                        </select>
-                    </div>
-                }
-
-                @* Étape 3 : cours *@
-                @if (selectedIdCat > 0)
-                {
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">3. Cours :</label>
+                        <label class="form-label fw-bold">2. Cours :</label>
                         <select class="form-select" value="@selectedCours" @onchange="OnCoursChanged">
                             <option value="">-- Choisir un cours --</option>
                             @foreach (var cours in listeCours)
@@ -103,11 +87,11 @@ else
                     </div>
                 }
 
-                @* Étape 4 : domaine *@
+                @* Étape 3 : domaine *@
                 @if (!string.IsNullOrEmpty(selectedCours))
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">4. Domaine :</label>
+                        <label class="form-label fw-bold">3. Domaine :</label>
                         <select class="form-select" value="@selectedIdDomaine" @onchange="OnDomaineChanged">
                             <option value="0">-- Choisir un domaine --</option>
                             @foreach (var d in domainesFiltres)
@@ -118,11 +102,11 @@ else
                     </div>
                 }
 
-                @* Étape 5 : sous-domaine (optionnel) *@
+                @* Étape 4 : sous-domaine (optionnel) *@
                 @if (selectedIdDomaine > 0 && listeSousDomaines.Count > 0)
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">5. Sous-domaine <span class="text-muted">(optionnel)</span></label>
+                        <label class="form-label fw-bold">4. Sous-domaine <span class="text-muted">(optionnel)</span></label>
                         <select class="form-select" value="@selectedIdSousD" @onchange="OnSousDChanged">
                             <option value="0">-- Aucun --</option>
                             @foreach (var s in listeSousDomaines)
@@ -133,11 +117,11 @@ else
                     </div>
                 }
 
-                @* Étape 6 : compétence / attendu (champ competence de la visée) *@
+                @* Étape 5 : compétence / attendu (champ competence de la visée) *@
                 @if (selectedIdDomaine > 0 && listeVisees.Count > 0)
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">6. Compétence / Attendu :</label>
+                        <label class="form-label fw-bold">5. Compétence / Attendu :</label>
                         <select class="form-select" value="@selectedIdCompetence" @onchange="OnCompetenceChanged">
                             <option value="0">-- Choisir --</option>
                             @foreach (var c in ListeCompetences)
@@ -148,11 +132,11 @@ else
                     </div>
                 }
 
-                @* Étape 7 : visée (nom_visee), filtrée par la compétence choisie *@
+                @* Étape 6 : visée (nom_visee), filtrée par la compétence choisie *@
                 @if (selectedIdCompetence > 0)
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">7. Visée :</label>
+                        <label class="form-label fw-bold">6. Visée :</label>
                         <select class="form-select" value="@selectedIdNomVisee" @onchange="OnNomViseeChanged">
                             <option value="0">-- Choisir une visée --</option>
                             @foreach (var nv in ListeNomVisees)
@@ -163,11 +147,11 @@ else
                     </div>
                 }
 
-                @* Étape 8 : visée à maîtriser *@
+                @* Étape 7 : visée à maîtriser *@
                 @if (selectedIdVisee > 0)
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">8. Visée à maîtriser :</label>
+                        <label class="form-label fw-bold">7. Visée à maîtriser :</label>
                         <select class="form-select" value="@selectedIdVm" @onchange="OnVmChanged">
                             <option value="0">-- Choisir --</option>
                             @foreach (var vm in listeViseesMaitriser)
@@ -187,7 +171,6 @@ else
                         <h5 class="card-title">Récapitulatif de la sélection :</h5>
                         <ul>
                             <li><strong>Année :</strong>      @(string.IsNullOrEmpty(selectedNiveau) ? "..." : (listeNiveaux.FirstOrDefault(n => n.CodeNiveau == selectedNiveau)?.NomNiveau ?? selectedNiveau))</li>
-                            <li><strong>Catégorie :</strong>  @(selectedIdCat == 0 ? "..." : (listeCategories.FirstOrDefault(c => c.IdCat == selectedIdCat)?.NomCat ?? "..."))</li>
                             <li><strong>Cours :</strong>      @(string.IsNullOrEmpty(selectedCours) ? "..." : (listeCours.FirstOrDefault(c => c.CodeCours == selectedCours)?.NomCours ?? selectedCours))</li>
                             @if (selectedCours == "LM")
                             {
@@ -235,19 +218,17 @@ else
 
     // ── Sélections courantes ───────────────────────────────────────────────
     private string selectedNiveau        = "";  // étape 1 : année
-    private int    selectedIdCat         = 0;   // étape 2 : catégorie
-    private string selectedCours         = "";  // étape 3 : cours
+    private string selectedCours         = "";  // étape 2 : cours
     private string selectedLangue        = "";  // sous-sélection LM
-    private int    selectedIdDomaine     = 0;   // étape 4 : domaine
-    private int    selectedIdSousD       = 0;   // étape 5 : sous-domaine (0 = aucun)
-    private int    selectedIdCompetence  = 0;   // étape 6 : compétence / attendu
-    private int    selectedIdNomVisee    = 0;   // étape 7 : visée (nom_visee)
+    private int    selectedIdDomaine     = 0;   // étape 3 : domaine
+    private int    selectedIdSousD       = 0;   // étape 4 : sous-domaine (0 = aucun)
+    private int    selectedIdCompetence  = 0;   // étape 5 : compétence / attendu
+    private int    selectedIdNomVisee    = 0;   // étape 6 : visée (nom_visee)
     private int    selectedIdVisee       = 0;   // IdVisée résolu depuis (competence, nom_visee)
-    private int    selectedIdVm          = 0;   // étape 8 : visée à maîtriser
+    private int    selectedIdVm          = 0;   // étape 7 : visée à maîtriser
 
     // ── Listes chargées depuis l'API ──────────────────────────────────────
     private List<NiveauDto>             listeNiveaux         = new();
-    private List<CategorieDto>          listeCategories      = new();
     private List<CoursDto>              listeCours           = new();
     private List<DomaineDto>            domainesFiltres      = new();
     private List<SousDomaineRefDto>     listeSousDomaines    = new();
@@ -256,14 +237,14 @@ else
 
     // ── Listes dérivées ───────────────────────────────────────────────────
 
-    // Étape 6 : compétences distinctes parmi les visées chargées
+    // Étape 5 : compétences distinctes parmi les visées chargées
     private IEnumerable<(int Id, string Nom)> ListeCompetences =>
         listeVisees
             .GroupBy(v => v.IdCompetence)
             .Select(g => (Id: g.Key, Nom: g.First().NomCompetence))
             .OrderBy(x => x.Nom);
 
-    // Étape 7 : nom_visee distincts pour la compétence choisie
+    // Étape 6 : nom_visee distincts pour la compétence choisie
     private IEnumerable<(int Id, string Nom)> ListeNomVisees =>
         listeVisees
             .Where(v => v.IdCompetence == selectedIdCompetence)
@@ -277,24 +258,13 @@ else
     {
         selectedNiveau = e.Value?.ToString() ?? "";
         ResetFrom(1);
-        if (!string.IsNullOrEmpty(selectedNiveau))
-            try { listeCategories = await Api.GetCategoriesByNiveauAsync(selectedNiveau); }
-            catch (Exception ex) { loadError = ex.Message; }
-    }
-
-    private async Task OnCategorieChanged(ChangeEventArgs e)
-    {
-        selectedIdCat = int.TryParse(e.Value?.ToString(), out var id) ? id : 0;
-        ResetFrom(2);
-        if (selectedIdCat > 0)
-            try { listeCours = await Api.GetCoursByCatNiveauAsync(selectedIdCat, selectedNiveau); }
-            catch (Exception ex) { loadError = ex.Message; }
+        await ChargerCours();
     }
 
     private async Task OnCoursChanged(ChangeEventArgs e)
     {
         selectedCours = e.Value?.ToString() ?? "";
-        ResetFrom(3);
+        ResetFrom(2);
         await ChargerDomaines();
     }
 
@@ -306,7 +276,7 @@ else
     private async Task OnDomaineChanged(ChangeEventArgs e)
     {
         selectedIdDomaine = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
-        ResetFrom(4);
+        ResetFrom(3);
         if (selectedIdDomaine > 0)
         {
             try { listeSousDomaines = await Api.GetSousDomainesRefAsync(selectedIdDomaine); }
@@ -318,21 +288,21 @@ else
     private async Task OnSousDChanged(ChangeEventArgs e)
     {
         selectedIdSousD = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
-        ResetFrom(5);
+        ResetFrom(4);
         await ChargerVisees();
     }
 
-    // Étape 6 : sélection de la compétence / attendu
+    // Étape 5 : sélection de la compétence / attendu
     private void OnCompetenceChanged(ChangeEventArgs e)
     {
         selectedIdCompetence = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
-        // Réinitialiser étapes 7+
+        // Réinitialiser étapes 6+
         selectedIdNomVisee = 0;
         selectedIdVisee    = 0;
         selectedIdVm       = 0; listeViseesMaitriser.Clear();
     }
 
-    // Étape 7 : sélection de la visée (nom_visee) → résout l'IdVisée puis charge les VM
+    // Étape 6 : sélection de la visée (nom_visee) → résout l'IdVisée puis charge les VM
     private async Task OnNomViseeChanged(ChangeEventArgs e)
     {
         selectedIdNomVisee = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
@@ -348,7 +318,7 @@ else
             catch (Exception ex) { loadError = ex.Message; }
     }
 
-    // Étape 8 : sélection de la visée à maîtriser
+    // Étape 7 : sélection de la visée à maîtriser
     private void OnVmChanged(ChangeEventArgs e)
     {
         selectedIdVm = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
@@ -358,16 +328,35 @@ else
 
     private void ResetFrom(int level)
     {
-        if (level <= 1) { selectedIdCat = 0; listeCategories.Clear(); }
-        if (level <= 2) { selectedCours = ""; listeCours.Clear(); selectedLangue = ""; }
-        if (level <= 3) { selectedIdDomaine = 0; domainesFiltres.Clear(); }
-        if (level <= 4) { selectedIdSousD = 0; listeSousDomaines.Clear(); }
-        // Étapes 6+ (compétence / visée / VM) toujours réinitialisées
+        if (level <= 1) { selectedCours = ""; listeCours.Clear(); selectedLangue = ""; }
+        if (level <= 2) { selectedIdDomaine = 0; domainesFiltres.Clear(); }
+        if (level <= 3) { selectedIdSousD = 0; listeSousDomaines.Clear(); }
+        // Étapes 5+ (compétence / visée / VM) toujours réinitialisées
         selectedIdCompetence = 0;
         selectedIdNomVisee   = 0;
         selectedIdVisee      = 0;
         listeVisees.Clear();
         selectedIdVm = 0; listeViseesMaitriser.Clear();
+    }
+
+    // Charge tous les cours enseignés au niveau choisi. Le référentiel n'expose les
+    // cours que catégorie par catégorie : on parcourt donc les catégories du niveau
+    // et on fusionne leurs cours, dédoublonnés par code (un cours peut être rattaché
+    // à plusieurs catégories).
+    private async Task ChargerCours()
+    {
+        listeCours.Clear();
+        if (string.IsNullOrEmpty(selectedNiveau)) return;
+        try
+        {
+            var categories = await Api.GetCategoriesByNiveauAsync(selectedNiveau);
+            var parCode = new Dictionary<string, CoursDto>();
+            foreach (var cat in categories)
+                foreach (var c in await Api.GetCoursByCatNiveauAsync(cat.IdCat, selectedNiveau))
+                    parCode[c.CodeCours] = c;
+            listeCours = parCode.Values.OrderBy(c => c.NomCours).ToList();
+        }
+        catch (Exception ex) { loadError = ex.Message; }
     }
 
     private async Task ChargerDomaines()
