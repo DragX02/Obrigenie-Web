@@ -761,7 +761,7 @@
             <div class="cascade-panel">
                 @* Bouton retour : masque le panneau *@
                 <button class="cascade-back" @onclick="ToggleCascadePanel" title="Fermer la cascade">⟵</button>
-                <CascadeSelector OnSelectionChanged="OnCascadeChanged" />
+                <CascadeSelector @ref="cascadeRef" OnSelectionChanged="OnCascadeChanged" />
 
                 @* Récapitulatif : contexte complet qui sera enregistré avec la note *@
                 @if (cascadeSelection?.IdVisee > 0)
@@ -1045,6 +1045,10 @@
 
     @* Dernière sélection remontée par le composant CascadeSelector (null tant que rien n'est choisi) *@
     private CascadeSelector.CascadeSelection? cascadeSelection;
+
+    @* Référence au composant : permet de lui faire créer en base les liens manquants
+       (visée, lien visée ↔ visée à maîtriser) juste avant d'enregistrer la note. *@
+    private CascadeSelector? cascadeRef;
 
     @* Le contenu textuel de la note en cours de création ou de modification *@
     private string noteContent = "";
@@ -1806,6 +1810,17 @@
 
         noteSaveError = null;
 
+        // La cascade peut contenir des entrées choisies dans les tables complètes, qui
+        // n'existent pas encore comme visées de ce champ : on les crée en base avant
+        // d'enregistrer, pour que la note pointe sur une visée réelle.
+        if (cascadeRef?.ReferentielAComplete == true)
+        {
+            noteSaving = true;
+            var erreurRef = await cascadeRef.SynchroniserReferentielAsync();
+            noteSaving = false;
+            if (erreurRef != null) { noteSaveError = erreurRef; return; }
+        }
+
         // Modification : la répétition ne s'applique qu'à la création, on ne touche
         // qu'à la note ouverte et sa date d'origine est conservée.
         if (editingNote != null)
@@ -1873,13 +1888,14 @@
         note.EndMinute = noteEnd.Minute;
         note.Content   = noteContent;
 
-        // Rattache les visées cochées dans la cascade, si une sélection valide a été faite.
+        // Rattache les visées retenues dans la cascade, si une sélection a été faite.
         // Sans nouvelle sélection, on conserve la visée déjà liée à la note en modification.
-        // La clé étrangère ne peut porter qu'une visée : on y met la première cochée,
-        // le détail de toutes les cases cochées vit dans le texte du contexte.
-        if (cascadeSelection?.IdVisee > 0)
+        // La clé étrangère ne peut porter qu'une visée : on y met la première retenue
+        // quand elle existe en base, le détail complet vit dans le texte du contexte.
+        if (cascadeSelection != null &&
+            (cascadeSelection.IdVisee > 0 || cascadeSelection.NomVisees.Count > 0))
         {
-            note.IdViseeFk     = cascadeSelection.IdVisee;
+            if (cascadeSelection.IdVisee > 0) note.IdViseeFk = cascadeSelection.IdVisee;
             note.ViseeContexte = BuildViseeContexte(cascadeSelection);
         }
     }

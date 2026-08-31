@@ -88,7 +88,7 @@
     }
 
     @* Étape 5 : compétences, savoirs, savoir-faire (champ competence de la visée) *@
-    @if (selectedIdDomaine > 0 && listeVisees.Count > 0)
+    @if (selectedIdDomaine > 0 && (listeVisees.Count > 0 || elargir))
     {
         <div class="cascade-field">
             <label>5. Compétences, savoirs, S-F</label>
@@ -96,6 +96,20 @@
                               ValueChanged="OnCompetenceChanged"
                               Placeholder="-- Choisir --"
                               Options="OptionsCompetences" EmptyValue="0" />
+
+            @* Quand le référentiel ne propose pas ce qu'il faut pour ce champ, on ouvre
+               les listes complètes des tables. Les liens manquants (visée, lien visée ↔
+               visée à maîtriser) sont créés en base à l'enregistrement de la note. *@
+            <button type="button" class="cascade-elargir" @onclick="BasculerElargir">
+                @(elargir ? "▾ Revenir au référentiel du champ" : "▸ Il manque une entrée ? Chercher dans toute la base")
+            </button>
+            @if (elargir)
+            {
+                <div class="cascade-elargir-note">
+                    Listes complètes des tables. Ce qui n'existe pas encore pour ce champ
+                    sera créé en base à l'enregistrement.
+                </div>
+            }
 
             @* Cours de français : quatre aptitudes en plus, liste figée (hors référentiel),
                une ou plusieurs cochées. Elles ne filtrent rien, elles s'ajoutent au texte. *@
@@ -124,7 +138,7 @@
     }
 
     @* Étape 7 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
-    @if (selectedIdVisees.Count > 0 && listeViseesMaitriser.Count > 0)
+    @if (selectedIdNomVisees.Count > 0 && OptionsViseesMaitriser.Any())
     {
         <div class="cascade-field">
             <label>7. Visées à maîtriser <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
@@ -146,6 +160,28 @@
     protected override async Task OnInitializedAsync()
     {
         try { listeNiveaux = await Api.GetNiveauxTousAsync(); }
+        catch (Exception ex) { loadError = ex.Message; }
+
+    }
+
+    // ── Mode élargi : listes complètes des tables du référentiel ───────────
+    private bool elargir;
+
+    private List<CompetenceRefDto>        toutesCompetences = new();
+    private List<NomViseeRefDto>          tousNomVisees     = new();
+    private List<ViseesMaitriserRefDto>   toutesVm          = new();
+
+    private async Task BasculerElargir()
+    {
+        elargir = !elargir;
+        if (!elargir || toutesCompetences.Count > 0) return;
+
+        try
+        {
+            toutesCompetences = await Api.GetCompetencesRefAsync();
+            tousNomVisees     = await Api.GetNomViseesRefAsync();
+            toutesVm          = await Api.GetToutesViseesMaitriserRefAsync();
+        }
         catch (Exception ex) { loadError = ex.Message; }
     }
 
@@ -208,17 +244,42 @@
     private IEnumerable<SearchableSelect.SelectOption> OptionsSousDomaines =>
         listeSousDomaines.Select(s => Opt(s.IdSousDomaine.ToString(), s.NomComp));
 
+    // En mode élargi, les trois dernières listes viennent des tables complètes plutôt
+    // que du seul référentiel du champ choisi. Les entrées déjà rattachées restent en
+    // tête pour rester repérables.
     private IEnumerable<SearchableSelect.SelectOption> OptionsCompetences =>
-        ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom));
+        elargir
+            ? Fusionner(ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom)),
+                        toutesCompetences.OrderBy(c => c.NomCompetence)
+                                         .Select(c => Opt(c.IdCompetence.ToString(), c.NomCompetence)))
+            : ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom));
 
     private IEnumerable<SearchableSelect.SelectOption> OptionsAptitudes =>
         AptitudesFrancais.Select(a => Opt(a, a));
 
     private IEnumerable<SearchableSelect.SelectOption> OptionsNomVisees =>
-        ListeNomVisees.Select(nv => Opt(nv.Id.ToString(), nv.Nom));
+        elargir
+            ? Fusionner(ListeNomVisees.Select(nv => Opt(nv.Id.ToString(), nv.Nom)),
+                        tousNomVisees.OrderBy(nv => nv.NomVisee)
+                                     .Select(nv => Opt(nv.IdNomVisee.ToString(), nv.NomVisee)))
+            : ListeNomVisees.Select(nv => Opt(nv.Id.ToString(), nv.Nom));
 
     private IEnumerable<SearchableSelect.SelectOption> OptionsViseesMaitriser =>
-        listeViseesMaitriser.Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser));
+        elargir
+            ? Fusionner(listeViseesMaitriser.Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser)),
+                        toutesVm.OrderBy(vm => vm.NomViseesMaitriser)
+                                .Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser)))
+            : listeViseesMaitriser.Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser));
+
+    // Concatène deux listes d'options en écartant les doublons de valeur.
+    private static IEnumerable<SearchableSelect.SelectOption> Fusionner(
+        IEnumerable<SearchableSelect.SelectOption> tete,
+        IEnumerable<SearchableSelect.SelectOption> reste)
+    {
+        var vues = new HashSet<string>();
+        foreach (var o in tete.Concat(reste))
+            if (vues.Add(o.Value)) yield return o;
+    }
 
     // ── Sélections vues comme des chaînes, pour MultiSelectSearch ──────────
     private IReadOnlyCollection<string> ValeursNomVisees =>
@@ -402,8 +463,99 @@
             catch (Exception ex) { loadError = ex.Message; }
         }
         listeViseesMaitriser = parId.Values.OrderBy(vm => vm.NomViseesMaitriser).ToList();
-        selectedIdVms.RemoveWhere(id => !parId.ContainsKey(id));
+        // En mode élargi, une visée à maîtriser peut venir de la table complète sans être
+        // encore reliée : on ne l'abandonne pas, le lien sera créé à l'enregistrement.
+        if (!elargir) selectedIdVms.RemoveWhere(id => !parId.ContainsKey(id));
     }
+
+    // ── Écriture en base des liens manquants ──────────────────────────────
+
+    /// <summary>
+    /// Vrai quand la sélection contient des entrées qui n'existent pas encore dans le
+    /// référentiel du champ : visée à créer, ou lien visée ↔ visée à maîtriser à créer.
+    /// </summary>
+    public bool ReferentielAComplete =>
+        selectedIdCompetence > 0 &&
+        (selectedIdNomVisees.Any(id => ViseeExistante(id) == 0) ||
+         (selectedIdVisees.Count > 0 &&
+          selectedIdVms.Any(idVm => !listeViseesMaitriser.Any(vm => vm.IdViseesMaitriser == idVm))));
+
+    // Identifiant de la visée reliant le champ courant à ce nom_visee, 0 si elle n'existe pas.
+    private int ViseeExistante(int idNomVisee) =>
+        listeVisees.FirstOrDefault(v => v.IdCompetence == selectedIdCompetence
+                                     && v.IdNomVisee   == idNomVisee)?.IdVisee ?? 0;
+
+    /// <summary>
+    /// Crée en base ce qui manque pour que la sélection soit complète : une visée par
+    /// nom_visee retenu qui n'en a pas encore pour ce champ, puis les liens vers les
+    /// visées à maîtriser retenues. Recharge ensuite les listes et remonte l'état.
+    /// Retourne null si tout s'est bien passé, sinon le message d'erreur.
+    /// </summary>
+    public async Task<string?> SynchroniserReferentielAsync()
+    {
+        if (!ReferentielAComplete) return null;
+
+        // 1. Les visées manquantes (champ + domaine + compétence + intitulé de visée).
+        //    Le champ porte déjà le couple cours/année : rien d'autre n'est nécessaire.
+        foreach (var idNomVisee in selectedIdNomVisees.ToList())
+        {
+            if (ViseeExistante(idNomVisee) != 0) continue;
+
+            var (ok, _, err) = await Api.CreateRefViseeAsync(
+                selectedIdDomaine, selectedIdSousD, idNomVisee, selectedIdCompetence);
+            if (!ok) return err ?? "Création de la visée refusée.";
+        }
+
+        // 2. Relecture : les visées créées ont maintenant un identifiant
+        await RechargerViseesDuChamp();
+
+        // 3. Les liens vers les visées à maîtriser retenues mais pas encore reliées
+        var idVisee = selectedIdVisees.FirstOrDefault();
+        if (idVisee != 0)
+        {
+            foreach (var idVm in selectedIdVms.ToList())
+            {
+                if (listeViseesMaitriser.Any(vm => vm.IdViseesMaitriser == idVm)) continue;
+
+                var (ok, err) = await Api.CreateRefLienViseeMaitriseAsync(idVisee, idVm);
+                if (!ok) return err ?? "Création du lien vers la visée à maîtriser refusée.";
+            }
+            await ChargerViseesMaitriser();
+        }
+
+        await Notify();
+        return null;
+    }
+
+    // Recharge les visées du champ courant et re-résout les identifiants retenus.
+    private async Task RechargerViseesDuChamp()
+    {
+        try
+        {
+            listeVisees = await Api.GetViseesRefAsync(
+                selectedIdDomaine, selectedIdSousD > 0 ? selectedIdSousD : null);
+        }
+        catch (Exception ex) { loadError = ex.Message; return; }
+
+        selectedIdVisees.Clear();
+        foreach (var idNomVisee in selectedIdNomVisees)
+        {
+            var id = ViseeExistante(idNomVisee);
+            if (id != 0) selectedIdVisees.Add(id);
+        }
+    }
+
+    // Libellé de la compétence retenue : depuis les visées du champ, sinon depuis la
+    // table complète quand elle a été choisie en mode élargi.
+    private string? NomDeLaCompetence =>
+        listeVisees.FirstOrDefault(v => v.IdCompetence == selectedIdCompetence)?.NomCompetence
+        ?? toutesCompetences.FirstOrDefault(c => c.IdCompetence == selectedIdCompetence)?.NomCompetence;
+
+    // Libellés des options dont l'identifiant est retenu, dans l'ordre d'affichage.
+    private static List<string> LibellesRetenus(
+        IEnumerable<SearchableSelect.SelectOption> options, HashSet<int> retenus) =>
+        options.Where(o => int.TryParse(o.Value, out var id) && retenus.Contains(id))
+               .Select(o => o.Label).ToList();
 
     // Remonte l'état courant au parent (avec les libellés résolus).
     private async Task Notify()
@@ -421,19 +573,15 @@
             IdSousDomaine   = selectedIdSousD,
             NomSousDomaine  = listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp,
             IdCompetence    = selectedIdCompetence,
-            NomCompetence   = listeVisees.FirstOrDefault(v => v.IdCompetence == selectedIdCompetence)?.NomCompetence,
+            NomCompetence   = NomDeLaCompetence,
             Aptitudes       = AptitudesFrancais.Where(a => selectedAptitudes.Contains(a)).ToList(),
-            // Étapes 6 et 7 : tout ce qui est coché, dans l'ordre d'affichage des listes.
-            IdVisees        = ListeNomVisees.Where(nv => selectedIdNomVisees.Contains(nv.Id))
-                                            .Select(nv => listeVisees.First(v => v.IdCompetence == selectedIdCompetence
-                                                                              && v.IdNomVisee   == nv.Id).IdVisee)
-                                            .ToList(),
-            NomVisees       = ListeNomVisees.Where(nv => selectedIdNomVisees.Contains(nv.Id))
-                                            .Select(nv => nv.Nom).ToList(),
-            IdsViseesMaitriser  = listeViseesMaitriser.Where(vm => selectedIdVms.Contains(vm.IdViseesMaitriser))
-                                                      .Select(vm => vm.IdViseesMaitriser).ToList(),
-            NomsViseesMaitriser = listeViseesMaitriser.Where(vm => selectedIdVms.Contains(vm.IdViseesMaitriser))
-                                                      .Select(vm => vm.NomViseesMaitriser).ToList()
+            // Étapes 6 et 7 : tout ce qui est retenu, dans l'ordre d'affichage des listes.
+            // Les libellés viennent des options affichées (référentiel du champ ou table
+            // complète), les identifiants de visée des seules visées déjà reliées.
+            IdVisees        = selectedIdVisees.ToList(),
+            NomVisees       = LibellesRetenus(OptionsNomVisees, selectedIdNomVisees),
+            IdsViseesMaitriser  = selectedIdVms.ToList(),
+            NomsViseesMaitriser = LibellesRetenus(OptionsViseesMaitriser, selectedIdVms)
         });
     }
 

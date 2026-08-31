@@ -955,6 +955,18 @@ h1:focus { outline: none; }
 .ms-check { flex: 0 0 0.9rem; color: #4CAF50; font-weight: 700; }
 .ms-empty { padding: 0.4rem 0.5rem; font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
 
+/* Ouverture des listes complètes du référentiel (comptes ADMIN) */
+.cascade-elargir {
+    margin-top: 0.4rem; align-self: flex-start;
+    background: none; border: none; padding: 0; cursor: pointer;
+    color: #6ea8fe; font-size: 0.78rem; text-align: left;
+}
+.cascade-elargir:hover { text-decoration: underline; }
+.cascade-elargir-note {
+    margin-top: 0.25rem; padding: 0.35rem 0.45rem; border-radius: 6px;
+    background: rgba(110,168,254,0.12); color: var(--text-muted); font-size: 0.75rem;
+}
+
 /* Aptitudes du français, sous la compétence */
 .cascade-aptitudes { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.2rem; }
 .cascade-aptitudes > label { font-size: 0.82rem; }

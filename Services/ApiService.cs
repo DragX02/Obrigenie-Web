@@ -967,6 +967,93 @@ namespace Obrigenie.Services
                 throw new HttpRequestException($"api/ref/appartenir/{idVm} a retourné {(int)response.StatusCode} {response.StatusCode}.");
             return await response.Content.ReadFromJsonAsync<List<AppartenirRefDto>>() ?? new();
         }
+
+        // ──────────────────────────────────────────────────────────────────
+        // TABLES COMPLÈTES ET COMPLÉMENT DU RÉFÉRENTIEL
+        // Le référentiel d'un champ est parfois incomplet : ces appels donnent les
+        // tables entières puis créent les liens manquants. Contrairement à
+        // api/admin-data, ils sont ouverts à tout utilisateur connecté.
+        // ──────────────────────────────────────────────────────────────────
+
+        // Toutes les compétences de la table. Endpoint : GET api/ref/competences
+        public async Task<List<CompetenceRefDto>> GetCompetencesRefAsync()
+        {
+            var request = await BuildAuthRequest(HttpMethod.Get, "api/ref/competences");
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/competences a retourné {(int)response.StatusCode} {response.StatusCode}.");
+            return await response.Content.ReadFromJsonAsync<List<CompetenceRefDto>>() ?? new();
+        }
+
+        // Tous les intitulés de visée. Endpoint : GET api/ref/nom-visees
+        public async Task<List<NomViseeRefDto>> GetNomViseesRefAsync()
+        {
+            var request = await BuildAuthRequest(HttpMethod.Get, "api/ref/nom-visees");
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/nom-visees a retourné {(int)response.StatusCode} {response.StatusCode}.");
+            return await response.Content.ReadFromJsonAsync<List<NomViseeRefDto>>() ?? new();
+        }
+
+        // Toutes les visées à maîtriser. Endpoint : GET api/ref/visees-maitriser
+        public async Task<List<ViseesMaitriserRefDto>> GetToutesViseesMaitriserRefAsync()
+        {
+            var request = await BuildAuthRequest(HttpMethod.Get, "api/ref/visees-maitriser");
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/visees-maitriser a retourné {(int)response.StatusCode} {response.StatusCode}.");
+            return await response.Content.ReadFromJsonAsync<List<ViseesMaitriserRefDto>>() ?? new();
+        }
+
+        // Rattache un intitulé de visée et une compétence à un champ (et éventuellement
+        // à un domaine). Rejouable : si la visée existe déjà, son id est simplement rendu.
+        // Endpoint : POST api/ref/visees
+        public async Task<(bool Ok, int IdVisee, string? Err)> CreateRefViseeAsync(
+            int idDomaine, int idSousDomaine, int idNomVisee, int idCompetence)
+        {
+            try
+            {
+                var request = await BuildAuthRequest(HttpMethod.Post, "api/ref/visees");
+                request.Content = JsonContent.Create(new { idDomaine, idSousDomaine, idNomVisee, idCompetence });
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                    return (true, json.TryGetProperty("idVisee", out var id) ? id.GetInt32() : 0, null);
+                }
+                return (false, 0, await LireMessageErreur(response));
+            }
+            catch (Exception ex) { return (false, 0, ex.Message); }
+        }
+
+        // Relie une visée à une visée à maîtriser. Rejouable.
+        // Endpoint : POST api/ref/lien-visee-maitrise
+        public async Task<(bool Ok, string? Err)> CreateRefLienViseeMaitriseAsync(int idVisee, int idViseesMaitriser)
+        {
+            try
+            {
+                var request = await BuildAuthRequest(HttpMethod.Post, "api/ref/lien-visee-maitrise");
+                request.Content = JsonContent.Create(new { idVisee, idViseesMaitriser });
+                var response = await _httpClient.SendAsync(request);
+                if (response.IsSuccessStatusCode) return (true, null);
+                return (false, await LireMessageErreur(response));
+            }
+            catch (Exception ex) { return (false, ex.Message); }
+        }
+
+        // Extrait la propriété "message" d'une réponse d'erreur, à défaut le code HTTP.
+        private static async Task<string> LireMessageErreur(HttpResponseMessage response)
+        {
+            try
+            {
+                var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                return json.TryGetProperty("message", out var m)
+                    ? m.GetString() ?? $"Erreur {(int)response.StatusCode}"
+                    : $"Erreur {(int)response.StatusCode}";
+            }
+            catch { return $"Erreur {(int)response.StatusCode}"; }
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -1104,6 +1191,20 @@ namespace Obrigenie.Services
         [JsonPropertyName("idCompetence")]  public int    IdCompetence  { get; set; }
         [JsonPropertyName("nomCompetence")] public string NomCompetence { get; set; } = string.Empty;
         [JsonPropertyName("label")]         public string Label         { get; set; } = string.Empty;
+    }
+
+    // DTO compétence de la table complète (ref)
+    public class CompetenceRefDto
+    {
+        [JsonPropertyName("idCompetence")]  public int    IdCompetence  { get; set; }
+        [JsonPropertyName("nomCompetence")] public string NomCompetence { get; set; } = string.Empty;
+    }
+
+    // DTO intitulé de visée de la table complète (ref)
+    public class NomViseeRefDto
+    {
+        [JsonPropertyName("idNomVisee")] public int    IdNomVisee { get; set; }
+        [JsonPropertyName("nomVisee")]   public string NomVisee   { get; set; } = string.Empty;
     }
 
     // DTO visée à maîtriser pour la sélection en cascade (ref)
