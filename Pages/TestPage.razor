@@ -2,15 +2,17 @@
 @* ─────────────────────────────────────────────────────────────────────────────
    TestPage.razor — Page de test de sélection en cascade.
 
-   Flux de sélection en cascade réordonné (7 niveaux) :
+   Flux de sélection en cascade réordonné (7 étapes) :
      1. Année            → Niveau (chargé en premier, tous niveaux ayant des visées)
      2. Cours            → tous les cours enseignés à ce niveau (ex : Français)
      3. Domaine          → domaines de la combinaison cours + niveau
      4. Sous-domaine     → optionnel
      5. Compétence/Attendu → le champ competence de la visée
                             (Savoirs / Savoir-faire / Attendus / Compétences ÉCOUTER…)
-     6. Visée            → NomVisée, filtrée par la compétence choisie
-     7. Visée à maîtriser
+     6. Visées           → NomVisée, filtrées par la compétence choisie —
+                           cases à cocher, plusieurs choix possibles
+     7. Visées à maîtriser → celles des visées cochées (fusionnées, dédoublonnées) —
+                           cases à cocher également
 
    NB : « Compétence/Attendu » et « Visée » proviennent tous deux de la même requête
    (api/ref/visees) ; leur ordre d'affichage (competence avant nom_visee) est purement
@@ -129,36 +131,65 @@ else
                                 <option value="@c.Id">@c.Nom</option>
                             }
                         </select>
+
+                        @* Cours de français : quatre aptitudes en plus, liste figée (hors
+                           référentiel), une ou plusieurs cochées. Elles ne filtrent rien. *@
+                        @if (EstFrancais)
+                        {
+                            <div class="mt-2">
+                                <label class="form-label fw-bold">Aptitudes <span class="text-muted fw-normal">(une ou plusieurs)</span></label>
+                                <div class="cascade-checks">
+                                    @foreach (var apt in AptitudesFrancais)
+                                    {
+                                        var nom = apt;
+                                        <label class="cascade-check">
+                                            <input type="checkbox" checked="@selectedAptitudes.Contains(nom)"
+                                                   @onchange="e => ToggleAptitude(nom, e.Value is bool b && b)" />
+                                            <span>@nom</span>
+                                        </label>
+                                    }
+                                </div>
+                            </div>
+                        }
                     </div>
                 }
 
-                @* Étape 6 : visée (nom_visee), filtrée par la compétence choisie *@
+                @* Étape 6 : visées (nom_visee) filtrées par la compétence choisie —
+                   cases à cocher, plusieurs choix possibles *@
                 @if (selectedIdCompetence > 0)
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">6. Visée :</label>
-                        <select class="form-select" value="@selectedIdNomVisee" @onchange="OnNomViseeChanged">
-                            <option value="0">-- Choisir une visée --</option>
+                        <label class="form-label fw-bold">6. Visées <span class="text-muted fw-normal">(plusieurs possibles)</span></label>
+                        <div class="cascade-checks">
                             @foreach (var nv in ListeNomVisees)
                             {
-                                <option value="@nv.Id">@nv.Nom</option>
+                                var id = nv.Id;
+                                <label class="cascade-check">
+                                    <input type="checkbox" checked="@selectedIdNomVisees.Contains(id)"
+                                           @onchange="e => ToggleNomVisee(id, e.Value is bool b && b)" />
+                                    <span>@nv.Nom</span>
+                                </label>
                             }
-                        </select>
+                        </div>
                     </div>
                 }
 
-                @* Étape 7 : visée à maîtriser *@
-                @if (selectedIdVisee > 0)
+                @* Étape 7 : visées à maîtriser des visées cochées — cases à cocher également *@
+                @if (selectedIdVisees.Count > 0 && listeViseesMaitriser.Count > 0)
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">7. Visée à maîtriser :</label>
-                        <select class="form-select" value="@selectedIdVm" @onchange="OnVmChanged">
-                            <option value="0">-- Choisir --</option>
+                        <label class="form-label fw-bold">7. Visées à maîtriser <span class="text-muted fw-normal">(plusieurs possibles)</span></label>
+                        <div class="cascade-checks">
                             @foreach (var vm in listeViseesMaitriser)
                             {
-                                <option value="@vm.IdViseesMaitriser">@vm.NomViseesMaitriser</option>
+                                var id = vm.IdViseesMaitriser;
+                                <label class="cascade-check">
+                                    <input type="checkbox" checked="@selectedIdVms.Contains(id)"
+                                           @onchange="e => ToggleVm(id, e.Value is bool b && b)" />
+                                    <span>@vm.NomViseesMaitriser</span>
+                                </label>
                             }
-                        </select>
+                        </div>
                     </div>
                 }
 
@@ -179,8 +210,30 @@ else
                             <li><strong>Domaine :</strong>    @(selectedIdDomaine == 0 ? "..." : (domainesFiltres.FirstOrDefault(d => d.IdDom == selectedIdDomaine)?.Nom ?? "..."))</li>
                             <li><strong>Sous-dom. :</strong>  @(selectedIdSousD == 0 ? "—" : (listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp ?? "..."))</li>
                             <li><strong>Compétence :</strong> @(selectedIdCompetence == 0 ? "..." : (listeVisees.FirstOrDefault(v => v.IdCompetence == selectedIdCompetence)?.NomCompetence ?? "..."))</li>
-                            <li><strong>Visée :</strong>      @(selectedIdNomVisee == 0 ? "..." : (listeVisees.FirstOrDefault(v => v.IdNomVisee == selectedIdNomVisee)?.NomVisee ?? "..."))</li>
-                            <li><strong>VM :</strong>         @(selectedIdVm == 0 ? "..." : (listeViseesMaitriser.FirstOrDefault(vm => vm.IdViseesMaitriser == selectedIdVm)?.NomViseesMaitriser ?? "..."))</li>
+                            @if (EstFrancais)
+                            {
+                                <li><strong>Aptitudes :</strong> @(selectedAptitudes.Count == 0 ? "—" : string.Join(", ", AptitudesFrancais.Where(a => selectedAptitudes.Contains(a))))</li>
+                            }
+                            <li>
+                                <strong>Visées :</strong>
+                                @if (NomsViseesCochees.Count == 0) { <text>...</text> }
+                                else
+                                {
+                                    <ul class="mb-0">
+                                        @foreach (var nom in NomsViseesCochees) { <li>@nom</li> }
+                                    </ul>
+                                }
+                            </li>
+                            <li>
+                                <strong>VM :</strong>
+                                @if (NomsVmCochees.Count == 0) { <text>...</text> }
+                                else
+                                {
+                                    <ul class="mb-0">
+                                        @foreach (var nom in NomsVmCochees) { <li>@nom</li> }
+                                    </ul>
+                                }
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -223,9 +276,27 @@ else
     private int    selectedIdDomaine     = 0;   // étape 3 : domaine
     private int    selectedIdSousD       = 0;   // étape 4 : sous-domaine (0 = aucun)
     private int    selectedIdCompetence  = 0;   // étape 5 : compétence / attendu
-    private int    selectedIdNomVisee    = 0;   // étape 6 : visée (nom_visee)
-    private int    selectedIdVisee       = 0;   // IdVisée résolu depuis (competence, nom_visee)
-    private int    selectedIdVm          = 0;   // étape 7 : visée à maîtriser
+
+    // Étapes 6 et 7 : sélection multiple par cases à cocher.
+    // selectedIdVisees est dérivé de selectedIdNomVisees (couple compétence + nom_visee).
+    private readonly HashSet<int> selectedIdNomVisees = new();   // étape 6 : visées cochées
+    private readonly HashSet<int> selectedIdVisees    = new();   // IdVisée résolus
+    private readonly HashSet<int> selectedIdVms       = new();   // étape 7 : VM cochées
+
+    // Aptitudes du cours de français : liste figée, indépendante du référentiel.
+    private static readonly string[] AptitudesFrancais = { "Parler", "Écrire", "Écouter", "Lire" };
+    private readonly HashSet<string> selectedAptitudes = new();
+
+    // Vrai quand le cours choisi est le français (code FR/FRA ou libellé « Français »).
+    private bool EstFrancais
+    {
+        get
+        {
+            if (selectedCours is "FR" or "FRA") return true;
+            var nom = listeCours.FirstOrDefault(c => c.CodeCours == selectedCours)?.NomCours;
+            return nom != null && nom.StartsWith("Fran", StringComparison.OrdinalIgnoreCase);
+        }
+    }
 
     // ── Listes chargées depuis l'API ──────────────────────────────────────
     private List<NiveauDto>             listeNiveaux         = new();
@@ -251,6 +322,15 @@ else
             .GroupBy(v => v.IdNomVisee)
             .Select(g => (Id: g.Key, Nom: g.First().NomVisee))
             .OrderBy(x => x.Nom);
+
+    // Récapitulatif : libellés cochés, dans l'ordre d'affichage des listes
+    private List<string> NomsViseesCochees =>
+        ListeNomVisees.Where(nv => selectedIdNomVisees.Contains(nv.Id))
+                      .Select(nv => nv.Nom).ToList();
+
+    private List<string> NomsVmCochees =>
+        listeViseesMaitriser.Where(vm => selectedIdVms.Contains(vm.IdViseesMaitriser))
+                            .Select(vm => vm.NomViseesMaitriser).ToList();
 
     // ── Gestionnaires ─────────────────────────────────────────────────────
 
@@ -296,32 +376,40 @@ else
     private void OnCompetenceChanged(ChangeEventArgs e)
     {
         selectedIdCompetence = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
-        // Réinitialiser étapes 6+
-        selectedIdNomVisee = 0;
-        selectedIdVisee    = 0;
-        selectedIdVm       = 0; listeViseesMaitriser.Clear();
+        ViderVisees();
     }
 
-    // Étape 6 : sélection de la visée (nom_visee) → résout l'IdVisée puis charge les VM
-    private async Task OnNomViseeChanged(ChangeEventArgs e)
+    // Étape 6 : coche / décoche une visée. Les visées à maîtriser proposées sont
+    // celles de l'ensemble des visées cochées.
+    private async Task ToggleNomVisee(int idNomVisee, bool coche)
     {
-        selectedIdNomVisee = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
-        selectedIdVm       = 0; listeViseesMaitriser.Clear();
+        if (coche) selectedIdNomVisees.Add(idNomVisee);
+        else       selectedIdNomVisees.Remove(idNomVisee);
 
-        // Résoudre l'IdVisée à partir du couple (compétence, nom_visee) sélectionné
-        selectedIdVisee = listeVisees
-            .FirstOrDefault(x => x.IdCompetence == selectedIdCompetence
-                              && x.IdNomVisee   == selectedIdNomVisee)?.IdVisee ?? 0;
+        // Résoudre les IdVisée correspondants (couple compétence + nom_visee)
+        selectedIdVisees.Clear();
+        foreach (var id in selectedIdNomVisees)
+        {
+            var visee = listeVisees.FirstOrDefault(x => x.IdCompetence == selectedIdCompetence
+                                                     && x.IdNomVisee   == id);
+            if (visee != null) selectedIdVisees.Add(visee.IdVisee);
+        }
 
-        if (selectedIdVisee > 0)
-            try { listeViseesMaitriser = await Api.GetViseesMaitriserRefAsync(selectedIdVisee); }
-            catch (Exception ex) { loadError = ex.Message; }
+        await ChargerViseesMaitriser();
     }
 
-    // Étape 7 : sélection de la visée à maîtriser
-    private void OnVmChanged(ChangeEventArgs e)
+    // Aptitude (français) : coche / décoche une entrée de la liste figée
+    private void ToggleAptitude(string nom, bool coche)
     {
-        selectedIdVm = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        if (coche) selectedAptitudes.Add(nom);
+        else       selectedAptitudes.Remove(nom);
+    }
+
+    // Étape 7 : coche / décoche une visée à maîtriser
+    private void ToggleVm(int idVm, bool coche)
+    {
+        if (coche) selectedIdVms.Add(idVm);
+        else       selectedIdVms.Remove(idVm);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
@@ -329,14 +417,23 @@ else
     private void ResetFrom(int level)
     {
         if (level <= 1) { selectedCours = ""; listeCours.Clear(); selectedLangue = ""; }
-        if (level <= 2) { selectedIdDomaine = 0; domainesFiltres.Clear(); }
+        // Les aptitudes dépendent du cours : elles ne survivent pas à un changement d'année
+        // ou de cours, mais restent cochées quand on navigue plus bas dans la cascade.
+        if (level <= 2) { selectedAptitudes.Clear(); selectedIdDomaine = 0; domainesFiltres.Clear(); }
         if (level <= 3) { selectedIdSousD = 0; listeSousDomaines.Clear(); }
-        // Étapes 5+ (compétence / visée / VM) toujours réinitialisées
+        // Étapes 5+ (compétence / visées / VM) toujours réinitialisées
         selectedIdCompetence = 0;
-        selectedIdNomVisee   = 0;
-        selectedIdVisee      = 0;
         listeVisees.Clear();
-        selectedIdVm = 0; listeViseesMaitriser.Clear();
+        ViderVisees();
+    }
+
+    // Vide les étapes 6 et 7 (visées cochées et visées à maîtriser proposées).
+    private void ViderVisees()
+    {
+        selectedIdNomVisees.Clear();
+        selectedIdVisees.Clear();
+        selectedIdVms.Clear();
+        listeViseesMaitriser.Clear();
     }
 
     // Charge tous les cours enseignés au niveau choisi. Le référentiel n'expose les
@@ -370,10 +467,28 @@ else
     private async Task ChargerVisees()
     {
         listeVisees.Clear();
-        selectedIdCompetence = 0; selectedIdNomVisee = 0; selectedIdVisee = 0;
-        listeViseesMaitriser.Clear(); selectedIdVm = 0;
+        selectedIdCompetence = 0;
+        ViderVisees();
         if (selectedIdDomaine == 0) return;
         try { listeVisees = await Api.GetViseesRefAsync(selectedIdDomaine, selectedIdSousD > 0 ? selectedIdSousD : null); }
         catch (Exception ex) { loadError = ex.Message; }
+    }
+
+    // Visées à maîtriser de toutes les visées cochées, fusionnées et dédoublonnées.
+    // Les cases cochées qui ne sont plus proposées sont abandonnées.
+    private async Task ChargerViseesMaitriser()
+    {
+        var parId = new Dictionary<int, ViseesMaitriserRefDto>();
+        foreach (var idVisee in selectedIdVisees)
+        {
+            try
+            {
+                foreach (var vm in await Api.GetViseesMaitriserRefAsync(idVisee))
+                    parId[vm.IdViseesMaitriser] = vm;
+            }
+            catch (Exception ex) { loadError = ex.Message; }
+        }
+        listeViseesMaitriser = parId.Values.OrderBy(vm => vm.NomViseesMaitriser).ToList();
+        selectedIdVms.RemoveWhere(id => !parId.ContainsKey(id));
     }
 }

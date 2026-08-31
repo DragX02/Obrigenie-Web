@@ -845,7 +845,7 @@ h1:focus { outline: none; }
 .cascade-panel {
     position: relative; background: var(--modal-bg); color: var(--text);
     border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-    padding: 1.25rem; flex: 1 1 300px; min-width: 220px; max-width: 340px;
+    padding: 1.25rem; flex: 1 1 440px; min-width: 300px; max-width: 560px;
     max-height: 85vh; overflow-y: auto;
 }
 .cascade-back {
@@ -887,7 +887,11 @@ h1:focus { outline: none; }
 }
 .ss-list {
     position: absolute; z-index: 40; top: calc(100% + 2px); left: 0; right: 0;
-    max-height: 220px; overflow-y: auto;
+    /* Les libellés de visées sont longs : la liste peut déborder du champ. */
+    min-width: 100%; width: max-content; max-width: min(90vw, 620px);
+    max-height: 340px; overflow-y: auto;
+    /* Barre de défilement large et visible plutôt que le filet par défaut. */
+    scrollbar-width: auto;
     background: var(--bg-main); color: var(--text);
     border: 1px solid var(--border); border-radius: 6px;
     box-shadow: 0 6px 18px rgba(0,0,0,0.35);
@@ -899,6 +903,40 @@ h1:focus { outline: none; }
 .ss-item-active { background: rgba(110,168,254,0.18); }
 .ss-item-selected { font-weight: 600; color: #6ea8fe; }
 .ss-empty { padding: 0.4rem 0.5rem; font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
+/* Ascenseur de la liste : plus large que le défaut WebKit (7px), donc attrapable. */
+.ss-list::-webkit-scrollbar { width: 14px; }
+.ss-list::-webkit-scrollbar-track { background: transparent; }
+.ss-list::-webkit-scrollbar-thumb {
+    background: var(--border); border-radius: 7px;
+    border: 3px solid var(--bg-main);   /* marge visuelle autour du pouce */
+}
+.ss-list::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+/* Aptitudes du français, sous la compétence : liste figée à cocher */
+.cascade-aptitudes { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.2rem; }
+.cascade-aptitudes > label { font-size: 0.82rem; }
+
+/* Étapes 6 et 7 : listes à cocher (plusieurs visées / visées à maîtriser) */
+.cascade-checks {
+    max-height: 240px; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg-main); padding: 0.25rem;
+    display: flex; flex-direction: column; gap: 0.1rem;
+    scrollbar-width: auto;
+}
+.cascade-checks::-webkit-scrollbar { width: 14px; }
+.cascade-checks::-webkit-scrollbar-track { background: transparent; }
+.cascade-checks::-webkit-scrollbar-thumb {
+    background: var(--border); border-radius: 7px; border: 3px solid var(--bg-main);
+}
+.cascade-checks::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+.cascade-check {
+    display: flex; align-items: flex-start; gap: 0.45rem;
+    padding: 0.3rem 0.4rem; border-radius: 4px; cursor: pointer;
+    font-size: 0.88rem; line-height: 1.3; font-weight: 400;
+}
+.cascade-check:hover { background: rgba(110,168,254,0.14); }
+.cascade-check input { margin: 0.15rem 0 0 0; flex: 0 0 auto; width: 15px; height: 15px; cursor: pointer; }
+
 .cascade-opt { font-weight: 400; color: var(--text-muted); }
 .cascade-error { color: #f44336; font-size: 0.8rem; margin-bottom: 0.5rem; }
 .cascade-recap { margin-top: 0.9rem; padding: 0.5rem 0.6rem; border-radius: 6px; background: rgba(76,175,80,0.12); color: var(--text); font-size: 0.82rem; }

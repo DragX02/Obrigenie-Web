@@ -1873,8 +1873,10 @@
         note.EndMinute = noteEnd.Minute;
         note.Content   = noteContent;
 
-        // Rattache la visée choisie dans la cascade, si une sélection valide a été faite.
+        // Rattache les visées cochées dans la cascade, si une sélection valide a été faite.
         // Sans nouvelle sélection, on conserve la visée déjà liée à la note en modification.
+        // La clé étrangère ne peut porter qu'une visée : on y met la première cochée,
+        // le détail de toutes les cases cochées vit dans le texte du contexte.
         if (cascadeSelection?.IdVisee > 0)
         {
             note.IdViseeFk     = cascadeSelection.IdVisee;
@@ -1932,8 +1934,10 @@
         Ajouter("Domaine", s.NomDomaine);
         Ajouter("Sous-domaine", s.NomSousDomaine);
         Ajouter("Compétence", s.NomCompetence);
-        Ajouter("Visée", s.NomVisee);
-        Ajouter("Visée à maîtriser", s.NomViseesMaitriser);
+        if (s.Aptitudes.Count > 0) Ajouter("Aptitudes", string.Join(", ", s.Aptitudes));
+        // Étapes 6 et 7 : une ligne par case cochée.
+        foreach (var visee in s.NomVisees) Ajouter("Visée", visee);
+        foreach (var vm in s.NomsViseesMaitriser) Ajouter("Visée à maîtriser", vm);
 
         return string.Join("\n", lignes);
     }
