@@ -967,10 +967,6 @@ h1:focus { outline: none; }
     background: rgba(110,168,254,0.12); color: var(--text-muted); font-size: 0.75rem;
 }
 
-/* Aptitudes du français, sous la compétence */
-.cascade-aptitudes { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.2rem; }
-.cascade-aptitudes > label { font-size: 0.82rem; }
-
 .cascade-opt { font-weight: 400; color: var(--text-muted); }
 .cascade-error { color: #f44336; font-size: 0.8rem; margin-bottom: 0.5rem; }
 .cascade-recap { margin-top: 0.9rem; padding: 0.5rem 0.6rem; border-radius: 6px; background: rgba(76,175,80,0.12); color: var(--text); font-size: 0.82rem; }

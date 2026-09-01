@@ -1969,7 +1969,6 @@
         // elles qui intitulent les blocs qu'elles qualifient (« Savoirs : … » plutôt
         // que « Visée : … »). Sans choix, on retombe sur le libellé générique.
         AjouterBloc(Libelle(s.NomCompetence, "Visée"), s.NomVisees);
-        AjouterBloc("Aptitudes", s.Aptitudes);
         AjouterBloc(Libelle(s.NomCompetenceVm, "Visée à maîtriser"), s.NomsViseesMaitriser);
 
         return string.Join("\n", lignes);
