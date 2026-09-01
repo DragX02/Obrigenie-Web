@@ -7,10 +7,13 @@
      2. Cours            → tous les cours enseignés à ce niveau (toutes catégories)
      3. Champ            → table domaine, pour la combinaison cours + niveau
      4. Domaine          → table sous_domaine, optionnel
-     5. Compétences, savoirs, S-F → champ competence de la visée
+     5. Compétences, savoirs, S-F → champ competence de la visée ; ce libellé
+                           intitule le bloc des visées dans la note
      6. Visées           → NomVisée, filtrées par la compétence choisie —
                            sélection multiple avec recherche (MultiSelectSearch)
-     7. Visées à maîtriser → celles des visées retenues (fusionnées, dédoublonnées) —
+     7. Compétences, savoirs, S-F des visées à maîtriser → ne filtre rien,
+                           intitule le bloc des visées à maîtriser dans la note
+     8. Visées à maîtriser → celles des visées retenues (fusionnées, dédoublonnées) —
                            sélection multiple avec recherche également
 
    Tout ce qui est retenu aux étapes 6 et 7 est remonté au parent et finit dans le
@@ -137,11 +140,24 @@
         </div>
     }
 
-    @* Étape 7 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
+    @* Étape 7 : compétence des visées à maîtriser. Comme à l'étape 5, ce choix ne filtre
+       rien : c'est lui qui intitule le bloc des visées à maîtriser dans la note. *@
+    @if (selectedIdNomVisees.Count > 0)
+    {
+        <div class="cascade-field">
+            <label>7. Compétences, savoirs, S-F <span class="cascade-opt">(des visées à maîtriser)</span></label>
+            <SearchableSelect Value="@selectedIdCompetenceVm.ToString()"
+                              ValueChanged="OnCompetenceVmChanged"
+                              Placeholder="-- Choisir --"
+                              Options="OptionsCompetences" EmptyValue="0" />
+        </div>
+    }
+
+    @* Étape 8 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
     @if (selectedIdNomVisees.Count > 0 && OptionsViseesMaitriser.Any())
     {
         <div class="cascade-field">
-            <label>7. Visées à maîtriser <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
+            <label>8. Visées à maîtriser <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
             <MultiSelectSearch Options="OptionsViseesMaitriser"
                                Selected="@ValeursVms"
                                OnToggle="ToggleVm"
@@ -192,6 +208,10 @@
     private int    selectedIdDomaine    = 0;
     private int    selectedIdSousD      = 0;
     private int    selectedIdCompetence = 0;
+
+    // Compétence des visées à maîtriser (étape 7) : sert uniquement d'intitulé au bloc
+    // correspondant dans la note, comme la compétence de l'étape 5 pour les visées.
+    private int    selectedIdCompetenceVm = 0;
 
     // Étapes 6 et 7 : sélection multiple par cases à cocher.
     // selectedIdVisees est dérivé de selectedIdNomVisees (couple compétence + nom_visee).
@@ -352,6 +372,13 @@
         await Notify();
     }
 
+    // Étape 7 : compétence qui intitulera le bloc des visées à maîtriser.
+    private async Task OnCompetenceVmChanged(string? value)
+    {
+        selectedIdCompetenceVm = int.TryParse(value, out var v) ? v : 0;
+        await Notify();
+    }
+
     // Étape 6 : ajoute / retire une visée. Les visées à maîtriser proposées sont
     // celles de l'ensemble des visées retenues.
     private async Task ToggleNomVisee(string valeur)
@@ -404,6 +431,7 @@
     // Vide les étapes 6 et 7 (visées cochées et visées à maîtriser proposées).
     private void ViderVisees()
     {
+        selectedIdCompetenceVm = 0;
         selectedIdNomVisees.Clear();
         selectedIdVisees.Clear();
         selectedIdVms.Clear();
@@ -545,11 +573,12 @@
         }
     }
 
-    // Libellé de la compétence retenue : depuis les visées du champ, sinon depuis la
-    // table complète quand elle a été choisie en mode élargi.
-    private string? NomDeLaCompetence =>
-        listeVisees.FirstOrDefault(v => v.IdCompetence == selectedIdCompetence)?.NomCompetence
-        ?? toutesCompetences.FirstOrDefault(c => c.IdCompetence == selectedIdCompetence)?.NomCompetence;
+    // Libellé d'une compétence : depuis les visées du champ, sinon depuis la table
+    // complète quand elle a été choisie en mode élargi.
+    private string? NomCompetenceDe(int idCompetence) =>
+        idCompetence == 0 ? null
+        : listeVisees.FirstOrDefault(v => v.IdCompetence == idCompetence)?.NomCompetence
+          ?? toutesCompetences.FirstOrDefault(c => c.IdCompetence == idCompetence)?.NomCompetence;
 
     // Libellés des options dont l'identifiant est retenu, dans l'ordre d'affichage.
     private static List<string> LibellesRetenus(
@@ -573,7 +602,9 @@
             IdSousDomaine   = selectedIdSousD,
             NomSousDomaine  = listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp,
             IdCompetence    = selectedIdCompetence,
-            NomCompetence   = NomDeLaCompetence,
+            NomCompetence   = NomCompetenceDe(selectedIdCompetence),
+            IdCompetenceVm  = selectedIdCompetenceVm,
+            NomCompetenceVm = NomCompetenceDe(selectedIdCompetenceVm),
             Aptitudes       = AptitudesFrancais.Where(a => selectedAptitudes.Contains(a)).ToList(),
             // Étapes 6 et 7 : tout ce qui est retenu, dans l'ordre d'affichage des listes.
             // Les libellés viennent des options affichées (référentiel du champ ou table
@@ -597,8 +628,13 @@
         public string? NomDomaine { get; set; }
         public int     IdSousDomaine { get; set; }
         public string? NomSousDomaine { get; set; }
+        // Compétence de l'étape 5 : intitule le bloc des visées dans la note.
         public int     IdCompetence { get; set; }
         public string? NomCompetence { get; set; }
+
+        // Compétence de l'étape 7 : intitule le bloc des visées à maîtriser.
+        public int     IdCompetenceVm { get; set; }
+        public string? NomCompetenceVm { get; set; }
 
         // Aptitudes cochées (français uniquement) : liste figée, hors référentiel.
         public List<string> Aptitudes { get; set; } = new();

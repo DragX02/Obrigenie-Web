@@ -7,11 +7,14 @@
      2. Cours            → tous les cours enseignés à ce niveau (ex : Français)
      3. Champ            → table domaine, pour la combinaison cours + niveau
      4. Domaine          → table sous_domaine, optionnel
-     5. Compétences, savoirs, S-F → le champ competence de la visée
+     5. Compétences, savoirs, S-F → le champ competence de la visée ; ce libellé
+                            intitule le bloc des visées dans la note
                             (Savoirs / Savoir-faire / Attendus / Compétences ÉCOUTER…)
      6. Visées           → NomVisée, filtrées par la compétence choisie —
                            sélection multiple avec recherche (MultiSelectSearch)
-     7. Visées à maîtriser → celles des visées retenues (fusionnées, dédoublonnées) —
+     7. Compétences, savoirs, S-F des visées à maîtriser → ne filtre rien,
+                           intitule le bloc des visées à maîtriser dans la note
+     8. Visées à maîtriser → celles des visées retenues (fusionnées, dédoublonnées) —
                            sélection multiple avec recherche également
 
    NB : « Compétence/Attendu » et « Visée » proviennent tous deux de la même requête
@@ -173,11 +176,27 @@ else
                     </div>
                 }
 
-                @* Étape 7 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
+                @* Étape 7 : compétence des visées à maîtriser. Comme à l'étape 5, ce choix ne
+                   filtre rien : il intitule le bloc des visées à maîtriser dans la note. *@
+                @if (selectedIdNomVisees.Count > 0)
+                {
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">7. Compétences, savoirs, S-F <span class="text-muted fw-normal">(des visées à maîtriser)</span></label>
+                        <select class="form-select" value="@selectedIdCompetenceVm" @onchange="OnCompetenceVmChanged">
+                            <option value="0">-- Choisir --</option>
+                            @foreach (var c in ListeCompetencesAffichees)
+                            {
+                                <option value="@c.Id">@c.Nom</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                @* Étape 8 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
                 @if (selectedIdNomVisees.Count > 0 && OptionsViseesMaitriser.Any())
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">7. Visées à maîtriser <span class="text-muted fw-normal">(plusieurs possibles)</span></label>
+                        <label class="form-label fw-bold">8. Visées à maîtriser <span class="text-muted fw-normal">(plusieurs possibles)</span></label>
                         <MultiSelectSearch Options="OptionsViseesMaitriser"
                                            Selected="@ValeursVms"
                                            OnToggle="ToggleVm"
@@ -220,13 +239,14 @@ else
                             }
                             <li><strong>Champ :</strong>      @(selectedIdDomaine == 0 ? "..." : (domainesFiltres.FirstOrDefault(d => d.IdDom == selectedIdDomaine)?.Nom ?? "..."))</li>
                             <li><strong>Domaine :</strong>    @(selectedIdSousD == 0 ? "—" : (listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp ?? "..."))</li>
-                            <li><strong>Comp., savoirs, S-F :</strong> @(selectedIdCompetence == 0 ? "..." : (NomDeLaCompetence ?? "..."))</li>
                             @if (EstFrancais)
                             {
                                 <li><strong>Aptitudes :</strong> @(selectedAptitudes.Count == 0 ? "—" : string.Join(", ", AptitudesFrancais.Where(a => selectedAptitudes.Contains(a))))</li>
                             }
+                            @* Les compétences choisies n'ont pas de ligne à elles :
+                               elles intitulent les deux blocs qu'elles qualifient. *@
                             <li>
-                                <strong>Visées :</strong>
+                                <strong>@(LibelleBloc(NomCompetenceDe(selectedIdCompetence), "Visées")) :</strong>
                                 @if (NomsViseesCochees.Count == 0) { <text>...</text> }
                                 else
                                 {
@@ -236,7 +256,7 @@ else
                                 }
                             </li>
                             <li>
-                                <strong>VM :</strong>
+                                <strong>@(LibelleBloc(NomCompetenceDe(selectedIdCompetenceVm), "Visées à maîtriser")) :</strong>
                                 @if (NomsVmCochees.Count == 0) { <text>...</text> }
                                 else
                                 {
@@ -287,6 +307,9 @@ else
     private int    selectedIdDomaine     = 0;   // étape 3 : domaine
     private int    selectedIdSousD       = 0;   // étape 4 : sous-domaine (0 = aucun)
     private int    selectedIdCompetence  = 0;   // étape 5 : compétence / attendu
+
+    // Étape 7 : compétence des visées à maîtriser. Ne filtre rien, sert d'intitulé.
+    private int    selectedIdCompetenceVm = 0;
 
     // Étapes 6 et 7 : sélection multiple par cases à cocher.
     // selectedIdVisees est dérivé de selectedIdNomVisees (couple compétence + nom_visee).
@@ -371,10 +394,15 @@ else
         }
     }
 
-    // Libellé de la compétence retenue : depuis les visées du champ, sinon depuis la table
-    private string? NomDeLaCompetence =>
-        listeVisees.FirstOrDefault(v => v.IdCompetence == selectedIdCompetence)?.NomCompetence
-        ?? toutesCompetences.FirstOrDefault(c => c.IdCompetence == selectedIdCompetence)?.NomCompetence;
+    // Libellé d'une compétence : depuis les visées du champ, sinon depuis la table complète
+    private string? NomCompetenceDe(int idCompetence) =>
+        idCompetence == 0 ? null
+        : listeVisees.FirstOrDefault(v => v.IdCompetence == idCompetence)?.NomCompetence
+          ?? toutesCompetences.FirstOrDefault(c => c.IdCompetence == idCompetence)?.NomCompetence;
+
+    // Intitulé d'un bloc du récapitulatif : la compétence choisie, à défaut le générique
+    private static string LibelleBloc(string? competence, string defaut) =>
+        string.IsNullOrWhiteSpace(competence) ? defaut : competence;
 
     // ── Options et sélections passées à MultiSelectSearch ─────────────────
     private static SearchableSelect.SelectOption Opt(string value, string label) => new(value, label);
@@ -468,6 +496,12 @@ else
         ViderVisees();
     }
 
+    // Étape 7 : compétence qui intitulera le bloc des visées à maîtriser
+    private void OnCompetenceVmChanged(ChangeEventArgs e)
+    {
+        selectedIdCompetenceVm = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+    }
+
     // Étape 6 : ajoute / retire une visée. Les visées à maîtriser proposées sont
     // celles de l'ensemble des visées retenues.
     private async Task ToggleNomVisee(string valeur)
@@ -518,6 +552,7 @@ else
     // Vide les étapes 6 et 7 (visées cochées et visées à maîtriser proposées).
     private void ViderVisees()
     {
+        selectedIdCompetenceVm = 0;
         selectedIdNomVisees.Clear();
         selectedIdVisees.Clear();
         selectedIdVms.Clear();
