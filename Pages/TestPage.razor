@@ -51,13 +51,10 @@ else
                 @* Étape 1 : année (niveau) *@
                 <div class="mb-3">
                     <label class="form-label fw-bold">1. Année :</label>
-                    <select class="form-select" value="@selectedNiveau" @onchange="OnNiveauChanged">
-                        <option value="">-- Choisir une année --</option>
-                        @foreach (var niveau in listeNiveaux)
-                        {
-                            <option value="@niveau.CodeNiveau">@niveau.NomNiveau</option>
-                        }
-                    </select>
+                    <SearchableSelect Value="@selectedNiveau"
+                                      ValueChanged="OnNiveauChanged"
+                                      Placeholder="-- Choisir une année --"
+                                      Options="OptionsNiveaux" EmptyValue="" />
                 </div>
 
                 @* Étape 2 : cours (tous les cours du niveau, toutes catégories confondues) *@
@@ -65,13 +62,10 @@ else
                 {
                     <div class="mb-3">
                         <label class="form-label fw-bold">2. Cours :</label>
-                        <select class="form-select" value="@selectedCours" @onchange="OnCoursChanged">
-                            <option value="">-- Choisir un cours --</option>
-                            @foreach (var cours in listeCours)
-                            {
-                                <option value="@cours.CodeCours">@cours.NomCours</option>
-                            }
-                        </select>
+                        <SearchableSelect Value="@selectedCours"
+                                          ValueChanged="OnCoursChanged"
+                                          Placeholder="-- Choisir un cours --"
+                                          Options="OptionsCours" EmptyValue="" />
                     </div>
                 }
 
@@ -94,28 +88,25 @@ else
                 {
                     <div class="mb-3">
                         <label class="form-label fw-bold">3. Champ :</label>
-                        <select class="form-select" value="@selectedIdDomaine" @onchange="OnDomaineChanged">
-                            <option value="0">-- Choisir un champ --</option>
-                            @foreach (var d in domainesFiltres)
-                            {
-                                <option value="@d.IdDom">@d.Nom</option>
-                            }
-                        </select>
+                        <SearchableSelect Value="@selectedIdDomaine.ToString()"
+                                          ValueChanged="OnDomaineChanged"
+                                          OnCreate="AjouterDomaine"
+                                          Placeholder="-- Choisir un champ --"
+                                          Options="OptionsDomaines" EmptyValue="0" />
                     </div>
                 }
 
-                @* Étape 4 : domaine (table sous_domaine du référentiel), optionnel *@
-                @if (selectedIdDomaine > 0 && listeSousDomaines.Count > 0)
+                @* Étape 4 : domaine (table sous_domaine du référentiel), optionnel.
+                   Affichée même quand la liste est vide, pour y ajouter le premier. *@
+                @if (selectedIdDomaine > 0)
                 {
                     <div class="mb-3">
                         <label class="form-label fw-bold">4. Domaine <span class="text-muted">(optionnel)</span></label>
-                        <select class="form-select" value="@selectedIdSousD" @onchange="OnSousDChanged">
-                            <option value="0">-- Aucun --</option>
-                            @foreach (var s in listeSousDomaines)
-                            {
-                                <option value="@s.IdSousDomaine">@s.NomComp</option>
-                            }
-                        </select>
+                        <SearchableSelect Value="@selectedIdSousD.ToString()"
+                                          ValueChanged="OnSousDChanged"
+                                          OnCreate="AjouterSousDomaine"
+                                          Placeholder="-- Aucun --"
+                                          Options="OptionsSousDomaines" EmptyValue="0" />
                     </div>
                 }
 
@@ -353,6 +344,19 @@ else
 
     private const string PrefixeNouveau = "nouveau:";
 
+    // Options des quatre premières étapes (mêmes listes qu'avant, en composant cherchable)
+    private IEnumerable<SearchableSelect.SelectOption> OptionsNiveaux =>
+        listeNiveaux.Select(n => Opt(n.CodeNiveau, n.NomNiveau));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsCours =>
+        listeCours.Select(c => Opt(c.CodeCours, c.NomCours));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsDomaines =>
+        domainesFiltres.Select(d => Opt(d.IdDom.ToString(), d.Nom));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsSousDomaines =>
+        listeSousDomaines.Select(s => Opt(s.IdSousDomaine.ToString(), s.NomComp));
+
     private IEnumerable<SearchableSelect.SelectOption> OptionsCompetences =>
         Fusionner(
             elargir
@@ -424,16 +428,16 @@ else
 
     // ── Gestionnaires ─────────────────────────────────────────────────────
 
-    private async Task OnNiveauChanged(ChangeEventArgs e)
+    private async Task OnNiveauChanged(string? value)
     {
-        selectedNiveau = e.Value?.ToString() ?? "";
+        selectedNiveau = value ?? "";
         ResetFrom(1);
         await ChargerCours();
     }
 
-    private async Task OnCoursChanged(ChangeEventArgs e)
+    private async Task OnCoursChanged(string? value)
     {
-        selectedCours = e.Value?.ToString() ?? "";
+        selectedCours = value ?? "";
         ResetFrom(2);
         await ChargerDomaines();
     }
@@ -443,9 +447,9 @@ else
         selectedLangue = e.Value?.ToString() ?? "";
     }
 
-    private async Task OnDomaineChanged(ChangeEventArgs e)
+    private async Task OnDomaineChanged(string? value)
     {
-        selectedIdDomaine = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        selectedIdDomaine = int.TryParse(value, out var v) ? v : 0;
         ResetFrom(3);
         if (selectedIdDomaine > 0)
         {
@@ -455,11 +459,38 @@ else
         }
     }
 
-    private async Task OnSousDChanged(ChangeEventArgs e)
+    private async Task OnSousDChanged(string? value)
     {
-        selectedIdSousD = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
+        selectedIdSousD = int.TryParse(value, out var v) ? v : 0;
         ResetFrom(4);
         await ChargerVisees();
+    }
+
+    // ── Ajout des entrées, à partir du champ ──────────────────────────────
+    // Année, catégorie et cours sont des données fixes : ils ne s'ajoutent pas ici.
+
+    private async Task AjouterDomaine(string nom)
+    {
+        if (string.IsNullOrEmpty(selectedCours) || string.IsNullOrEmpty(selectedNiveau)) return;
+
+        var (ok, id, err) = await Api.CreateRefDomaineAsync(nom, selectedCours, selectedNiveau);
+        if (!ok || id == 0) { loadError = err ?? "Ajout du champ refusé."; return; }
+
+        await ChargerDomaines();
+        await OnDomaineChanged(id.ToString());
+    }
+
+    private async Task AjouterSousDomaine(string nom)
+    {
+        if (selectedIdDomaine == 0) return;
+
+        var (ok, id, err) = await Api.CreateRefSousDomaineAsync(nom, selectedIdDomaine);
+        if (!ok || id == 0) { loadError = err ?? "Ajout du domaine refusé."; return; }
+
+        try { listeSousDomaines = await Api.GetSousDomainesRefAsync(selectedIdDomaine); }
+        catch (Exception ex) { loadError = ex.Message; }
+
+        await OnSousDChanged(id.ToString());
     }
 
     // Étape 7 : compétence qui intitulera le bloc des visées à maîtriser

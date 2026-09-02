@@ -70,18 +70,21 @@
             <label>3. Champ</label>
             <SearchableSelect Value="@selectedIdDomaine.ToString()"
                               ValueChanged="OnDomaineChanged"
+                              OnCreate="AjouterDomaine"
                               Placeholder="-- Choisir un champ --"
                               Options="OptionsDomaines" EmptyValue="0" />
         </div>
     }
 
-    @* Étape 4 : domaine (table sous_domaine du référentiel), optionnel *@
-    @if (selectedIdDomaine > 0 && listeSousDomaines.Count > 0)
+    @* Étape 4 : domaine (table sous_domaine du référentiel), optionnel.
+       Affichée même quand la liste est vide, pour pouvoir y ajouter le premier. *@
+    @if (selectedIdDomaine > 0)
     {
         <div class="cascade-field">
             <label>4. Domaine <span class="cascade-opt">(optionnel)</span></label>
             <SearchableSelect Value="@selectedIdSousD.ToString()"
                               ValueChanged="OnSousDChanged"
+                              OnCreate="AjouterSousDomaine"
                               Placeholder="-- Aucun --"
                               Options="OptionsSousDomaines" EmptyValue="0" />
         </div>
@@ -390,6 +393,34 @@
     // Chaque utilisateur peut compléter les tables depuis la cascade : ce qui n'existe
     // nulle part est créé, puis immédiatement sélectionné. Les appels sont rejouables
     // côté serveur, un nom déjà présent rend simplement son identifiant.
+
+    // Année et cours sont des données fixes : la complétion commence au champ.
+
+    // Étape 3 : nouveau champ pour le cours et l'année choisis.
+    private async Task AjouterDomaine(string nom)
+    {
+        if (string.IsNullOrEmpty(selectedCours) || string.IsNullOrEmpty(selectedNiveau)) return;
+
+        var (ok, id, err) = await Api.CreateRefDomaineAsync(nom, selectedCours, selectedNiveau);
+        if (!ok || id == 0) { loadError = err ?? "Ajout du champ refusé."; return; }
+
+        await ChargerDomaines();
+        await OnDomaineChanged(id.ToString());
+    }
+
+    // Étape 4 : nouveau domaine sous le champ choisi.
+    private async Task AjouterSousDomaine(string nom)
+    {
+        if (selectedIdDomaine == 0) return;
+
+        var (ok, id, err) = await Api.CreateRefSousDomaineAsync(nom, selectedIdDomaine);
+        if (!ok || id == 0) { loadError = err ?? "Ajout du domaine refusé."; return; }
+
+        try { listeSousDomaines = await Api.GetSousDomainesRefAsync(selectedIdDomaine); }
+        catch (Exception ex) { loadError = ex.Message; }
+
+        await OnSousDChanged(id.ToString());
+    }
 
     private async Task AjouterCompetenceVm(string nom)
     {

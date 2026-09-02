@@ -1005,6 +1005,45 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<ViseesMaitriserRefDto>>() ?? new();
         }
 
+        // Ajoute un champ (domaine) pour un cours et une année. Endpoint : POST api/ref/domaines
+        public async Task<(bool Ok, int Id, string? Err)> CreateRefDomaineAsync(
+            string nom, string codeCours, string codeNiveau)
+        {
+            try
+            {
+                var request = await BuildAuthRequest(HttpMethod.Post, "api/ref/domaines");
+                request.Content = JsonContent.Create(new { nom, codeCours, codeNiveau });
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                    return (true, json.TryGetProperty("idDom", out var id) ? id.GetInt32() : 0, null);
+                }
+                return (false, 0, await LireMessageErreur(response));
+            }
+            catch (Exception ex) { return (false, 0, ex.Message); }
+        }
+
+        // Ajoute un domaine (sous-domaine) sous un champ. Endpoint : POST api/ref/sous-domaines
+        public async Task<(bool Ok, int Id, string? Err)> CreateRefSousDomaineAsync(string nom, int idDomaine)
+        {
+            try
+            {
+                var request = await BuildAuthRequest(HttpMethod.Post, "api/ref/sous-domaines");
+                request.Content = JsonContent.Create(new { nom, idDomaine });
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                    return (true, json.TryGetProperty("idSousDomaine", out var id) ? id.GetInt32() : 0, null);
+                }
+                return (false, 0, await LireMessageErreur(response));
+            }
+            catch (Exception ex) { return (false, 0, ex.Message); }
+        }
+
         // Ajoute une compétence au référentiel (rejouable : un nom déjà présent rend
         // simplement son identifiant). Endpoint : POST api/ref/competences
         public Task<(bool Ok, int Id, string? Err)> CreateRefCompetenceAsync(string nom) =>
