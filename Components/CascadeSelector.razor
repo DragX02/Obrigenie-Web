@@ -127,11 +127,25 @@
         </div>
     }
 
-    @* Étape 7 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
+    @* Étape 7 : compétence des visées à maîtriser. Comme à l'étape 5, ce choix ne filtre
+       rien : c'est lui qui intitule le bloc des visées à maîtriser dans la note. *@
     @if (selectedIdNomVisees.Count > 0)
     {
         <div class="cascade-field">
-            <label>7. Visées à maîtriser <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
+            <label>7. Compétences, savoirs, S-F <span class="cascade-opt">(des visées à maîtriser)</span></label>
+            <SearchableSelect Value="@selectedIdCompetenceVm.ToString()"
+                              ValueChanged="OnCompetenceVmChanged"
+                              OnCreate="AjouterCompetenceVm"
+                              Placeholder="-- Choisir --"
+                              Options="OptionsCompetences" EmptyValue="0" />
+        </div>
+    }
+
+    @* Étape 8 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
+    @if (selectedIdNomVisees.Count > 0)
+    {
+        <div class="cascade-field">
+            <label>8. Visées à maîtriser <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
             <MultiSelectSearch Options="OptionsViseesMaitriser"
                                Selected="@ValeursVms"
                                OnToggle="ToggleVm"
@@ -186,6 +200,10 @@
     private int    selectedIdDomaine    = 0;
     private int    selectedIdSousD      = 0;
     private int    selectedIdCompetence = 0;
+
+    // Compétence des visées à maîtriser (étape 7) : sert uniquement d'intitulé au bloc
+    // correspondant dans la note, comme la compétence de l'étape 5 pour les visées.
+    private int    selectedIdCompetenceVm = 0;
 
     // Étapes 6 et 7 : sélection multiple par cases à cocher.
     // selectedIdVisees est dérivé de selectedIdNomVisees (couple compétence + nom_visee).
@@ -355,10 +373,35 @@
         await Notify();
     }
 
+    // Étape 7 : compétence qui intitulera le bloc des visées à maîtriser.
+    private async Task OnCompetenceVmChanged(string? value)
+    {
+        if (value != null && value.StartsWith(PrefixeNouveau, StringComparison.Ordinal))
+        {
+            await AjouterCompetenceVm(value[PrefixeNouveau.Length..]);
+            return;
+        }
+
+        selectedIdCompetenceVm = int.TryParse(value, out var v) ? v : 0;
+        await Notify();
+    }
+
     // ── Ajout d'entrées absentes du référentiel ───────────────────────────
     // Chaque utilisateur peut compléter les tables depuis la cascade : ce qui n'existe
     // nulle part est créé, puis immédiatement sélectionné. Les appels sont rejouables
     // côté serveur, un nom déjà présent rend simplement son identifiant.
+
+    private async Task AjouterCompetenceVm(string nom)
+    {
+        var (ok, id, err) = await Api.CreateRefCompetenceAsync(nom);
+        if (!ok || id == 0) { loadError = err ?? "Ajout de la compétence refusé."; return; }
+
+        try { toutesCompetences = await Api.GetCompetencesRefAsync(); }
+        catch (Exception ex) { loadError = ex.Message; }
+
+        selectedIdCompetenceVm = id;
+        await Notify();
+    }
 
     private async Task AjouterCompetence(string nom)
     {
@@ -442,6 +485,7 @@
     // Vide les étapes 6 et 7 (visées cochées et visées à maîtriser proposées).
     private void ViderVisees()
     {
+        selectedIdCompetenceVm = 0;
         selectedIdNomVisees.Clear();
         selectedIdVisees.Clear();
         selectedIdVms.Clear();
@@ -583,11 +627,12 @@
         }
     }
 
-    // Libellé de la compétence retenue : depuis les visées du champ, sinon depuis la
-    // table complète quand elle a été choisie en mode élargi.
-    private string? NomDeLaCompetence =>
-        listeVisees.FirstOrDefault(v => v.IdCompetence == selectedIdCompetence)?.NomCompetence
-        ?? toutesCompetences.FirstOrDefault(c => c.IdCompetence == selectedIdCompetence)?.NomCompetence;
+    // Libellé d'une compétence : depuis les visées du champ, sinon depuis la table
+    // complète (entrée choisie hors du référentiel du champ, ou créée à la volée).
+    private string? NomCompetenceDe(int idCompetence) =>
+        idCompetence == 0 ? null
+        : listeVisees.FirstOrDefault(v => v.IdCompetence == idCompetence)?.NomCompetence
+          ?? toutesCompetences.FirstOrDefault(c => c.IdCompetence == idCompetence)?.NomCompetence;
 
     // Libellés des options dont l'identifiant est retenu, dans l'ordre d'affichage.
     private static List<string> LibellesRetenus(
@@ -611,7 +656,9 @@
             IdSousDomaine   = selectedIdSousD,
             NomSousDomaine  = listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp,
             IdCompetence    = selectedIdCompetence,
-            NomCompetence   = NomDeLaCompetence,
+            NomCompetence   = NomCompetenceDe(selectedIdCompetence),
+            IdCompetenceVm  = selectedIdCompetenceVm,
+            NomCompetenceVm = NomCompetenceDe(selectedIdCompetenceVm),
             // Étapes 6 et 7 : tout ce qui est retenu, dans l'ordre d'affichage des listes.
             // Les libellés viennent des options affichées (référentiel du champ ou table
             // complète), les identifiants de visée des seules visées déjà reliées.
@@ -634,8 +681,13 @@
         public string? NomDomaine { get; set; }
         public int     IdSousDomaine { get; set; }
         public string? NomSousDomaine { get; set; }
+        // Compétence de l'étape 5 : intitule le bloc des visées dans la note.
         public int     IdCompetence { get; set; }
         public string? NomCompetence { get; set; }
+
+        // Compétence de l'étape 7 : intitule le bloc des visées à maîtriser.
+        public int     IdCompetenceVm { get; set; }
+        public string? NomCompetenceVm { get; set; }
 
         // Étape 6 : visées cochées (plusieurs possibles), listes parallèles.
         public List<int>    IdVisees  { get; set; } = new();

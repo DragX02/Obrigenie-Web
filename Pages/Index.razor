@@ -1944,6 +1944,10 @@
             if (!string.IsNullOrWhiteSpace(valeur)) lignes.Add($"{label} : {valeur}");
         }
 
+        // Intitulé d'un bloc : la compétence choisie, à défaut le libellé générique.
+        static string Libelle(string? competence, string defaut) =>
+            string.IsNullOrWhiteSpace(competence) ? defaut : competence;
+
         // Bloc à valeurs multiples : le libellé n'est écrit qu'une fois, les valeurs
         // suivantes sont alignées dessous, sous la première (indentation conservée
         // à l'affichage comme à l'impression).
@@ -1960,9 +1964,12 @@
         Ajouter("Langue", s.Langue);
         Ajouter("Champ", s.NomDomaine);
         Ajouter("Domaine", s.NomSousDomaine);
-        Ajouter("Compétences, savoirs, S-F", s.NomCompetence);
-        AjouterBloc("Visée", s.NomVisees);
-        AjouterBloc("Visée à maîtriser", s.NomsViseesMaitriser);
+
+        // Les compétences choisies ne s'écrivent pas sur une ligne à elles : ce sont
+        // elles qui intitulent les blocs qu'elles qualifient (« Savoirs : … » plutôt
+        // que « Visée : … »). Sans choix, on retombe sur le libellé générique.
+        AjouterBloc(Libelle(s.NomCompetence, "Visée"), s.NomVisees);
+        AjouterBloc(Libelle(s.NomCompetenceVm, "Visée à maîtriser"), s.NomsViseesMaitriser);
 
         return string.Join("\n", lignes);
     }
