@@ -1005,6 +1005,39 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<ViseesMaitriserRefDto>>() ?? new();
         }
 
+        // Ajoute une compétence au référentiel (rejouable : un nom déjà présent rend
+        // simplement son identifiant). Endpoint : POST api/ref/competences
+        public Task<(bool Ok, int Id, string? Err)> CreateRefCompetenceAsync(string nom) =>
+            CreerEntreeNommeeAsync("api/ref/competences", nom, "idCompetence");
+
+        // Ajoute un intitulé de visée. Endpoint : POST api/ref/nom-visees
+        public Task<(bool Ok, int Id, string? Err)> CreateRefNomViseeAsync(string nom) =>
+            CreerEntreeNommeeAsync("api/ref/nom-visees", nom, "idNomVisee");
+
+        // Ajoute une visée à maîtriser. Endpoint : POST api/ref/visees-maitriser
+        public Task<(bool Ok, int Id, string? Err)> CreateRefViseeMaitriserAsync(string nom) =>
+            CreerEntreeNommeeAsync("api/ref/visees-maitriser", nom, "idViseesMaitriser");
+
+        // Corps commun des trois créations ci-dessus : { nom } en entrée, identifiant en sortie.
+        private async Task<(bool Ok, int Id, string? Err)> CreerEntreeNommeeAsync(
+            string url, string nom, string proprieteId)
+        {
+            try
+            {
+                var request = await BuildAuthRequest(HttpMethod.Post, url);
+                request.Content = JsonContent.Create(new { nom });
+                var response = await _httpClient.SendAsync(request);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                    return (true, json.TryGetProperty(proprieteId, out var id) ? id.GetInt32() : 0, null);
+                }
+                return (false, 0, await LireMessageErreur(response));
+            }
+            catch (Exception ex) { return (false, 0, ex.Message); }
+        }
+
         // Rattache un intitulé de visée et une compétence à un champ (et éventuellement
         // à un domaine). Rejouable : si la visée existe déjà, son id est simplement rendu.
         // Endpoint : POST api/ref/visees

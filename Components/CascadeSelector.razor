@@ -94,6 +94,7 @@
             <label>5. Compétences, savoirs, S-F</label>
             <SearchableSelect Value="@selectedIdCompetence.ToString()"
                               ValueChanged="OnCompetenceChanged"
+                              OnCreate="AjouterCompetence"
                               Placeholder="-- Choisir --"
                               Options="OptionsCompetences" EmptyValue="0" />
 
@@ -110,18 +111,6 @@
                     sera créé en base à l'enregistrement.
                 </div>
             }
-
-            @* Cours de français : quatre aptitudes en plus, liste figée (hors référentiel),
-               une ou plusieurs cochées. Elles ne filtrent rien, elles s'ajoutent au texte. *@
-            @if (EstFrancais)
-            {
-                <div class="cascade-aptitudes">
-                    <label>Aptitudes <span class="cascade-opt">(une ou plusieurs)</span></label>
-                    <MultiSelectSearch Options="OptionsAptitudes"
-                                       Selected="@selectedAptitudes"
-                                       OnToggle="ToggleAptitude" />
-                </div>
-            }
         </div>
     }
 
@@ -133,18 +122,20 @@
             <MultiSelectSearch Options="OptionsNomVisees"
                                Selected="@ValeursNomVisees"
                                OnToggle="ToggleNomVisee"
+                               OnCreate="AjouterNomVisee"
                                Placeholder="Rechercher une visée…" />
         </div>
     }
 
     @* Étape 7 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
-    @if (selectedIdNomVisees.Count > 0 && OptionsViseesMaitriser.Any())
+    @if (selectedIdNomVisees.Count > 0)
     {
         <div class="cascade-field">
             <label>7. Visées à maîtriser <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
             <MultiSelectSearch Options="OptionsViseesMaitriser"
                                Selected="@ValeursVms"
                                OnToggle="ToggleVm"
+                               OnCreate="AjouterViseeMaitriser"
                                Placeholder="Rechercher une visée à maîtriser…" />
         </div>
     }
@@ -162,6 +153,10 @@
         try { listeNiveaux = await Api.GetNiveauxTousAsync(); }
         catch (Exception ex) { loadError = ex.Message; }
 
+        // La table des compétences est chargée d'emblée : l'étape 5 y ajoute
+        // Compétences / Savoirs / Savoir-faire même quand le champ ne les propose pas.
+        try { toutesCompetences = await Api.GetCompetencesRefAsync(); }
+        catch (Exception ex) { loadError = ex.Message; }
     }
 
     // ── Mode élargi : listes complètes des tables du référentiel ───────────
@@ -174,11 +169,10 @@
     private async Task BasculerElargir()
     {
         elargir = !elargir;
-        if (!elargir || toutesCompetences.Count > 0) return;
+        if (!elargir || tousNomVisees.Count > 0) return;
 
         try
         {
-            toutesCompetences = await Api.GetCompetencesRefAsync();
             tousNomVisees     = await Api.GetNomViseesRefAsync();
             toutesVm          = await Api.GetToutesViseesMaitriserRefAsync();
         }
@@ -198,21 +192,6 @@
     private readonly HashSet<int> selectedIdNomVisees = new();
     private readonly HashSet<int> selectedIdVisees    = new();
     private readonly HashSet<int> selectedIdVms       = new();
-
-    // Aptitudes du cours de français : liste figée, indépendante du référentiel.
-    private static readonly string[] AptitudesFrancais = { "Parler", "Écrire", "Écouter", "Lire" };
-    private readonly HashSet<string> selectedAptitudes = new();
-
-    // Vrai quand le cours choisi est le français (code FR/FRA ou libellé « Français »).
-    private bool EstFrancais
-    {
-        get
-        {
-            if (selectedCours is "FR" or "FRA") return true;
-            var nom = listeCours.FirstOrDefault(c => c.CodeCours == selectedCours)?.NomCours;
-            return nom != null && nom.StartsWith("Fran", StringComparison.OrdinalIgnoreCase);
-        }
-    }
 
     // ── Listes chargées ────────────────────────────────────────────────────
     private List<NiveauDto>             listeNiveaux         = new();
@@ -247,15 +226,32 @@
     // En mode élargi, les trois dernières listes viennent des tables complètes plutôt
     // que du seul référentiel du champ choisi. Les entrées déjà rattachées restent en
     // tête pour rester repérables.
-    private IEnumerable<SearchableSelect.SelectOption> OptionsCompetences =>
-        elargir
-            ? Fusionner(ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom)),
-                        toutesCompetences.OrderBy(c => c.NomCompetence)
-                                         .Select(c => Opt(c.IdCompetence.ToString(), c.NomCompetence)))
-            : ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom));
+    // Trois entrées toujours proposées à l'étape 5, en plus de celles du champ.
+    // Elles sont résolues en compétences réelles du référentiel ; celle qui n'existe
+    // pas encore dans la table est créée au moment où l'utilisateur la choisit.
+    private static readonly string[] CompetencesToujoursProposees =
+        { "Compétences", "Savoirs", "Savoir-faire" };
 
-    private IEnumerable<SearchableSelect.SelectOption> OptionsAptitudes =>
-        AptitudesFrancais.Select(a => Opt(a, a));
+    private IEnumerable<SearchableSelect.SelectOption> OptionsCompetences =>
+        Fusionner(
+            elargir
+                ? Fusionner(ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom)),
+                            toutesCompetences.OrderBy(c => c.NomCompetence)
+                                             .Select(c => Opt(c.IdCompetence.ToString(), c.NomCompetence)))
+                : ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom)),
+            CompetencesToujoursProposees.Select(OptionCompetenceFigee));
+
+    // Option d'une entrée toujours proposée : son identifiant si la table la connaît,
+    // sinon une valeur « nouveau:… » qui déclenche sa création à la sélection.
+    private SearchableSelect.SelectOption OptionCompetenceFigee(string nom)
+    {
+        var connue = toutesCompetences.FirstOrDefault(
+            c => string.Equals(c.NomCompetence.Trim(), nom, StringComparison.OrdinalIgnoreCase));
+        return connue != null ? Opt(connue.IdCompetence.ToString(), connue.NomCompetence)
+                              : Opt($"{PrefixeNouveau}{nom}", nom);
+    }
+
+    private const string PrefixeNouveau = "nouveau:";
 
     private IEnumerable<SearchableSelect.SelectOption> OptionsNomVisees =>
         elargir
@@ -347,9 +343,60 @@
 
     private async Task OnCompetenceChanged(string? value)
     {
+        // Entrée toujours proposée mais absente de la table : on la crée à la volée.
+        if (value != null && value.StartsWith(PrefixeNouveau, StringComparison.Ordinal))
+        {
+            await AjouterCompetence(value[PrefixeNouveau.Length..]);
+            return;
+        }
+
         selectedIdCompetence = int.TryParse(value, out var v) ? v : 0;
         ViderVisees();
         await Notify();
+    }
+
+    // ── Ajout d'entrées absentes du référentiel ───────────────────────────
+    // Chaque utilisateur peut compléter les tables depuis la cascade : ce qui n'existe
+    // nulle part est créé, puis immédiatement sélectionné. Les appels sont rejouables
+    // côté serveur, un nom déjà présent rend simplement son identifiant.
+
+    private async Task AjouterCompetence(string nom)
+    {
+        var (ok, id, err) = await Api.CreateRefCompetenceAsync(nom);
+        if (!ok || id == 0) { loadError = err ?? "Ajout de la compétence refusé."; return; }
+
+        try { toutesCompetences = await Api.GetCompetencesRefAsync(); }
+        catch (Exception ex) { loadError = ex.Message; }
+
+        selectedIdCompetence = id;
+        ViderVisees();
+        await Notify();
+    }
+
+    private async Task AjouterNomVisee(string nom)
+    {
+        var (ok, id, err) = await Api.CreateRefNomViseeAsync(nom);
+        if (!ok || id == 0) { loadError = err ?? "Ajout de la visée refusé."; return; }
+
+        // La nouvelle entrée n'appartient à aucun champ : elle doit figurer dans la
+        // liste pour être sélectionnable, donc le mode élargi s'active de lui-même.
+        elargir = true;
+        try { tousNomVisees = await Api.GetNomViseesRefAsync(); }
+        catch (Exception ex) { loadError = ex.Message; }
+
+        await ToggleNomVisee(id.ToString());
+    }
+
+    private async Task AjouterViseeMaitriser(string nom)
+    {
+        var (ok, id, err) = await Api.CreateRefViseeMaitriserAsync(nom);
+        if (!ok || id == 0) { loadError = err ?? "Ajout de la visée à maîtriser refusé."; return; }
+
+        elargir = true;
+        try { toutesVm = await Api.GetToutesViseesMaitriserRefAsync(); }
+        catch (Exception ex) { loadError = ex.Message; }
+
+        await ToggleVm(id.ToString());
     }
 
     // Étape 6 : ajoute / retire une visée. Les visées à maîtriser proposées sont
@@ -372,13 +419,6 @@
         await Notify();
     }
 
-    // Aptitude (français) : ajoute / retire une entrée de la liste figée.
-    private async Task ToggleAptitude(string nom)
-    {
-        if (!selectedAptitudes.Remove(nom)) selectedAptitudes.Add(nom);
-        await Notify();
-    }
-
     // Étape 7 : ajoute / retire une visée à maîtriser.
     private async Task ToggleVm(string valeur)
     {
@@ -392,9 +432,7 @@
     private void ResetFrom(int level)
     {
         if (level <= 1) { selectedCours = ""; listeCours.Clear(); selectedLangue = ""; }
-        // Les aptitudes dépendent du cours : elles ne survivent pas à un changement d'année
-        // ou de cours, mais restent cochées quand on navigue plus bas dans la cascade.
-        if (level <= 2) { selectedAptitudes.Clear(); selectedIdDomaine = 0; domainesFiltres.Clear(); }
+        if (level <= 2) { selectedIdDomaine = 0; domainesFiltres.Clear(); }
         if (level <= 3) { selectedIdSousD = 0; listeSousDomaines.Clear(); }
         selectedIdCompetence = 0;
         listeVisees.Clear();
@@ -574,7 +612,6 @@
             NomSousDomaine  = listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp,
             IdCompetence    = selectedIdCompetence,
             NomCompetence   = NomDeLaCompetence,
-            Aptitudes       = AptitudesFrancais.Where(a => selectedAptitudes.Contains(a)).ToList(),
             // Étapes 6 et 7 : tout ce qui est retenu, dans l'ordre d'affichage des listes.
             // Les libellés viennent des options affichées (référentiel du champ ou table
             // complète), les identifiants de visée des seules visées déjà reliées.
@@ -599,9 +636,6 @@
         public string? NomSousDomaine { get; set; }
         public int     IdCompetence { get; set; }
         public string? NomCompetence { get; set; }
-
-        // Aptitudes cochées (français uniquement) : liste figée, hors référentiel.
-        public List<string> Aptitudes { get; set; } = new();
 
         // Étape 6 : visées cochées (plusieurs possibles), listes parallèles.
         public List<int>    IdVisees  { get; set; } = new();

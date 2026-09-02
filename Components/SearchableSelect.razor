@@ -27,7 +27,17 @@
     @if (open)
     {
         <div class="ss-list">
-            @if (Filtered.Count == 0)
+            @* Rien ne correspond à la saisie : proposer de l'ajouter au référentiel. *@
+            @if (PeutAjouter)
+            {
+                <div class="ss-item ss-item-ajout"
+                     @onmousedown:preventDefault="true"
+                     @onmousedown="Ajouter">
+                    ＋ Ajouter « @search!.Trim() »
+                </div>
+            }
+
+            @if (Filtered.Count == 0 && !PeutAjouter)
             {
                 <div class="ss-empty">Aucun résultat</div>
             }
@@ -72,9 +82,31 @@
     /// </summary>
     [Parameter] public string? EmptyValue { get; set; }
 
+    /// <summary>
+    /// Si renseigné, une entrée « Ajouter … » apparaît quand la saisie ne correspond à
+    /// aucune option ; elle est invoquée avec le texte tapé pour créer l'entrée manquante.
+    /// </summary>
+    [Parameter] public EventCallback<string> OnCreate { get; set; }
+
     private bool open;
     private string? search;   // null = pas de saisie en cours (on affiche le libellé)
     private int highlight = -1;
+
+    // Vrai quand une saisie non vide ne correspond exactement à aucune option proposée.
+    private bool PeutAjouter =>
+        OnCreate.HasDelegate
+        && !string.IsNullOrWhiteSpace(search)
+        && !Options.Any(o => Normalize(o.Label) == Normalize(search!.Trim()));
+
+    private async Task Ajouter()
+    {
+        var nom = search?.Trim() ?? "";
+        if (nom.Length == 0) return;
+        open = false;
+        search = null;
+        highlight = -1;
+        await OnCreate.InvokeAsync(nom);
+    }
 
     // Libellé de la valeur courante.
     private string SelectedLabel =>

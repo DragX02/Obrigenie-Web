@@ -39,7 +39,16 @@
     }
 
     <div class="ms-list">
-        @if (Filtered.Count == 0)
+        @* Rien ne correspond à la saisie : proposer de l'ajouter au référentiel. *@
+        @if (PeutAjouter)
+        {
+            <div class="ms-item ms-item-ajout" @onclick="Ajouter">
+                <span class="ms-check">＋</span>
+                <span>Ajouter « @search.Trim() »</span>
+            </div>
+        }
+
+        @if (Filtered.Count == 0 && !PeutAjouter)
         {
             <div class="ms-empty">Aucun résultat</div>
         }
@@ -76,7 +85,27 @@
     /// <summary>Le champ de recherche n'apparaît qu'au-delà de ce nombre d'options.</summary>
     [Parameter] public int SeuilRecherche { get; set; } = 6;
 
+    /// <summary>
+    /// Si renseigné, une entrée « Ajouter … » apparaît quand la saisie ne correspond à
+    /// aucune option ; elle est invoquée avec le texte tapé pour créer l'entrée manquante.
+    /// </summary>
+    [Parameter] public EventCallback<string> OnCreate { get; set; }
+
     private string search = "";
+
+    // Vrai quand une saisie non vide ne correspond exactement à aucune option proposée.
+    private bool PeutAjouter =>
+        OnCreate.HasDelegate
+        && !string.IsNullOrWhiteSpace(search)
+        && !Options.Any(o => SearchableSelect.Normalize(o.Label) == SearchableSelect.Normalize(search.Trim()));
+
+    private async Task Ajouter()
+    {
+        var nom = search.Trim();
+        if (nom.Length == 0) return;
+        search = "";
+        await OnCreate.InvokeAsync(nom);
+    }
 
     private List<SearchableSelect.SelectOption> Filtered
     {

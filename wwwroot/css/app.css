@@ -903,6 +903,9 @@ h1:focus { outline: none; }
 .ss-item-active { background: rgba(110,168,254,0.18); }
 .ss-item-selected { font-weight: 600; color: #6ea8fe; }
 .ss-empty { padding: 0.4rem 0.5rem; font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
+/* Entrée « Ajouter … » : ce que l'on tape et qui n'existe pas encore au référentiel */
+.ss-item-ajout { color: #6ea8fe; font-weight: 600; border-bottom: 1px solid var(--border); }
+.ss-item-ajout:hover { background: rgba(110,168,254,0.22); }
 /* Ascenseur de la liste : plus large que le défaut WebKit (7px), donc attrapable. */
 .ss-list::-webkit-scrollbar { width: 14px; }
 .ss-list::-webkit-scrollbar-track { background: transparent; }
@@ -954,6 +957,10 @@ h1:focus { outline: none; }
 .ms-item-selected:hover { background: rgba(76,175,80,0.22); }
 .ms-check { flex: 0 0 0.9rem; color: #4CAF50; font-weight: 700; }
 .ms-empty { padding: 0.4rem 0.5rem; font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
+/* Entrée « Ajouter … » : ce que l'on tape et qui n'existe pas encore au référentiel */
+.ms-item-ajout { color: #6ea8fe; font-weight: 600; border-bottom: 1px solid var(--border); }
+.ms-item-ajout:hover { background: rgba(110,168,254,0.22); }
+.ms-item-ajout .ms-check { color: #6ea8fe; }
 
 /* Ouverture des listes complètes du référentiel (comptes ADMIN) */
 .cascade-elargir {
