@@ -7,14 +7,10 @@
      2. Cours            → tous les cours enseignés à ce niveau (toutes catégories)
      3. Champ            → table domaine, pour la combinaison cours + niveau
      4. Domaine          → table sous_domaine, optionnel
-     5. Compétences, savoirs, S-F → trois choix seulement (Compétences, Savoirs,
-                           Savoir-faire), résolus en compétences du référentiel ;
-                           ce libellé intitule le bloc des attendus dans la note
-     6. Attendus         → NomVisée, filtrés par la compétence choisie —
+     5. Compétences, savoirs, S-F → champ competence de la visée
+     6. Visées           → NomVisée, filtrées par la compétence choisie —
                            sélection multiple avec recherche (MultiSelectSearch)
-     7. Compétences, savoirs, S-F des visées à maîtriser → ne filtre rien,
-                           intitule le bloc des visées à maîtriser dans la note
-     8. Visées à maîtriser → celles des visées retenues (fusionnées, dédoublonnées) —
+     7. Visées à maîtriser → celles des visées retenues (fusionnées, dédoublonnées) —
                            sélection multiple avec recherche également
 
    Tout ce qui est retenu aux étapes 6 et 7 est remonté au parent et finit dans le
@@ -114,6 +110,18 @@
                     sera créé en base à l'enregistrement.
                 </div>
             }
+
+            @* Cours de français : quatre aptitudes en plus, liste figée (hors référentiel),
+               une ou plusieurs cochées. Elles ne filtrent rien, elles s'ajoutent au texte. *@
+            @if (EstFrancais)
+            {
+                <div class="cascade-aptitudes">
+                    <label>Aptitudes <span class="cascade-opt">(une ou plusieurs)</span></label>
+                    <MultiSelectSearch Options="OptionsAptitudes"
+                                       Selected="@selectedAptitudes"
+                                       OnToggle="ToggleAptitude" />
+                </div>
+            }
         </div>
     }
 
@@ -121,32 +129,19 @@
     @if (selectedIdCompetence > 0)
     {
         <div class="cascade-field">
-            <label>6. Attendus <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
+            <label>6. Visées <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
             <MultiSelectSearch Options="OptionsNomVisees"
                                Selected="@ValeursNomVisees"
                                OnToggle="ToggleNomVisee"
-                               Placeholder="Rechercher un attendu…" />
+                               Placeholder="Rechercher une visée…" />
         </div>
     }
 
-    @* Étape 7 : compétence des visées à maîtriser. Comme à l'étape 5, ce choix ne filtre
-       rien : c'est lui qui intitule le bloc des visées à maîtriser dans la note. *@
-    @if (selectedIdNomVisees.Count > 0)
-    {
-        <div class="cascade-field">
-            <label>7. Compétences, savoirs, S-F <span class="cascade-opt">(des visées à maîtriser)</span></label>
-            <SearchableSelect Value="@selectedIdCompetenceVm.ToString()"
-                              ValueChanged="OnCompetenceVmChanged"
-                              Placeholder="-- Choisir --"
-                              Options="OptionsCompetences" EmptyValue="0" />
-        </div>
-    }
-
-    @* Étape 8 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
+    @* Étape 7 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
     @if (selectedIdNomVisees.Count > 0 && OptionsViseesMaitriser.Any())
     {
         <div class="cascade-field">
-            <label>8. Visées à maîtriser <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
+            <label>7. Visées à maîtriser <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
             <MultiSelectSearch Options="OptionsViseesMaitriser"
                                Selected="@ValeursVms"
                                OnToggle="ToggleVm"
@@ -167,10 +162,6 @@
         try { listeNiveaux = await Api.GetNiveauxTousAsync(); }
         catch (Exception ex) { loadError = ex.Message; }
 
-        // La table des compétences sert à résoudre les trois choix figés des étapes
-        // 5 et 7 en identifiants réels du référentiel.
-        try { toutesCompetences = await Api.GetCompetencesRefAsync(); }
-        catch (Exception ex) { loadError = ex.Message; }
     }
 
     // ── Mode élargi : listes complètes des tables du référentiel ───────────
@@ -183,10 +174,11 @@
     private async Task BasculerElargir()
     {
         elargir = !elargir;
-        if (!elargir || tousNomVisees.Count > 0) return;
+        if (!elargir || toutesCompetences.Count > 0) return;
 
         try
         {
+            toutesCompetences = await Api.GetCompetencesRefAsync();
             tousNomVisees     = await Api.GetNomViseesRefAsync();
             toutesVm          = await Api.GetToutesViseesMaitriserRefAsync();
         }
@@ -201,15 +193,26 @@
     private int    selectedIdSousD      = 0;
     private int    selectedIdCompetence = 0;
 
-    // Compétence des visées à maîtriser (étape 7) : sert uniquement d'intitulé au bloc
-    // correspondant dans la note, comme la compétence de l'étape 5 pour les visées.
-    private int    selectedIdCompetenceVm = 0;
-
     // Étapes 6 et 7 : sélection multiple par cases à cocher.
     // selectedIdVisees est dérivé de selectedIdNomVisees (couple compétence + nom_visee).
     private readonly HashSet<int> selectedIdNomVisees = new();
     private readonly HashSet<int> selectedIdVisees    = new();
     private readonly HashSet<int> selectedIdVms       = new();
+
+    // Aptitudes du cours de français : liste figée, indépendante du référentiel.
+    private static readonly string[] AptitudesFrancais = { "Parler", "Écrire", "Écouter", "Lire" };
+    private readonly HashSet<string> selectedAptitudes = new();
+
+    // Vrai quand le cours choisi est le français (code FR/FRA ou libellé « Français »).
+    private bool EstFrancais
+    {
+        get
+        {
+            if (selectedCours is "FR" or "FRA") return true;
+            var nom = listeCours.FirstOrDefault(c => c.CodeCours == selectedCours)?.NomCours;
+            return nom != null && nom.StartsWith("Fran", StringComparison.OrdinalIgnoreCase);
+        }
+    }
 
     // ── Listes chargées ────────────────────────────────────────────────────
     private List<NiveauDto>             listeNiveaux         = new();
@@ -241,33 +244,18 @@
     private IEnumerable<SearchableSelect.SelectOption> OptionsSousDomaines =>
         listeSousDomaines.Select(s => Opt(s.IdSousDomaine.ToString(), s.NomComp));
 
-    // Étapes 5 et 7 : trois choix seulement, résolus en identifiants du référentiel.
-    // Les libellés de la table varient (pluriel, trait d'union) : on rapproche sur une
-    // clé sans accent ni ponctuation, via une liste d'orthographes acceptées.
-    private static readonly (string Libelle, string[] Cles)[] CompetencesRetenues =
-    {
-        ("Compétences",  new[] { "competences", "competence" }),
-        ("Savoirs",      new[] { "savoirs", "savoir" }),
-        ("Savoir-faire", new[] { "savoirfaire", "savoirsfaire", "savoirfaires" })
-    };
-
-    private IEnumerable<SearchableSelect.SelectOption> OptionsCompetences =>
-        CompetencesRetenues
-            .Select(c => (c.Libelle, Id: IdCompetenceParCle(c.Cles)))
-            .Where(c => c.Id != 0)
-            .Select(c => Opt(c.Id.ToString(), c.Libelle));
-
-    // Identifiant de la première compétence de la table dont le nom correspond.
-    private int IdCompetenceParCle(string[] cles) =>
-        toutesCompetences.FirstOrDefault(c => cles.Contains(CleCompetence(c.NomCompetence)))?.IdCompetence ?? 0;
-
-    // Clé de rapprochement : sans accent, sans casse, lettres uniquement.
-    private static string CleCompetence(string nom) =>
-        new string(SearchableSelect.Normalize(nom).Where(char.IsLetter).ToArray());
-
-    // En mode élargi, les deux listes de visées viennent des tables complètes plutôt
+    // En mode élargi, les trois dernières listes viennent des tables complètes plutôt
     // que du seul référentiel du champ choisi. Les entrées déjà rattachées restent en
     // tête pour rester repérables.
+    private IEnumerable<SearchableSelect.SelectOption> OptionsCompetences =>
+        elargir
+            ? Fusionner(ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom)),
+                        toutesCompetences.OrderBy(c => c.NomCompetence)
+                                         .Select(c => Opt(c.IdCompetence.ToString(), c.NomCompetence)))
+            : ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom));
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsAptitudes =>
+        AptitudesFrancais.Select(a => Opt(a, a));
 
     private IEnumerable<SearchableSelect.SelectOption> OptionsNomVisees =>
         elargir
@@ -364,13 +352,6 @@
         await Notify();
     }
 
-    // Étape 7 : compétence qui intitulera le bloc des visées à maîtriser.
-    private async Task OnCompetenceVmChanged(string? value)
-    {
-        selectedIdCompetenceVm = int.TryParse(value, out var v) ? v : 0;
-        await Notify();
-    }
-
     // Étape 6 : ajoute / retire une visée. Les visées à maîtriser proposées sont
     // celles de l'ensemble des visées retenues.
     private async Task ToggleNomVisee(string valeur)
@@ -391,6 +372,13 @@
         await Notify();
     }
 
+    // Aptitude (français) : ajoute / retire une entrée de la liste figée.
+    private async Task ToggleAptitude(string nom)
+    {
+        if (!selectedAptitudes.Remove(nom)) selectedAptitudes.Add(nom);
+        await Notify();
+    }
+
     // Étape 7 : ajoute / retire une visée à maîtriser.
     private async Task ToggleVm(string valeur)
     {
@@ -404,7 +392,9 @@
     private void ResetFrom(int level)
     {
         if (level <= 1) { selectedCours = ""; listeCours.Clear(); selectedLangue = ""; }
-        if (level <= 2) { selectedIdDomaine = 0; domainesFiltres.Clear(); }
+        // Les aptitudes dépendent du cours : elles ne survivent pas à un changement d'année
+        // ou de cours, mais restent cochées quand on navigue plus bas dans la cascade.
+        if (level <= 2) { selectedAptitudes.Clear(); selectedIdDomaine = 0; domainesFiltres.Clear(); }
         if (level <= 3) { selectedIdSousD = 0; listeSousDomaines.Clear(); }
         selectedIdCompetence = 0;
         listeVisees.Clear();
@@ -414,7 +404,6 @@
     // Vide les étapes 6 et 7 (visées cochées et visées à maîtriser proposées).
     private void ViderVisees()
     {
-        selectedIdCompetenceVm = 0;
         selectedIdNomVisees.Clear();
         selectedIdVisees.Clear();
         selectedIdVms.Clear();
@@ -556,12 +545,11 @@
         }
     }
 
-    // Libellé d'une compétence : depuis les visées du champ, sinon depuis la table
-    // complète quand elle a été choisie en mode élargi.
-    private string? NomCompetenceDe(int idCompetence) =>
-        idCompetence == 0 ? null
-        : listeVisees.FirstOrDefault(v => v.IdCompetence == idCompetence)?.NomCompetence
-          ?? toutesCompetences.FirstOrDefault(c => c.IdCompetence == idCompetence)?.NomCompetence;
+    // Libellé de la compétence retenue : depuis les visées du champ, sinon depuis la
+    // table complète quand elle a été choisie en mode élargi.
+    private string? NomDeLaCompetence =>
+        listeVisees.FirstOrDefault(v => v.IdCompetence == selectedIdCompetence)?.NomCompetence
+        ?? toutesCompetences.FirstOrDefault(c => c.IdCompetence == selectedIdCompetence)?.NomCompetence;
 
     // Libellés des options dont l'identifiant est retenu, dans l'ordre d'affichage.
     private static List<string> LibellesRetenus(
@@ -585,9 +573,8 @@
             IdSousDomaine   = selectedIdSousD,
             NomSousDomaine  = listeSousDomaines.FirstOrDefault(s => s.IdSousDomaine == selectedIdSousD)?.NomComp,
             IdCompetence    = selectedIdCompetence,
-            NomCompetence   = NomCompetenceDe(selectedIdCompetence),
-            IdCompetenceVm  = selectedIdCompetenceVm,
-            NomCompetenceVm = NomCompetenceDe(selectedIdCompetenceVm),
+            NomCompetence   = NomDeLaCompetence,
+            Aptitudes       = AptitudesFrancais.Where(a => selectedAptitudes.Contains(a)).ToList(),
             // Étapes 6 et 7 : tout ce qui est retenu, dans l'ordre d'affichage des listes.
             // Les libellés viennent des options affichées (référentiel du champ ou table
             // complète), les identifiants de visée des seules visées déjà reliées.
@@ -610,13 +597,11 @@
         public string? NomDomaine { get; set; }
         public int     IdSousDomaine { get; set; }
         public string? NomSousDomaine { get; set; }
-        // Compétence de l'étape 5 : intitule le bloc des visées dans la note.
         public int     IdCompetence { get; set; }
         public string? NomCompetence { get; set; }
 
-        // Compétence de l'étape 7 : intitule le bloc des visées à maîtriser.
-        public int     IdCompetenceVm { get; set; }
-        public string? NomCompetenceVm { get; set; }
+        // Aptitudes cochées (français uniquement) : liste figée, hors référentiel.
+        public List<string> Aptitudes { get; set; } = new();
 
         // Étape 6 : visées cochées (plusieurs possibles), listes parallèles.
         public List<int>    IdVisees  { get; set; } = new();
