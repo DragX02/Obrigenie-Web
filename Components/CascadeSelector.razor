@@ -63,6 +63,25 @@
         </div>
     }
 
+    @* À partir du champ, tout se complète : taper un nom absent des listes propose de
+       l'ajouter, et le bouton ouvre en plus les tables entières aux étapes 5 à 8. *@
+    @if (!string.IsNullOrEmpty(selectedCours))
+    {
+        <div class="cascade-completion">
+            <button type="button" class="cascade-elargir" @onclick="BasculerElargir">
+                @(elargir ? "▾ Revenir au référentiel du champ" : "▸ Il manque une entrée ? Chercher dans toute la base")
+            </button>
+            <div class="cascade-elargir-note">
+                À partir d'ici, tape un nom : s'il n'existe pas encore, « ＋ Ajouter » le crée.
+                @if (elargir)
+                {
+                    <text>Les étapes 5 à 8 affichent en ce moment les tables entières ; ce qui
+                    n'existe pas encore pour ce champ sera rattaché à l'enregistrement.</text>
+                }
+            </div>
+        </div>
+    }
+
     @* Étape 3 : champ (table domaine du référentiel) *@
     @if (!string.IsNullOrEmpty(selectedCours))
     {
@@ -100,20 +119,6 @@
                               OnCreate="AjouterCompetence"
                               Placeholder="-- Choisir --"
                               Options="OptionsCompetences" EmptyValue="0" />
-
-            @* Quand le référentiel ne propose pas ce qu'il faut pour ce champ, on ouvre
-               les listes complètes des tables. Les liens manquants (visée, lien visée ↔
-               visée à maîtriser) sont créés en base à l'enregistrement de la note. *@
-            <button type="button" class="cascade-elargir" @onclick="BasculerElargir">
-                @(elargir ? "▾ Revenir au référentiel du champ" : "▸ Il manque une entrée ? Chercher dans toute la base")
-            </button>
-            @if (elargir)
-            {
-                <div class="cascade-elargir-note">
-                    Listes complètes des tables. Ce qui n'existe pas encore pour ce champ
-                    sera créé en base à l'enregistrement.
-                </div>
-            }
         </div>
     }
 

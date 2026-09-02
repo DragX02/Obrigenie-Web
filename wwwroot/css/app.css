@@ -962,17 +962,21 @@ h1:focus { outline: none; }
 .ms-item-ajout:hover { background: rgba(110,168,254,0.22); }
 .ms-item-ajout .ms-check { color: #6ea8fe; }
 
-/* Ouverture des listes complètes du référentiel (comptes ADMIN) */
+/* Bandeau de complétion, au-dessus du champ : ce qui suit peut être créé */
+.cascade-completion {
+    display: flex; flex-direction: column; gap: 0.15rem;
+    padding: 0.4rem 0.5rem; border-radius: 6px;
+    background: rgba(110,168,254,0.08); border: 1px solid rgba(110,168,254,0.25);
+}
+
+/* Ouverture des listes complètes du référentiel */
 .cascade-elargir {
-    margin-top: 0.4rem; align-self: flex-start;
+    align-self: flex-start;
     background: none; border: none; padding: 0; cursor: pointer;
     color: #6ea8fe; font-size: 0.78rem; text-align: left;
 }
 .cascade-elargir:hover { text-decoration: underline; }
-.cascade-elargir-note {
-    margin-top: 0.25rem; padding: 0.35rem 0.45rem; border-radius: 6px;
-    background: rgba(110,168,254,0.12); color: var(--text-muted); font-size: 0.75rem;
-}
+.cascade-elargir-note { color: var(--text-muted); font-size: 0.75rem; line-height: 1.35; }
 
 /* Aptitudes du français, sous la compétence */
 .cascade-aptitudes { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.2rem; }

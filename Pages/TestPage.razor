@@ -83,6 +83,25 @@ else
                     </div>
                 }
 
+                @* À partir du champ, tout se complète : taper un nom absent des listes
+                   propose de l'ajouter, et le bouton ouvre en plus les tables entières. *@
+                @if (!string.IsNullOrEmpty(selectedCours))
+                {
+                    <div class="cascade-completion mb-3">
+                        <button type="button" class="cascade-elargir" @onclick="BasculerElargir">
+                            @(elargir ? "▾ Revenir au référentiel du champ" : "▸ Il manque une entrée ? Chercher dans toute la base")
+                        </button>
+                        <div class="cascade-elargir-note">
+                            À partir d'ici, tape un nom : s'il n'existe pas encore, « ＋ Ajouter » le crée.
+                            @if (elargir)
+                            {
+                                <text>Les étapes 5 à 8 affichent en ce moment les tables entières ;
+                                ce qui n'existe pas encore pour ce champ devra être rattaché.</text>
+                            }
+                        </div>
+                    </div>
+                }
+
                 @* Étape 3 : champ (table domaine du référentiel) *@
                 @if (!string.IsNullOrEmpty(selectedCours))
                 {
@@ -120,20 +139,6 @@ else
                                           OnCreate="AjouterCompetence"
                                           Placeholder="-- Choisir --"
                                           Options="OptionsCompetences" EmptyValue="0" />
-
-                        @* Quand le référentiel du champ ne propose pas ce qu'il faut, on ouvre
-                           les listes complètes des tables ; les liens manquants sont créés en
-                           base par le bouton en bas de colonne. *@
-                        <button type="button" class="cascade-elargir" @onclick="BasculerElargir">
-                            @(elargir ? "▾ Revenir au référentiel du champ" : "▸ Il manque une entrée ? Chercher dans toute la base")
-                        </button>
-                        @if (elargir)
-                        {
-                            <div class="cascade-elargir-note">
-                                Listes complètes des tables. Ce qui n'existe pas encore pour ce
-                                champ devra être créé en base pour être utilisable.
-                            </div>
-                        }
 
                     </div>
                 }
