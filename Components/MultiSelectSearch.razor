@@ -7,8 +7,8 @@
    ("visee" trouve "Visée"), et les sélections en cours sont rappelées sous forme
    d'étiquettes cliquables pour les retirer d'un clic.
 
-   Le champ de recherche n'apparaît qu'au-delà de SeuilRecherche options : pour
-   une liste courte (les aptitudes du français, par exemple), il n'apporte rien.
+   Quand la saisie ne correspond à aucune option et que OnCreate est fourni, une
+   entrée « Ajouter … » permet de créer l'entrée manquante au référentiel.
 
    Utilisation :
      <MultiSelectSearch Options="mesOptions" Selected="mesValeurs"
@@ -17,11 +17,10 @@
 
 <div class="ms-root">
 
-    @if (Options.Count() > SeuilRecherche)
-    {
-        <input type="text" class="ms-search" placeholder="@Placeholder"
-               value="@search" @oninput="OnInput" />
-    }
+    @* Toujours affiché, même sur une liste courte : c'est aussi par lui que passe
+       l'ajout d'une entrée absente du référentiel. *@
+    <input type="text" class="ms-search" placeholder="@Placeholder"
+           value="@search" @oninput="OnInput" />
 
     @* Rappel des sélections : une étiquette par valeur cochée, ✕ pour la retirer *@
     @if (Selected.Count > 0)
@@ -81,9 +80,6 @@
 
     /// <summary>Texte du champ de recherche.</summary>
     [Parameter] public string Placeholder { get; set; } = "Rechercher…";
-
-    /// <summary>Le champ de recherche n'apparaît qu'au-delà de ce nombre d'options.</summary>
-    [Parameter] public int SeuilRecherche { get; set; } = 6;
 
     /// <summary>
     /// Si renseigné, une entrée « Ajouter … » apparaît quand la saisie ne correspond à
