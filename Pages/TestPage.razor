@@ -2,15 +2,15 @@
 @* ─────────────────────────────────────────────────────────────────────────────
    TestPage.razor — Page de test de sélection en cascade.
 
-   Flux de sélection en cascade réordonné (7 étapes) :
+   Flux de sélection en cascade réordonné (8 étapes) :
      1. Année            → Niveau (chargé en premier, tous niveaux ayant des visées)
      2. Cours            → tous les cours enseignés à ce niveau (ex : Français)
      3. Champ            → table domaine, pour la combinaison cours + niveau
      4. Domaine          → table sous_domaine, optionnel
-     5. Compétences, savoirs, S-F → le champ competence de la visée ; ce libellé
-                            intitule le bloc des visées dans la note
-                            (Savoirs / Savoir-faire / Attendus / Compétences ÉCOUTER…)
-     6. Visées           → NomVisée, filtrées par la compétence choisie —
+     5. Compétences, savoirs, S-F → trois choix seulement (Compétences, Savoirs,
+                            Savoir-faire), résolus en compétences du référentiel ;
+                            ce libellé intitule le bloc des attendus dans la note
+     6. Attendus         → NomVisée, filtrés par la compétence choisie —
                            sélection multiple avec recherche (MultiSelectSearch)
      7. Compétences, savoirs, S-F des visées à maîtriser → ne filtre rien,
                            intitule le bloc des visées à maîtriser dans la note
@@ -157,11 +157,11 @@ else
                 @if (selectedIdCompetence > 0)
                 {
                     <div class="mb-3">
-                        <label class="form-label fw-bold">6. Visées <span class="text-muted fw-normal">(plusieurs possibles)</span></label>
+                        <label class="form-label fw-bold">6. Attendus <span class="text-muted fw-normal">(plusieurs possibles)</span></label>
                         <MultiSelectSearch Options="OptionsNomVisees"
                                            Selected="@ValeursNomVisees"
                                            OnToggle="ToggleNomVisee"
-                                           Placeholder="Rechercher une visée…" />
+                                           Placeholder="Rechercher un attendu…" />
                     </div>
                 }
 
@@ -231,7 +231,7 @@ else
                             @* Les compétences choisies n'ont pas de ligne à elles :
                                elles intitulent les deux blocs qu'elles qualifient. *@
                             <li>
-                                <strong>@(LibelleBloc(NomCompetenceDe(selectedIdCompetence), "Visées")) :</strong>
+                                <strong>@(LibelleBloc(NomCompetenceDe(selectedIdCompetence), "Attendus")) :</strong>
                                 @if (NomsViseesCochees.Count == 0) { <text>...</text> }
                                 else
                                 {
@@ -278,6 +278,10 @@ else
         {
             // Première étape de la cascade : tous les niveaux (années) disponibles
             listeNiveaux = await Api.GetNiveauxTousAsync();
+
+            // La table des compétences sert à résoudre les trois choix figés des
+            // étapes 5 et 7 en identifiants réels du référentiel.
+            toutesCompetences = await Api.GetCompetencesRefAsync();
         }
         catch (Exception ex)
         {
@@ -341,29 +345,38 @@ else
     private async Task BasculerElargir()
     {
         elargir = !elargir;
-        if (!elargir || toutesCompetences.Count > 0) return;
+        if (!elargir || tousNomVisees.Count > 0) return;
 
         try
         {
-            toutesCompetences = await Api.GetCompetencesRefAsync();
             tousNomVisees     = await Api.GetNomViseesRefAsync();
             toutesVm          = await Api.GetToutesViseesMaitriserRefAsync();
         }
         catch (Exception ex) { loadError = ex.Message; }
     }
 
-    // Compétences proposées : celles du champ, complétées par la table entière en mode élargi
-    private IEnumerable<(int Id, string Nom)> ListeCompetencesAffichees
+    // Étapes 5 et 7 : trois choix seulement, résolus en identifiants du référentiel.
+    // Les libellés de la table varient (pluriel, trait d'union) : on rapproche sur une
+    // clé sans accent ni ponctuation, via une liste d'orthographes acceptées.
+    private static readonly (string Libelle, string[] Cles)[] CompetencesRetenues =
     {
-        get
-        {
-            if (!elargir) return ListeCompetences;
-            var vues = new HashSet<int>(ListeCompetences.Select(c => c.Id));
-            return ListeCompetences.Concat(
-                toutesCompetences.Where(c => !vues.Contains(c.IdCompetence))
-                                 .Select(c => (Id: c.IdCompetence, Nom: c.NomCompetence)));
-        }
-    }
+        ("Compétences",  new[] { "competences", "competence" }),
+        ("Savoirs",      new[] { "savoirs", "savoir" }),
+        ("Savoir-faire", new[] { "savoirfaire", "savoirsfaire", "savoirfaires" })
+    };
+
+    private IEnumerable<(int Id, string Nom)> ListeCompetencesAffichees =>
+        CompetencesRetenues
+            .Select(c => (Id: IdCompetenceParCle(c.Cles), Nom: c.Libelle))
+            .Where(c => c.Id != 0);
+
+    // Identifiant de la première compétence de la table dont le nom correspond.
+    private int IdCompetenceParCle(string[] cles) =>
+        toutesCompetences.FirstOrDefault(c => cles.Contains(CleCompetence(c.NomCompetence)))?.IdCompetence ?? 0;
+
+    // Clé de rapprochement : sans accent, sans casse, lettres uniquement.
+    private static string CleCompetence(string nom) =>
+        new string(SearchableSelect.Normalize(nom).Where(char.IsLetter).ToArray());
 
     // Libellé d'une compétence : depuis les visées du champ, sinon depuis la table complète
     private string? NomCompetenceDe(int idCompetence) =>

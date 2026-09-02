@@ -1968,7 +1968,7 @@
         // Les compétences choisies ne s'écrivent pas sur une ligne à elles : ce sont
         // elles qui intitulent les blocs qu'elles qualifient (« Savoirs : … » plutôt
         // que « Visée : … »). Sans choix, on retombe sur le libellé générique.
-        AjouterBloc(Libelle(s.NomCompetence, "Visée"), s.NomVisees);
+        AjouterBloc(Libelle(s.NomCompetence, "Attendus"), s.NomVisees);
         AjouterBloc(Libelle(s.NomCompetenceVm, "Visée à maîtriser"), s.NomsViseesMaitriser);
 
         return string.Join("\n", lignes);

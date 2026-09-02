@@ -7,9 +7,10 @@
      2. Cours            → tous les cours enseignés à ce niveau (toutes catégories)
      3. Champ            → table domaine, pour la combinaison cours + niveau
      4. Domaine          → table sous_domaine, optionnel
-     5. Compétences, savoirs, S-F → champ competence de la visée ; ce libellé
-                           intitule le bloc des visées dans la note
-     6. Visées           → NomVisée, filtrées par la compétence choisie —
+     5. Compétences, savoirs, S-F → trois choix seulement (Compétences, Savoirs,
+                           Savoir-faire), résolus en compétences du référentiel ;
+                           ce libellé intitule le bloc des attendus dans la note
+     6. Attendus         → NomVisée, filtrés par la compétence choisie —
                            sélection multiple avec recherche (MultiSelectSearch)
      7. Compétences, savoirs, S-F des visées à maîtriser → ne filtre rien,
                            intitule le bloc des visées à maîtriser dans la note
@@ -120,11 +121,11 @@
     @if (selectedIdCompetence > 0)
     {
         <div class="cascade-field">
-            <label>6. Visées <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
+            <label>6. Attendus <span class="cascade-opt">(sélectionne ce qui va dans la note)</span></label>
             <MultiSelectSearch Options="OptionsNomVisees"
                                Selected="@ValeursNomVisees"
                                OnToggle="ToggleNomVisee"
-                               Placeholder="Rechercher une visée…" />
+                               Placeholder="Rechercher un attendu…" />
         </div>
     }
 
@@ -166,6 +167,10 @@
         try { listeNiveaux = await Api.GetNiveauxTousAsync(); }
         catch (Exception ex) { loadError = ex.Message; }
 
+        // La table des compétences sert à résoudre les trois choix figés des étapes
+        // 5 et 7 en identifiants réels du référentiel.
+        try { toutesCompetences = await Api.GetCompetencesRefAsync(); }
+        catch (Exception ex) { loadError = ex.Message; }
     }
 
     // ── Mode élargi : listes complètes des tables du référentiel ───────────
@@ -178,11 +183,10 @@
     private async Task BasculerElargir()
     {
         elargir = !elargir;
-        if (!elargir || toutesCompetences.Count > 0) return;
+        if (!elargir || tousNomVisees.Count > 0) return;
 
         try
         {
-            toutesCompetences = await Api.GetCompetencesRefAsync();
             tousNomVisees     = await Api.GetNomViseesRefAsync();
             toutesVm          = await Api.GetToutesViseesMaitriserRefAsync();
         }
@@ -237,15 +241,33 @@
     private IEnumerable<SearchableSelect.SelectOption> OptionsSousDomaines =>
         listeSousDomaines.Select(s => Opt(s.IdSousDomaine.ToString(), s.NomComp));
 
-    // En mode élargi, les trois dernières listes viennent des tables complètes plutôt
+    // Étapes 5 et 7 : trois choix seulement, résolus en identifiants du référentiel.
+    // Les libellés de la table varient (pluriel, trait d'union) : on rapproche sur une
+    // clé sans accent ni ponctuation, via une liste d'orthographes acceptées.
+    private static readonly (string Libelle, string[] Cles)[] CompetencesRetenues =
+    {
+        ("Compétences",  new[] { "competences", "competence" }),
+        ("Savoirs",      new[] { "savoirs", "savoir" }),
+        ("Savoir-faire", new[] { "savoirfaire", "savoirsfaire", "savoirfaires" })
+    };
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsCompetences =>
+        CompetencesRetenues
+            .Select(c => (c.Libelle, Id: IdCompetenceParCle(c.Cles)))
+            .Where(c => c.Id != 0)
+            .Select(c => Opt(c.Id.ToString(), c.Libelle));
+
+    // Identifiant de la première compétence de la table dont le nom correspond.
+    private int IdCompetenceParCle(string[] cles) =>
+        toutesCompetences.FirstOrDefault(c => cles.Contains(CleCompetence(c.NomCompetence)))?.IdCompetence ?? 0;
+
+    // Clé de rapprochement : sans accent, sans casse, lettres uniquement.
+    private static string CleCompetence(string nom) =>
+        new string(SearchableSelect.Normalize(nom).Where(char.IsLetter).ToArray());
+
+    // En mode élargi, les deux listes de visées viennent des tables complètes plutôt
     // que du seul référentiel du champ choisi. Les entrées déjà rattachées restent en
     // tête pour rester repérables.
-    private IEnumerable<SearchableSelect.SelectOption> OptionsCompetences =>
-        elargir
-            ? Fusionner(ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom)),
-                        toutesCompetences.OrderBy(c => c.NomCompetence)
-                                         .Select(c => Opt(c.IdCompetence.ToString(), c.NomCompetence)))
-            : ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom));
 
     private IEnumerable<SearchableSelect.SelectOption> OptionsNomVisees =>
         elargir
