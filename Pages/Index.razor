@@ -1506,21 +1506,16 @@
         int off = ((int)start.DayOfWeek - (int)System.DayOfWeek.Monday + 7) % 7;
         DateTime gridStart = start.AddDays(-off);
 
-        // Collecte tous les jours de semaine (Lun–Ven) de la période pour les requêtes API groupées
-        var weekdays = new List<DateTime>();
-        for (DateTime d = gridStart; d.Date <= end.Date; d = d.AddDays(1))
-            if (d.DayOfWeek != System.DayOfWeek.Saturday && d.DayOfWeek != System.DayOfWeek.Sunday)
-                weekdays.Add(d);
-
-        // Lance une tâche de récupération de cours par jour de semaine et une requête de notes — toutes en parallèle
-        var courseTasks = weekdays.Select(d => Api.GetCoursesForDateAsync(d)).ToArray();
+        // Cours et notes de toute la période : une requête chacun, lancées en parallèle.
+        // Les cours partaient auparavant en une requête par jour de semaine, soit une
+        // cinquantaine d'appels simultanés pour afficher un seul trimestre, alors que les
+        // notes de la même période tenaient déjà en un appel.
+        var coursesTask = Api.GetCoursesForRangeAsync(gridStart, end);
         var notesTask   = Api.GetNotesForRangeAsync(gridStart, end);
-        await Task.WhenAll(Task.WhenAll(courseTasks), notesTask);
+        await Task.WhenAll(coursesTask, notesTask);
 
-        // Indexe les cours par date pour des recherches en O(1) lors de la construction des objets TrimDay
-        var coursesByDate = weekdays
-            .Zip(courseTasks.Select(t => t.Result))
-            .ToDictionary(p => p.First.Date, p => p.Second);
+        // Le serveur rend les cours déjà indexés par date (recherches en O(1) plus bas)
+        var coursesByDate = coursesTask.Result;
 
         // Groupe les notes par date pour des recherches en O(1)
         var allTrimNotes = notesTask.Result;
@@ -1827,11 +1822,10 @@
         {
             ApplyFormTo(editingNote);
 
-            // Le texte saisi ne contient pas la mention de report : on la réécrit,
-            // sinon modifier une leçon reportée effacerait la trace du report.
-            if (editingNoteReport is DateTime dejaReporte)
-                editingNote.Content = ReportNote.Marquer(editingNote.Content, dejaReporte);
-
+            // Le texte saisi ne contient pas la mention de report ; c'est le serveur qui
+            // la reprend depuis la note stockée, lui seul sachant ce qu'elle contient
+            // réellement. Le client la réécrivait de mémoire, ce qui la perdait dès que
+            // sa copie de la note était en retard sur la base.
             var (ok, err) = await Api.SaveNoteAsync(editingNote);
             if (!ok) { noteSaveError = err; return; }
         }
@@ -2105,8 +2099,10 @@
     }
 
     // Recopie les leçons cochées sur la semaine visée et marque chaque originale.
-    // La copie est créée d'abord : si le marquage échoue, la leçon est reportée
-    // quand même et le compte rendu le signale.
+    //
+    // Le serveur fait les deux en une transaction. Le report partait auparavant en deux
+    // requêtes par leçon — la copie, puis le marquage de l'originale — et une coupure au
+    // milieu laissait une semaine à moitié reportée, sans marqueur pour dire lesquelles.
     private async Task ReporterSemaine()
     {
         if (reportEnCours) return;
@@ -2120,36 +2116,20 @@
         reportEnCours = true;
         reportErreur  = null;
 
-        int copiees = 0, marquees = 0;
+        var (ok, copiees, err) = await Api.CopierNotesAsync(
+            choisies.Select(x => x.Note.Id), new[] { delta }, marquer: true);
 
-        foreach (var (_, note) in choisies)
+        reportEnCours = false;
+
+        if (!ok)
         {
-            var cible = note.Date.Date.AddDays(delta);
-
-            var (ok, err) = await Api.SaveNoteAsync(ReportNote.Copier(note, cible));
-            if (!ok)
-            {
-                reportEnCours = false;
-                reportErreur  = copiees == 0
-                    ? (err ?? "Le report a échoué.")
-                    : $"{copiees} leçon(s) reportée(s), puis erreur : {err}";
-                await UpdateCalendarView();
-                return;
-            }
-            copiees++;
-
-            // Marque l'originale ; un échec ici ne remet pas la copie en cause
-            note.Content = ReportNote.Marquer(note.Content, cible);
-            var (okMarque, _) = await Api.SaveNoteAsync(note);
-            if (okMarque) marquees++;
+            // Rien n'a été écrit : la semaine d'origine est intacte
+            reportErreur = err ?? "Le report a échoué.";
+            return;
         }
 
-        reportEnCours   = false;
         showReportModal = false;
-
-        reportInfo = marquees == copiees
-            ? $"{copiees} leçon(s) reportée(s) vers la semaine du {LundiDe(reportCible):dd/MM/yyyy}."
-            : $"{copiees} leçon(s) reportée(s), mais {copiees - marquees} mention(s) « Reporté au … » n'ont pas pu être enregistrées.";
+        reportInfo = $"{copiees} leçon(s) reportée(s) vers la semaine du {LundiDe(reportCible):dd/MM/yyyy}.";
 
         await UpdateCalendarView();
     }
@@ -2165,31 +2145,37 @@
         reportEnCours = true;
         reportErreur  = null;
 
-        // Reprend les valeurs de la modale sur la note d'origine avant de la copier
+        // Les retouches faites juste avant le report partent avec la copie : la note
+        // d'origine est d'abord enregistrée, puis c'est elle que le serveur recopie.
         ApplyFormTo(editingNote);
 
-        var (ok, err) = await Api.SaveNoteAsync(ReportNote.Copier(editingNote, reportNoteCible));
-        if (!ok)
+        var (okEnregistre, errEnregistre) = await Api.SaveNoteAsync(editingNote);
+        if (!okEnregistre)
         {
             reportEnCours = false;
-            reportErreur  = err ?? "Le report a échoué.";
+            reportErreur  = errEnregistre ?? "Le report a échoué.";
             return;
         }
 
-        // Marque l'originale de sa nouvelle date de report
-        editingNote.Content = ReportNote.Marquer(editingNote.Content, reportNoteCible);
-        var (okMarque, errMarque) = await Api.SaveNoteAsync(editingNote);
+        // Copie et marquage de l'originale se font en une transaction côté serveur
+        int delta = (reportNoteCible.Date - editingNote.Date.Date).Days;
+        var (ok, _, err) = await Api.CopierNotesAsync(new[] { editingNote.Id }, new[] { delta }, marquer: true);
 
-        reportEnCours     = false;
+        reportEnCours = false;
+
+        if (!ok)
+        {
+            reportErreur = err ?? "Le report a échoué.";
+            return;
+        }
+
         showNoteModal     = false;
         showReportPanel   = false;
         showCascadePanel  = false;
         cascadeSelection  = null;
         editingNoteReport = null;
 
-        reportInfo = okMarque
-            ? $"Leçon reportée au {reportNoteCible:dd/MM/yyyy}."
-            : $"Leçon reportée au {reportNoteCible:dd/MM/yyyy}, mais la mention « Reporté au … » n'a pas pu être enregistrée ({errMarque}).";
+        reportInfo = $"Leçon reportée au {reportNoteCible:dd/MM/yyyy}.";
 
         await UpdateCalendarView();
     }
@@ -2355,6 +2341,10 @@
     // Écrit les copies : une par leçon retenue et par destination.
     // Chaque copie repart sans mention de report — c'est une nouvelle occurrence,
     // pas la trace d'un déplacement.
+    //
+    // Le serveur les écrit toutes dans une transaction. Le client les postait une par
+    // une : copier une semaine de dix leçons sur quatre semaines faisait quarante
+    // requêtes, et une coupure au milieu laissait des semaines à moitié remplies.
     private async Task LancerCopie()
     {
         if (copieEnCours) return;
@@ -2366,28 +2356,28 @@
         copieEnCours = true;
         copieErreur  = null;
 
-        int faites = 0;
+        // Chaque destination est un décalage en jours par rapport à la date de référence
+        // de la source : le même calcul que ReportNote.DateCopie, exprimé une seule fois
+        // pour toutes les leçons.
+        var decalages = copieCibles.Select(c => (c.Date - copieSourceDate.Date).Days).ToList();
 
-        foreach (var cible in copieCibles)
+        // Copier une leçon depuis sa fenêtre d'édition part d'un modèle détaché (Id 0)
+        // portant les valeurs affichées : il voyage tel quel, l'originale n'est pas touchée.
+        var (ok, faites, err) = await Api.CopierNotesAsync(
+            lecons.Where(n => n.Id >  0).Select(n => n.Id),
+            decalages,
+            marquer: false,
+            lecons.Where(n => n.Id == 0));
+
+        copieEnCours = false;
+
+        if (!ok)
         {
-            foreach (var note in lecons)
-            {
-                var (ok, err) = await Api.SaveNoteAsync(
-                    ReportNote.Copier(note, ReportNote.DateCopie(note, copieSourceDate, cible)));
-                if (!ok)
-                {
-                    copieEnCours = false;
-                    copieErreur  = faites == 0
-                        ? (err ?? "La copie a échoué.")
-                        : $"{faites} copie(s) faite(s), puis erreur : {err}";
-                    await UpdateCalendarView();
-                    return;
-                }
-                faites++;
-            }
+            // Rien n'a été écrit : aucune semaine à moitié remplie à rattraper
+            copieErreur = err ?? "La copie a échoué.";
+            return;
         }
 
-        copieEnCours   = false;
         showCopieModal = false;
 
         reportInfo = CopieParSemaine

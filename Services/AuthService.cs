@@ -135,8 +135,14 @@ namespace Obrigenie.Services
                 // La deuxième partie (index 1) est la charge utile JSON encodée en Base64url
                 var payload = parts[1];
 
-                // Base64url utilise '-' et '_' à la place de '+' et '/' ; le rembourrage '=' peut être supprimé.
-                // Rajouter le rembourrage '=' requis pour que Convert.FromBase64String puisse le décoder.
+                // Base64url utilise '-' et '_' à la place de '+' et '/' : sans cette
+                // conversion, Convert.FromBase64String refuse la charge utile dès qu'elle
+                // contient l'un des deux — le rôle sortait alors à null et le menu
+                // d'administration disparaissait pour un compte pourtant admin.
+                payload = payload.Replace('-', '+').Replace('_', '/');
+
+                // Le rembourrage '=' peut être supprimé en base64url : on le rajoute
+                // pour que Convert.FromBase64String puisse décoder.
                 payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
 
                 // Décoder les octets base64 et les interpréter comme du JSON UTF-8

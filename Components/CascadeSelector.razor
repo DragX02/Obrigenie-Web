@@ -528,23 +528,15 @@
         listeViseesMaitriser.Clear();
     }
 
-    // Charge tous les cours enseignés au niveau choisi. Le référentiel n'expose les
-    // cours que catégorie par catégorie : on parcourt donc les catégories du niveau
-    // et on fusionne leurs cours, dédoublonnés par code (un cours peut être rattaché
-    // à plusieurs catégories).
+    // Charge tous les cours enseignés au niveau choisi, toutes catégories confondues.
+    // Le serveur rend la liste déjà fusionnée et dédoublonnée (un cours peut être
+    // rattaché à plusieurs catégories) : ce travail se faisait ici, au prix d'un appel
+    // par catégorie du niveau.
     private async Task ChargerCours()
     {
         listeCours.Clear();
         if (string.IsNullOrEmpty(selectedNiveau)) return;
-        try
-        {
-            var categories = await Api.GetCategoriesByNiveauAsync(selectedNiveau);
-            var parCode = new Dictionary<string, CoursDto>();
-            foreach (var cat in categories)
-                foreach (var c in await Api.GetCoursByCatNiveauAsync(cat.IdCat, selectedNiveau))
-                    parCode[c.CodeCours] = c;
-            listeCours = parCode.Values.OrderBy(c => c.NomCours).ToList();
-        }
+        try { listeCours = await Api.GetCoursByNiveauAsync(selectedNiveau); }
         catch (Exception ex) { loadError = ex.Message; }
     }
 
@@ -566,24 +558,21 @@
         catch (Exception ex) { loadError = ex.Message; }
     }
 
-    // Visées à maîtriser de toutes les visées cochées, fusionnées et dédoublonnées.
-    // Les cases cochées qui ne sont plus proposées sont abandonnées.
+    // Visées à maîtriser de toutes les visées cochées. Le serveur les fusionne et les
+    // dédoublonne en une requête ; la boucle qui interrogeait ici une visée à la fois
+    // coûtait un aller-retour par case cochée.
     private async Task ChargerViseesMaitriser()
     {
-        var parId = new Dictionary<int, ViseesMaitriserRefDto>();
-        foreach (var idVisee in selectedIdVisees)
-        {
-            try
-            {
-                foreach (var vm in await Api.GetViseesMaitriserRefAsync(idVisee))
-                    parId[vm.IdViseesMaitriser] = vm;
-            }
-            catch (Exception ex) { loadError = ex.Message; }
-        }
-        listeViseesMaitriser = parId.Values.OrderBy(vm => vm.NomViseesMaitriser).ToList();
+        try { listeViseesMaitriser = await Api.GetViseesMaitriserParViseesAsync(selectedIdVisees); }
+        catch (Exception ex) { loadError = ex.Message; return; }
+
+        // Les cases cochées qui ne sont plus proposées sont abandonnées.
         // En mode élargi, une visée à maîtriser peut venir de la table complète sans être
         // encore reliée : on ne l'abandonne pas, le lien sera créé à l'enregistrement.
-        if (!elargir) selectedIdVms.RemoveWhere(id => !parId.ContainsKey(id));
+        if (elargir) return;
+
+        var proposees = listeViseesMaitriser.Select(vm => vm.IdViseesMaitriser).ToHashSet();
+        selectedIdVms.RemoveWhere(id => !proposees.Contains(id));
     }
 
     // ── Écriture en base des liens manquants ──────────────────────────────
@@ -608,44 +597,37 @@
     /// nom_visee retenu qui n'en a pas encore pour ce champ, puis les liens vers les
     /// visées à maîtriser retenues. Recharge ensuite les listes et remonte l'état.
     /// Retourne null si tout s'est bien passé, sinon le message d'erreur.
+    ///
+    /// Le serveur mène la séquence entière dans une transaction. Elle se faisait ici :
+    /// une requête par visée à créer, une relecture pour récupérer les identifiants
+    /// attribués, puis une requête par lien — et un onglet fermé au milieu laissait des
+    /// visées créées sans aucun lien, que rien ne venait rattraper.
     /// </summary>
     public async Task<string?> SynchroniserReferentielAsync()
     {
         if (!ReferentielAComplete) return null;
 
-        // 1. Les visées manquantes (champ + domaine + compétence + intitulé de visée).
-        //    Le champ porte déjà le couple cours/année : rien d'autre n'est nécessaire.
-        foreach (var idNomVisee in selectedIdNomVisees.ToList())
-        {
-            if (ViseeExistante(idNomVisee) != 0) continue;
+        var (ok, idVisees, err) = await Api.EnregistrerSelectionRefAsync(
+            selectedIdDomaine, selectedIdSousD, selectedIdCompetence,
+            selectedIdNomVisees, selectedIdVms);
 
-            var (ok, _, err) = await Api.CreateRefViseeAsync(
-                selectedIdDomaine, selectedIdSousD, idNomVisee, selectedIdCompetence);
-            if (!ok) return err ?? "Création de la visée refusée.";
-        }
+        if (!ok) return err ?? "Enregistrement du référentiel refusé.";
 
-        // 2. Relecture : les visées créées ont maintenant un identifiant
+        // Relecture : les listes affichées doivent contenir les visées qui viennent
+        // d'être créées, sans quoi elles resteraient marquées comme manquantes.
         await RechargerViseesDuChamp();
 
-        // 3. Les liens vers les visées à maîtriser retenues mais pas encore reliées
-        var idVisee = selectedIdVisees.FirstOrDefault();
-        if (idVisee != 0)
-        {
-            foreach (var idVm in selectedIdVms.ToList())
-            {
-                if (listeViseesMaitriser.Any(vm => vm.IdViseesMaitriser == idVm)) continue;
+        // Les identifiants rendus par le serveur font foi : ils couvrent aussi les
+        // visées créées à l'instant, dans l'ordre des intitulés envoyés.
+        selectedIdVisees.Clear();
+        foreach (var idVisee in idVisees) selectedIdVisees.Add(idVisee);
 
-                var (ok, err) = await Api.CreateRefLienViseeMaitriseAsync(idVisee, idVm);
-                if (!ok) return err ?? "Création du lien vers la visée à maîtriser refusée.";
-            }
-            await ChargerViseesMaitriser();
-        }
-
+        await ChargerViseesMaitriser();
         await Notify();
         return null;
     }
 
-    // Recharge les visées du champ courant et re-résout les identifiants retenus.
+    // Recharge les visées du champ courant.
     private async Task RechargerViseesDuChamp()
     {
         try
@@ -653,14 +635,7 @@
             listeVisees = await Api.GetViseesRefAsync(
                 selectedIdDomaine, selectedIdSousD > 0 ? selectedIdSousD : null);
         }
-        catch (Exception ex) { loadError = ex.Message; return; }
-
-        selectedIdVisees.Clear();
-        foreach (var idNomVisee in selectedIdNomVisees)
-        {
-            var id = ViseeExistante(idNomVisee);
-            if (id != 0) selectedIdVisees.Add(id);
-        }
+        catch (Exception ex) { loadError = ex.Message; }
     }
 
     // Libellé d'une compétence : depuis les visées du champ, sinon depuis la table

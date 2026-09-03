@@ -8,14 +8,21 @@ namespace ObrigenieTest;
 ///
 /// Reporter une leçon la recopie sur une autre date et laisse sur l'originale la
 /// mention « Reporté au … ». Faute de colonne dédiée en base, cette mention vit
-/// dans le texte de la note : elle doit donc se réécrire sans jamais s'empiler,
-/// se relire à l'identique, et disparaître du texte partout où il est affiché ou
-/// remis dans la zone de saisie — sans quoi l'utilisateur verrait le marqueur brut
-/// et finirait par l'effacer ou le dupliquer à la première modification.
+/// dans le texte de la note : elle doit disparaître du texte partout où il est
+/// affiché ou remis dans la zone de saisie, sans quoi l'utilisateur verrait le
+/// marqueur brut et finirait par l'effacer à la première modification.
+///
+/// Le client ne fait que LIRE le marqueur : son écriture appartient au serveur, et
+/// c'est seragendaTest/ReportNoteTests qui la couvre. Les marqueurs employés ici
+/// sont donc écrits littéralement — c'est aussi ce qui vérifie que les deux côtés
+/// s'accordent sur la forme exacte stockée en base.
 /// </summary>
 public class ReportNoteTests
 {
     private static readonly DateTime Cible = new(2025, 10, 6);
+
+    // Forme exacte du marqueur tel que le serveur l'écrit dans le texte de la note
+    private const string Marqueur = "↪ Reporté au 06/10/2025";
 
     [Fact]
     public void Lire_SansMarqueur_RendLeTexteIntact()
@@ -34,10 +41,9 @@ public class ReportNoteTests
     }
 
     [Fact]
-    public void Marquer_PuisLire_RendLeTexteEtLaDate()
+    public void Lire_AvecMarqueur_SepareLeTexteEtLaDate()
     {
-        var marque = ReportNote.Marquer("Lecture suivie chapitre 3", Cible);
-        var (texte, cible) = ReportNote.Lire(marque);
+        var (texte, cible) = ReportNote.Lire($"Lecture suivie chapitre 3\n{Marqueur}");
 
         // Le texte revient tel qu'il a été saisi : c'est lui qu'on remet dans la zone de saisie.
         Assert.Equal("Lecture suivie chapitre 3", texte);
@@ -45,27 +51,12 @@ public class ReportNoteTests
     }
 
     [Fact]
-    public void Marquer_NoteSansTexte_NeGardeQueLaMention()
+    public void Lire_MarqueurSeul_NeRendAucunTexte()
     {
-        var marque = ReportNote.Marquer("", Cible);
-
-        // Une leçon peut n'avoir qu'une visée : la mention ne doit pas traîner de ligne vide.
-        Assert.Equal(ReportNote.Libelle(Cible), marque);
-        Assert.Equal(Cible, ReportNote.Cible(marque));
-        Assert.Equal(string.Empty, ReportNote.Texte(marque));
-    }
-
-    [Fact]
-    public void Marquer_DeuxFois_NeLaisseQuUneSeuleMention()
-    {
-        var seconde = new DateTime(2025, 10, 13);
-
-        var marque = ReportNote.Marquer(ReportNote.Marquer("Dictée", Cible), seconde);
-
-        // Reporter une leçon déjà reportée écrase la mention précédente au lieu de l'empiler.
-        Assert.Equal("Dictée", ReportNote.Texte(marque));
-        Assert.Equal(seconde, ReportNote.Cible(marque));
-        Assert.Equal(1, marque.Split('\n').Count(l => l.Contains("Report")));
+        // Une leçon peut n'avoir qu'une visée : la mention ne doit pas laisser de ligne vide.
+        Assert.Equal(Marqueur, ReportNote.Libelle(Cible));
+        Assert.Equal(Cible, ReportNote.Cible(Marqueur));
+        Assert.Equal(string.Empty, ReportNote.Texte(Marqueur));
     }
 
     [Fact]
@@ -90,17 +81,6 @@ public class ReportNoteTests
     }
 
     [Fact]
-    public void Marquer_TexteTresLong_LaisseLaPlaceALaMention()
-    {
-        // Le serveur tronque à 2000 caractères : c'est le texte qui cède, pas la mention,
-        // sinon la trace du report serait coupée en base.
-        var marque = ReportNote.Marquer(new string('a', 2000), Cible);
-
-        Assert.True(marque.Length <= 2000);
-        Assert.Equal(Cible, ReportNote.Cible(marque));
-    }
-
-    [Fact]
     public void Copier_ReprendHoraireEtViseeSurLaNouvelleDate()
     {
         var source = new Note
@@ -109,7 +89,7 @@ public class ReportNoteTests
             Date          = new DateTime(2025, 9, 29),
             Hour          = 10, Minute = 15,
             EndHour       = 11, EndMinute = 45,
-            Content       = ReportNote.Marquer("Dictée préparée", Cible),
+            Content       = $"Dictée préparée\n{Marqueur}",
             IdViseeFk     = 7,
             ViseeContexte = "Cours : Français",
         };
@@ -192,7 +172,7 @@ public class ReportNoteTests
     [Fact]
     public void Infobulle_SuitLaPresenceDuMarqueur()
     {
-        var reportee = new Note { Content = ReportNote.Marquer("Dictée", Cible) };
+        var reportee = new Note { Content = $"Dictée\n{Marqueur}" };
         var ordinaire = new Note { Content = "Dictée" };
 
         Assert.Equal("Reporté au 06/10/2025", ReportNote.Infobulle(reportee));

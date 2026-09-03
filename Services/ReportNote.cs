@@ -11,10 +11,16 @@ namespace Obrigenie.Services
     //
     // Cette mention vit dans le texte de la note, sur une dernière ligne dédiée
     // ("↪ Reporté au 06/10/2025"), et non dans une colonne dédiée : le schéma de
-    // production se modifie à la main et l'enregistrement d'une note existante ne
-    // met à jour que son contenu et son horaire. Le marqueur est retiré partout où
-    // la note est affichée ou modifiée, puis réécrit à l'enregistrement : il n'est
-    // jamais montré sous sa forme brute.
+    // production se modifie à la main. Le marqueur est retiré partout où la note est
+    // affichée ou remise dans la zone de saisie : il n'est jamais montré sous sa
+    // forme brute.
+    //
+    // Seule la LECTURE du marqueur vit ici. Son écriture appartient au serveur
+    // (seragenda/Services/ReportNote.cs) : lui seul connaît le contenu réellement
+    // stocké, et lui seul peut garantir que la mention survit à la modification
+    // d'une leçon déjà reportée et à la troncature des 2000 caractères. Le client
+    // la réécrivait de mémoire, ce qui la perdait dès que sa copie de la note était
+    // en retard sur la base.
     // ─────────────────────────────────────────────────────────────────────────
     public static class ReportNote
     {
@@ -38,11 +44,6 @@ namespace Obrigenie.Services
         // Séparateurs acceptés à la relecture, pour rattraper les marqueurs écrits
         // avant cette règle par une culture qui n'utilisait pas la barre oblique.
         private static readonly string[] FormatsLus = { "dd/MM/yyyy", "dd-MM-yyyy", "dd.MM.yyyy" };
-
-        // Longueur maximale du contenu acceptée par le serveur ; au-delà, il tronque.
-        // Le texte libre cède la place au marqueur plutôt que l'inverse, sans quoi
-        // la troncature couperait la mention de report.
-        private const int MaxContenu = 2000;
 
         // Sépare le texte libre de la note de son éventuelle mention de report.
         // Retourne le texte débarrassé du marqueur et la date cible quand il y en a une.
@@ -76,25 +77,6 @@ namespace Obrigenie.Services
 
         // Date de report portée par la note, ou null quand elle n'a pas été reportée.
         public static DateTime? Cible(string? content) => Lire(content).Cible;
-
-        // Réécrit le contenu avec la mention de report vers `cible`.
-        // Une mention déjà présente est remplacée : reporter deux fois une leçon
-        // laisse une seule ligne, celle du dernier report.
-        public static string Marquer(string? content, DateTime cible)
-        {
-            var texte = Texte(content);
-            var marqueur = Libelle(cible);
-
-            if (string.IsNullOrEmpty(texte)) return marqueur;
-
-            // Le texte libre est rogné si nécessaire pour que le marqueur tienne
-            // dans les 2000 caractères acceptés par le serveur.
-            int place = MaxContenu - marqueur.Length - 1;
-            if (place < 0) return marqueur;
-            if (texte.Length > place) texte = texte[..place];
-
-            return $"{texte}\n{marqueur}";
-        }
 
         // Libellé court affiché dans la case de la leçon d'origine — et forme exacte
         // du marqueur écrit dans le texte de la note.

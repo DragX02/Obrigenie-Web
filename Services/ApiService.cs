@@ -267,6 +267,32 @@ namespace Obrigenie.Services
             }
         }
 
+        // Récupère les cours de tous les jours d'une plage de dates en une seule requête.
+        //
+        // La vue Trimestre demandait ses cours jour par jour : une cinquantaine de requêtes
+        // simultanées pour une seule période, alors que les notes de la même période
+        // tenaient déjà en un appel. Le serveur développe la récurrence (masque des jours
+        // + plage de dates du cours), comme il le fait déjà pour la variante par date.
+        // Endpoint : GET api/courses/range?start={yyyy-MM-dd}&end={yyyy-MM-dd}
+        // Retourne les cours indexés par date, ou un dictionnaire vide en cas d'erreur —
+        // le calendrier s'affiche alors sans les cours plutôt que de planter.
+        public async Task<Dictionary<DateTime, List<Course>>> GetCoursesForRangeAsync(DateTime start, DateTime end)
+        {
+            try
+            {
+                var jours = await _httpClient.GetFromJsonAsync<List<CoursesJourDto>>(
+                    $"api/courses/range?start={start:yyyy-MM-dd}&end={end:yyyy-MM-dd}");
+
+                if (jours == null) return new();
+
+                return jours.ToDictionary(j => j.Date.Date, j => j.Courses);
+            }
+            catch
+            {
+                return new();
+            }
+        }
+
         // Récupère toutes les notes utilisateur dont la date se situe dans la plage de dates inclusive donnée.
         // Utilisé par les vues semaine et mois pour charger les notes de tous les jours affichés en une seule
         // requête, ce qui est plus efficace qu'une requête par jour.
@@ -349,6 +375,49 @@ namespace Obrigenie.Services
             {
                 // Panne réseau ou de sérialisation : remonte le message de l'exception
                 return (false, ex.Message);
+            }
+        }
+
+        // Recopie des leçons sur d'autres dates, en une requête et une transaction.
+        //
+        // Le report et la copie partaient auparavant en un POST par copie, plus un POST
+        // par originale à marquer : reporter une semaine de dix leçons faisait vingt
+        // allers-retours, et une coupure au milieu laissait la moitié du travail fait
+        // sans moyen d'y revenir. Le serveur écrit désormais tout ou rien.
+        //
+        // Endpoint : POST api/notes/copier
+        // idsNotes  : les leçons enregistrées à recopier.
+        // decalages : les destinations, en jours par rapport à la date de chaque leçon.
+        //             Un multiple de 7 conserve le jour de la semaine.
+        // marquer   : vrai pour un report (l'originale reçoit la mention « Reporté au … »),
+        //             faux pour une copie.
+        // modeles   : leçons sources qui n'existent pas en base — la copie d'une leçon
+        //             depuis sa fenêtre d'édition part des valeurs affichées sans toucher
+        //             à l'originale. Leur date sert de référence aux décalages.
+        // Retourne (true, nombre de copies, null) en cas de succès ; (false, 0, message) sinon.
+        public async Task<(bool Ok, int Copiees, string? Err)> CopierNotesAsync(
+            IEnumerable<int> idsNotes, IEnumerable<int> decalages, bool marquer,
+            IEnumerable<Note>? modeles = null)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/notes/copier", new
+                {
+                    idsNotes  = idsNotes.ToList(),
+                    modeles   = modeles?.ToList() ?? new List<Note>(),
+                    decalages = decalages.ToList(),
+                    marquer
+                });
+
+                if (!response.IsSuccessStatusCode)
+                    return (false, 0, await LireMessageErreur(response));
+
+                var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                return (true, json.TryGetProperty("copiees", out var n) ? n.GetInt32() : 0, null);
+            }
+            catch (Exception ex)
+            {
+                return (false, 0, ex.Message);
             }
         }
 
@@ -885,6 +954,22 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<CoursDto>>() ?? new();
         }
 
+        // Récupère tous les cours enseignés à un niveau, toutes catégories confondues.
+        //
+        // La cascade dressait cette liste elle-même : les catégories du niveau, puis les
+        // cours de chaque catégorie un appel à la fois, puis la fusion et le dédoublonnage
+        // (un cours peut relever de plusieurs catégories). Le serveur rend la même liste
+        // en une jointure.
+        // Endpoint : GET api/ref/cours/by-niveau/{codeNiveau}
+        public async Task<List<CoursDto>> GetCoursByNiveauAsync(string codeNiveau)
+        {
+            var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/cours/by-niveau/{Uri.EscapeDataString(codeNiveau)}");
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/cours/by-niveau/{codeNiveau} a retourné {(int)response.StatusCode} {response.StatusCode}.");
+            return await response.Content.ReadFromJsonAsync<List<CoursDto>>() ?? new();
+        }
+
         // Récupère les niveaux disponibles pour un code de cours spécifique.
         // Appelé lorsque l'utilisateur sélectionne un cours dans la première liste déroulante de la page de test.
         // Endpoint : GET api/ref/niveaux/{codeCours}
@@ -949,6 +1034,28 @@ namespace Obrigenie.Services
             var response = await _httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode)
                 throw new HttpRequestException($"api/ref/visees-maitriser/{idVisee} a retourné {(int)response.StatusCode} {response.StatusCode}.");
+            return await response.Content.ReadFromJsonAsync<List<ViseesMaitriserRefDto>>() ?? new();
+        }
+
+        // Retourne les visées à maîtriser de plusieurs visées à la fois, fusionnées et
+        // dédoublonnées par le serveur.
+        //
+        // La cascade interrogeait la variante à un identifiant une fois par visée cochée,
+        // puis fusionnait les réponses : cocher six visées coûtait six allers-retours pour
+        // une liste que la base rend d'un coup.
+        // Endpoint : GET api/ref/visees-maitriser/par-visees?ids=1&ids=2
+        public async Task<List<ViseesMaitriserRefDto>> GetViseesMaitriserParViseesAsync(IEnumerable<int> idVisees)
+        {
+            var ids = idVisees.Distinct().ToList();
+
+            // Aucune visée cochée : inutile d'interroger le serveur pour une liste vide
+            if (ids.Count == 0) return new();
+
+            var url = "api/ref/visees-maitriser/par-visees?" + string.Join("&", ids.Select(id => $"ids={id}"));
+            var request = await BuildAuthRequest(HttpMethod.Get, url);
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"api/ref/visees-maitriser/par-visees a retourné {(int)response.StatusCode} {response.StatusCode}.");
             return await response.Content.ReadFromJsonAsync<List<ViseesMaitriserRefDto>>() ?? new();
         }
 
@@ -1114,6 +1221,51 @@ namespace Obrigenie.Services
             catch (Exception ex) { return (false, ex.Message); }
         }
 
+        // Complète le référentiel pour que la sélection de la cascade existe en base :
+        // les visées manquantes du champ, puis les liens vers les visées à maîtriser.
+        //
+        // Le client menait cette séquence lui-même — une requête par visée, une relecture
+        // pour récupérer les identifiants, une requête par lien — et une coupure au milieu
+        // laissait des visées créées sans aucun lien. Le serveur fait le tout dans une
+        // transaction : au premier refus, rien n'est écrit.
+        // Endpoint : POST api/ref/selection
+        // Retourne (true, identifiants des visées, null) en cas de succès ;
+        // (false, liste vide, message) sinon.
+        public async Task<(bool Ok, List<int> IdVisees, string? Err)> EnregistrerSelectionRefAsync(
+            int idDomaine, int idSousDomaine, int idCompetence,
+            IEnumerable<int> idNomVisees, IEnumerable<int> idsViseesMaitriser)
+        {
+            try
+            {
+                var request = await BuildAuthRequest(HttpMethod.Post, "api/ref/selection");
+                request.Content = JsonContent.Create(new
+                {
+                    idDomaine,
+                    idSousDomaine,
+                    idCompetence,
+                    idNomVisees        = idNomVisees.ToList(),
+                    idsViseesMaitriser = idsViseesMaitriser.ToList()
+                });
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                    return (false, new(), await LireMessageErreur(response));
+
+                var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+
+                var idVisees = new List<int>();
+                if (json.TryGetProperty("idVisees", out var tableau) &&
+                    tableau.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var element in tableau.EnumerateArray()) idVisees.Add(element.GetInt32());
+                }
+
+                return (true, idVisees, null);
+            }
+            catch (Exception ex) { return (false, new(), ex.Message); }
+        }
+
         // Extrait la propriété "message" d'une réponse d'erreur, à défaut le code HTTP.
         private static async Task<string> LireMessageErreur(HttpResponseMessage response)
         {
@@ -1184,6 +1336,20 @@ namespace Obrigenie.Services
         // Null lorsque la licence n'a jamais été activée.
         [JsonPropertyName("assignedAt")]
         public DateTime? AssignedAt { get; set; }
+    }
+
+    // Cours d'un jour, tels que renvoyés par GET api/courses/range.
+    // Le serveur développe la récurrence des cours sur toute la plage demandée et rend
+    // une entrée par jour ; le client n'a plus qu'à indexer par date.
+    public class CoursesJourDto
+    {
+        // Le jour concerné (à minuit).
+        [JsonPropertyName("date")]
+        public DateTime Date { get; set; }
+
+        // Les cours qui ont lieu ce jour-là ; liste vide les jours sans cours.
+        [JsonPropertyName("courses")]
+        public List<Course> Courses { get; set; } = new();
     }
 
     // Objet de transfert de données représentant une catégorie de matière de la table categorie_cours.
