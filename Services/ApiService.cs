@@ -489,6 +489,76 @@ namespace Obrigenie.Services
         }
 
         // ──────────────────────────────────────────────────────────────────
+        // LEÇONS — PRÉPARATIONS DE COURS
+        // ──────────────────────────────────────────────────────────────────
+
+        // Récupère les préparations de leçon de l'utilisateur courant, la plus
+        // récemment modifiée en tête.
+        // Endpoint : GET api/lecons
+        // Ne lève jamais : en cas d'échec, retourne une liste vide accompagnée du
+        // message d'erreur, pour que la page affiche la raison au lieu de rester muette
+        // (cause la plus probable : les tables lecon / lecon_phase pas encore créées).
+        public async Task<(List<Lecon> Lecons, string? Error)> GetLeconsAsync()
+        {
+            try
+            {
+                var reponse = await _httpClient.GetAsync("api/lecons");
+
+                if (!reponse.IsSuccessStatusCode)
+                {
+                    var body = await reponse.Content.ReadAsStringAsync();
+                    return (new(), $"Error {(int)reponse.StatusCode}: {body}");
+                }
+
+                var lecons = await reponse.Content.ReadFromJsonAsync<List<Lecon>>();
+                return (lecons ?? new(), null);
+            }
+            catch (Exception ex)
+            {
+                return (new(), ex.Message);
+            }
+        }
+
+        // Crée une préparation (Id == 0) ou met à jour une existante.
+        // Le serveur réécrit le déroulement en bloc et renumérote les phases.
+        // Endpoint : POST api/lecons
+        // Retourne (true, la préparation enregistrée, null) en cas de succès ;
+        // (false, null, message) sinon, pour que l'interface affiche le refus inline.
+        public async Task<(bool Ok, Lecon? Lecon, string? Err)> SaveLeconAsync(Lecon lecon)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/lecons", lecon);
+
+                if (!response.IsSuccessStatusCode)
+                    return (false, null, await LireMessageErreur(response));
+
+                var enregistree = await response.Content.ReadFromJsonAsync<Lecon>();
+                return (true, enregistree, null);
+            }
+            catch (Exception ex)
+            {
+                return (false, null, ex.Message);
+            }
+        }
+
+        // Supprime définitivement une préparation ; ses phases partent avec elle.
+        // Endpoint : DELETE api/lecons/{id}
+        public async Task<(bool Ok, string? Err)> DeleteLeconAsync(int id)
+        {
+            try
+            {
+                var response = await _httpClient.DeleteAsync($"api/lecons/{id}");
+                if (response.IsSuccessStatusCode) return (true, null);
+                return (false, await LireMessageErreur(response));
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
+        }
+
+        // ──────────────────────────────────────────────────────────────────
         // LICENCE — VALIDATION ET VÉRIFICATION
         // ──────────────────────────────────────────────────────────────────
 

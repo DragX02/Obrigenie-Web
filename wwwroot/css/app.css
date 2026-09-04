@@ -1628,3 +1628,186 @@ h1:focus { outline: none; }
     font-size: 0.78rem; font-weight: 600; letter-spacing: 0.3px;
     color: var(--text-muted); text-transform: uppercase;
 }
+
+/* ===== MES LECONS =====
+   Les preparations de lecon, au format de la fiche papier. La page reprend la
+   presentation en carte de l'ecran des conges ; la fenetre d'edition reutilise
+   la modale commune (.modal-overlay / .modal-content).
+
+   Le bloc .lecon-print, tout en bas, est la feuille imprimee : invisible a
+   l'ecran, il est le seul contenu revele par @media print. */
+
+.lecons-page {
+    padding: 1.2rem 1rem 3rem;
+    display: flex; justify-content: center;
+}
+
+.lecons-card {
+    width: 100%; max-width: 900px;
+    background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.4rem 1.5rem 1.8rem;
+}
+
+.lecons-title { margin: 0 0 .4rem; font-size: 1.35rem; }
+
+.lecons-intro {
+    margin: 0 0 1.1rem;
+    font-size: .88rem; line-height: 1.5; color: var(--text-muted);
+}
+
+.lecons-actions { margin-bottom: 1.1rem; }
+
+.lecons-loading, .lecons-vide {
+    padding: 1.1rem; text-align: center;
+    font-size: .88rem; color: var(--text-muted);
+}
+
+/* ---- Une preparation dans la liste ---- */
+
+.lecon-row {
+    display: flex; align-items: center; gap: .8rem;
+    padding: .7rem .8rem; margin-bottom: .5rem;
+    border: 1px solid var(--border); border-radius: 8px;
+}
+.lecon-row:hover { background: var(--row-hover); }
+
+/* Toute la zone de gauche ouvre la fiche : la cible est large et evidente */
+.lecon-row-main { flex: 1; min-width: 0; cursor: pointer; }
+
+.lecon-row-titre {
+    font-weight: 600; font-size: .96rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.lecon-row-meta { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .35rem; }
+
+.lecon-chip {
+    padding: .1rem .45rem; border-radius: 999px;
+    background: var(--row-hover); border: 1px solid var(--border);
+    font-size: .72rem; color: var(--text-muted);
+}
+
+.lecon-row-btns { display: flex; gap: .35rem; flex-shrink: 0; }
+
+/* ---- Boutons ---- */
+
+.btn-lecon, .btn-lecon-new, .btn-lecon-add {
+    padding: .34rem .7rem; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg-card); color: var(--text);
+    font-size: .82rem; font-family: inherit;
+}
+.btn-lecon:hover:not(:disabled),
+.btn-lecon-add:hover { background: var(--row-hover); }
+.btn-lecon:disabled { opacity: .4; cursor: default; }
+
+.btn-lecon-del { color: #c0392b; border-color: #c0392b55; }
+.btn-lecon-del:hover:not(:disabled) { background: #c0392b18; }
+
+.btn-lecon-new {
+    padding: .45rem 1rem; font-size: .88rem; font-weight: 600;
+    background: #2E7D32; border-color: #2E7D32; color: #ffffff;
+}
+.btn-lecon-new:hover { opacity: .88; }
+
+/* ---- La fenetre d'edition ---- */
+
+.lecon-modal { max-width: 760px; width: 94vw; max-height: 88vh; overflow-y: auto; }
+
+/* L'en-tete de la fiche : deux colonnes, les champs longs en occupent deux */
+.lecon-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: .7rem .9rem; margin: .9rem 0;
+}
+.lecon-champ-large { grid-column: 1 / -1; }
+
+.lecon-champ { display: flex; flex-direction: column; gap: .22rem; }
+.lecon-champ > span { font-size: .78rem; font-weight: 600; color: var(--text-muted); }
+.lecon-champ-bloc { margin-bottom: .9rem; }
+
+.lecon-input, .lecon-zone {
+    width: 100%; box-sizing: border-box;
+    padding: .4rem .55rem; border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-main); color: var(--text);
+    font-size: .88rem; font-family: inherit;
+}
+.lecon-zone { resize: vertical; line-height: 1.45; }
+
+/* ---- Le deroulement ---- */
+
+.lecon-phases-entete {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: .8rem; margin: 1.1rem 0 .5rem;
+    font-size: .82rem; font-weight: 600; letter-spacing: .3px;
+    color: var(--text-muted); text-transform: uppercase;
+}
+
+.lecon-phase {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: .6rem .7rem; margin-bottom: .5rem;
+}
+
+.lecon-phase-entete {
+    display: flex; align-items: flex-end; gap: .5rem; margin-bottom: .4rem;
+}
+.lecon-phase-num { font-weight: 600; font-size: .88rem; margin-right: auto; }
+
+/* Le temps reste etroit : c'est « 10 min », pas une phrase */
+.lecon-phase-temps { display: flex; flex-direction: column; gap: .22rem; width: 110px; }
+.lecon-phase-temps > span { font-size: .72rem; color: var(--text-muted); }
+
+@media (max-width: 620px) {
+    .lecon-grid { grid-template-columns: 1fr; }
+    .lecon-row { flex-direction: column; align-items: stretch; }
+    .lecon-row-btns { justify-content: flex-end; }
+}
+
+/* ---- La feuille imprimee ----
+   Masquee a l'ecran ; @media print la revele et masque tout le reste. */
+.lecon-print { display: none; }
+
+@media print {
+    /* Quand une preparation est en cours d'impression, elle prend toute la page :
+       l'application entiere s'efface derriere elle. */
+    body:has(.lecon-print) .lecons-page,
+    body:has(.lecon-print) .print-header { display: none !important; }
+
+    .lecon-print {
+        display: block !important;
+        color: #000000; background: #ffffff;
+        font-size: 11pt; line-height: 1.5;
+    }
+
+    .lecon-print-entete {
+        display: flex; justify-content: space-between; gap: 1rem;
+        margin-bottom: 4mm;
+    }
+    .lecon-print-titre { font-size: 13pt; }
+
+    /* Le cadre du formulaire papier autour de duree / seances / niveaux */
+    .lecon-print-cadre {
+        border: 1px solid #000000; border-radius: 2px;
+        padding: 3mm 4mm; margin-bottom: 5mm;
+    }
+    .lecon-print-cadre > div + div { margin-top: 1.5mm; }
+
+    .lecon-print-bloc { margin-bottom: 5mm; }
+    .lecon-print-libelle { font-weight: 700; margin-bottom: 1.5mm; }
+
+    /* Les retours a la ligne saisis par l'enseignant sont conserves tels quels */
+    .lecon-print-texte { white-space: pre-wrap; }
+
+    /* Une phase ne doit pas se couper entre deux pages */
+    .lecon-print-phase { margin-bottom: 3.5mm; break-inside: avoid; }
+    .lecon-print-phase-entete {
+        display: flex; justify-content: space-between; gap: 1rem;
+    }
+}
+
+/* La cascade dans la fenetre d'une lecon : elle occupe toute la largeur du
+   formulaire, contrairement au panneau lateral de la modale de note. */
+.lecon-cascade {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: .7rem .8rem; margin-bottom: .6rem;
+}

@@ -1,0 +1,525 @@
+@* ─────────────────────────────────────────────────────────────────────────────
+   LeconsPage.razor — Les préparations de leçon de l'enseignant.
+
+   Reprend le formulaire papier « Préparation de leçon type » : un en-tête
+   (titre, enseignant, durée, nombre de séances, niveaux), les compétences
+   visées, puis le déroulement découpé en phases.
+
+   La page liste les préparations enregistrées ; la fenêtre d'édition les crée
+   et les modifie. Elle travaille sur un brouillon détaché : fermer sans
+   enregistrer laisse la liste intacte.
+
+   La sortie visée est le papier. Deux chemins, la même mise en page :
+     • « PDF » construit le fichier côté client (LeconPdfExporter, texte
+       vectoriel) et le télécharge ;
+     • « Imprimer » passe par la boîte de dialogue du navigateur, qui sait aussi
+       enregistrer en PDF. Le bloc .lecon-print, invisible à l'écran, porte alors
+       la feuille au format du formulaire.
+   ───────────────────────────────────────────────────────────────────────────── *@
+
+@page "/lecons"
+
+@inject ApiService Api
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<div class="lecons-page">
+    <div class="lecons-card">
+
+        <h2 class="lecons-title">Mes leçons</h2>
+        <p class="lecons-intro">
+            Prépare tes leçons au format de la fiche papier, garde-les ici, et sors-les
+            en PDF ou à l'imprimante quand tu en as besoin.
+        </p>
+
+        <div class="lecons-actions">
+            <button class="btn-lecon-new" @onclick="NouvelleLecon">＋ Nouvelle leçon</button>
+        </div>
+
+        @* Message d'erreur du serveur (titre vide, tables absentes…) *@
+        @if (erreur != null)
+        {
+            <p class="modal-error">@erreur</p>
+        }
+
+        @if (chargement)
+        {
+            <div class="lecons-loading">Chargement…</div>
+        }
+        else if (lecons.Count == 0)
+        {
+            <div class="lecons-vide">
+                Aucune préparation pour l'instant. « Nouvelle leçon » ouvre une fiche vierge.
+            </div>
+        }
+        else
+        {
+            @foreach (var lecon in lecons)
+            {
+                @* Capture pour les fermetures des gestionnaires de clic *@
+                var courante = lecon;
+
+                <div class="lecon-row">
+                    <div class="lecon-row-main" @onclick="() => Ouvrir(courante)">
+                        <div class="lecon-row-titre">@courante.Titre</div>
+                        <div class="lecon-row-meta">
+                            @* Seuls les champs renseignés apparaissent : une fiche à
+                               peine commencée ne doit pas afficher une ligne de tirets. *@
+                            @foreach (var info in Resume(courante))
+                            {
+                                <span class="lecon-chip">@info</span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="lecon-row-btns">
+                        <button class="btn-lecon" title="Modifier la préparation"
+                                @onclick="() => Ouvrir(courante)">Ouvrir</button>
+                        <button class="btn-lecon" title="Télécharger la fiche en PDF"
+                                @onclick="() => ExporterPdf(courante)">PDF</button>
+                        <button class="btn-lecon" title="Imprimer la fiche"
+                                @onclick="() => Imprimer(courante)">Imprimer</button>
+                        <button class="btn-lecon btn-lecon-del" title="Supprimer définitivement"
+                                @onclick="() => DemanderSuppression(courante)">✕</button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@* ── La fenêtre : création et modification d'une préparation ───────────────── *@
+@if (brouillon != null)
+{
+    <div class="modal-overlay" @onclick="Fermer">
+        <div class="modal-content lecon-modal" @onclick:stopPropagation="true">
+
+            <h3>@(brouillon.Id == 0 ? "Nouvelle leçon" : "Modifier la leçon")</h3>
+
+            @if (erreurFenetre != null)
+            {
+                <p class="modal-error">@erreurFenetre</p>
+            }
+
+            @* En-tête de la fiche : titre et enseignant côte à côte *@
+            <div class="lecon-grid">
+                <label class="lecon-champ lecon-champ-large">
+                    <span>Titre de la leçon</span>
+                    <input class="lecon-input" @bind="brouillon.Titre" maxlength="200"
+                           placeholder="Ex : Les fractions équivalentes" />
+                </label>
+
+                <label class="lecon-champ">
+                    <span>Enseignant</span>
+                    <input class="lecon-input" @bind="brouillon.Enseignant" maxlength="150" />
+                </label>
+
+                <label class="lecon-champ">
+                    <span>Durée de la leçon</span>
+                    <input class="lecon-input" @bind="brouillon.Duree" maxlength="100"
+                           placeholder="Ex : 50 min" />
+                </label>
+
+                <label class="lecon-champ">
+                    <span>Nombre de séances</span>
+                    <input class="lecon-input" type="number" min="1" max="100"
+                           @bind="brouillon.NombreSeances" />
+                </label>
+
+                <label class="lecon-champ lecon-champ-large">
+                    <span>Niveaux</span>
+                    <input class="lecon-input" @bind="brouillon.Niveaux" maxlength="200"
+                           placeholder="Ex : 3e et 4e primaire" />
+                </label>
+            </div>
+
+            @* Compétences : choisies dans le référentiel, pas saisies à la main.
+               La cascade compose le contexte complet (Année, Cours, Champ, la
+               compétence et ses visées) ; c'est ce texte, figé à l'enregistrement,
+               qui s'imprime sous « Compétences : » sur la fiche. *@
+            <div class="lecon-champ-bloc">
+                <div class="lecon-phases-entete">
+                    <span>Compétences</span>
+                </div>
+
+                <div class="lecon-cascade">
+                    <CascadeSelector @ref="cascadeRef" OnSelectionChanged="OnCascadeChanged" />
+                </div>
+
+                @* Ce qui partira sur la fiche : la sélection en cours, ou à défaut
+                   celle déjà enregistrée sur la préparation. *@
+                @if (cascadeSelection?.ADesVisees == true)
+                {
+                    <div class="cascade-recap">
+                        <div class="cascade-recap-titre">✔ Sera enregistré :</div>
+                        <span class="note-visee-recap">@cascadeSelection.EnTexte()</span>
+                    </div>
+                }
+                else if (!string.IsNullOrWhiteSpace(brouillon.Competences))
+                {
+                    <div class="cascade-recap cascade-recap-muted">
+                        <span class="note-visee-recap">@brouillon.Competences</span>
+                        <div class="cascade-opt">Sélectionne à nouveau pour remplacer.</div>
+                    </div>
+                }
+            </div>
+
+            @* Déroulement : les phases, ajoutables et retirables *@
+            <div class="lecon-phases-entete">
+                <span>Déroulement de la leçon</span>
+                <button class="btn-lecon-add" @onclick="AjouterPhase">＋ Ajouter une phase</button>
+            </div>
+
+            @if (brouillon.Phases.Count == 0)
+            {
+                <div class="lecons-vide">Aucune phase. « Ajouter une phase » en crée une.</div>
+            }
+
+            @for (int i = 0; i < brouillon.Phases.Count; i++)
+            {
+                @* Capture de l'index : sans elle, tous les boutons viseraient la
+                   dernière phase une fois la boucle terminée. *@
+                var rang  = i;
+                var phase = brouillon.Phases[rang];
+
+                <div class="lecon-phase">
+                    <div class="lecon-phase-entete">
+                        <span class="lecon-phase-num">Phase @(rang + 1)</span>
+
+                        <label class="lecon-phase-temps">
+                            <span>Temps</span>
+                            <input class="lecon-input" @bind="phase.Temps" maxlength="50"
+                                   placeholder="Ex : 10 min" />
+                        </label>
+
+                        <button class="btn-lecon" title="Monter cette phase"
+                                disabled="@(rang == 0)"
+                                @onclick="() => DeplacerPhase(rang, -1)">↑</button>
+                        <button class="btn-lecon" title="Descendre cette phase"
+                                disabled="@(rang == brouillon.Phases.Count - 1)"
+                                @onclick="() => DeplacerPhase(rang, 1)">↓</button>
+                        <button class="btn-lecon btn-lecon-del" title="Retirer cette phase"
+                                @onclick="() => RetirerPhase(rang)">✕</button>
+                    </div>
+
+                    <textarea class="lecon-zone" rows="3" maxlength="1000"
+                              placeholder="Ce qui se passe pendant cette phase"
+                              @bind="phase.Intitule"></textarea>
+                </div>
+            }
+
+            <div class="modal-buttons">
+                <button class="btn-cancel" @onclick="Fermer">Annuler</button>
+                <button class="btn-save" disabled="@enregistrement" @onclick="Enregistrer">
+                    @(enregistrement ? "Enregistrement…" : "Enregistrer")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Confirmation de suppression ──────────────────────────────────────────── *@
+@if (aSupprimer != null)
+{
+    <div class="modal-overlay" @onclick="() => aSupprimer = null">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <h3>Supprimer cette préparation ?</h3>
+            <p>« @aSupprimer.Titre » sera définitivement perdue, avec son déroulement.</p>
+
+            <div class="modal-buttons">
+                <button class="btn-cancel" @onclick="() => aSupprimer = null">Annuler</button>
+                <button class="btn-delete" @onclick="Supprimer">Supprimer</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── La feuille imprimée ──────────────────────────────────────────────────────
+   Invisible à l'écran, révélée par la règle @@media print. Elle reprend la mise
+   en page du formulaire papier ; c'est ce bloc, et lui seul, qui sort de
+   l'imprimante quand on demande l'impression d'une préparation. *@
+@if (aImprimer != null)
+{
+    <div class="lecon-print">
+        <div class="lecon-print-entete">
+            <div class="lecon-print-titre">
+                <strong>Titre de la leçon :</strong> @aImprimer.Titre
+            </div>
+            <div><strong>Enseignant :</strong> @aImprimer.Enseignant</div>
+        </div>
+
+        <div class="lecon-print-cadre">
+            <div><strong>Durée de la leçon :</strong> @aImprimer.Duree</div>
+            <div><strong>Nombre de séances :</strong> @aImprimer.NombreSeances</div>
+            <div><strong>Niveaux :</strong> @aImprimer.Niveaux</div>
+        </div>
+
+        <div class="lecon-print-bloc">
+            <div class="lecon-print-libelle">Compétences :</div>
+            <div class="lecon-print-texte">@aImprimer.Competences</div>
+        </div>
+
+        <div class="lecon-print-bloc">
+            <div class="lecon-print-libelle">Déroulement de la leçon :</div>
+
+            @foreach (var phase in aImprimer.Phases.OrderBy(p => p.Ordre))
+            {
+                <div class="lecon-print-phase">
+                    <div class="lecon-print-phase-entete">
+                        <strong>Phase @phase.Ordre :</strong>
+                        <span><strong>Temps :</strong> @phase.Temps</span>
+                    </div>
+                    <div class="lecon-print-texte">@phase.Intitule</div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    @* ══════════════════════════════════════════════════════════════════════════
+       ÉTAT
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    @* Les préparations enregistrées, la plus récemment modifiée en tête *@
+    private List<Lecon> lecons = new();
+
+    @* Brouillon en cours d'édition dans la fenêtre ; null quand elle est fermée.
+       C'est une copie : fermer sans enregistrer laisse la liste intacte. *@
+    private Lecon? brouillon;
+
+    @* Préparation dont la suppression attend confirmation *@
+    private Lecon? aSupprimer;
+
+    @* Préparation rendue dans le bloc imprimable, le temps de l'impression *@
+    private Lecon? aImprimer;
+
+    @* Le composant de cascade de la fenêtre, et la dernière sélection qu'il a
+       remontée (null tant que rien n'est choisi). C'est cette sélection qui, à
+       l'enregistrement, devient la section Compétences de la fiche. *@
+    private CascadeSelector? cascadeRef;
+    private CascadeSelector.CascadeSelection? cascadeSelection;
+
+    private bool    chargement     = true;
+    private bool    enregistrement = false;
+    private string? erreur;
+    private string? erreurFenetre;
+
+    @* Nombre de phases d'une fiche vierge : celui du formulaire papier *@
+    private const int PhasesParDefaut = 4;
+
+    @* ══════════════════════════════════════════════════════════════════════════
+       CHARGEMENT
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Garde : les utilisateurs non authentifiés doivent d'abord se connecter
+        if (!await Auth.IsLoggedInAsync()) { Nav.NavigateTo("/login"); return; }
+
+        await Recharger();
+    }
+
+    private async Task Recharger()
+    {
+        chargement = true;
+
+        var (liste, err) = await Api.GetLeconsAsync();
+        lecons = liste;
+        erreur = err;
+
+        chargement = false;
+    }
+
+    @* ══════════════════════════════════════════════════════════════════════════
+       LA FENÊTRE
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    // Ouvre une fiche vierge, pré-remplie du nom de l'enseignant connecté quand
+    // une préparation précédente l'a déjà renseigné : c'est presque toujours le même.
+    private void NouvelleLecon()
+    {
+        brouillon = new Lecon
+        {
+            Enseignant = lecons.Select(l => l.Enseignant)
+                               .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? "",
+            Phases = Enumerable.Range(1, PhasesParDefaut)
+                               .Select(n => new LeconPhase { Ordre = n })
+                               .ToList(),
+        };
+
+        cascadeSelection = null;
+        erreurFenetre    = null;
+    }
+
+    // Ouvre une préparation existante. La fenêtre travaille sur une copie pour
+    // que « Annuler » n'ait rien à défaire.
+    private void Ouvrir(Lecon lecon)
+    {
+        brouillon        = lecon.Copier();
+        cascadeSelection = null;
+        erreurFenetre    = null;
+    }
+
+    private void Fermer()
+    {
+        brouillon        = null;
+        cascadeSelection = null;
+        erreurFenetre    = null;
+    }
+
+    // Reçoit la sélection courante remontée par le composant CascadeSelector.
+    private void OnCascadeChanged(CascadeSelector.CascadeSelection selection)
+        => cascadeSelection = selection;
+
+    private void AjouterPhase()
+    {
+        if (brouillon == null) return;
+        brouillon.Phases.Add(new LeconPhase { Ordre = brouillon.Phases.Count + 1 });
+    }
+
+    private void RetirerPhase(int rang)
+    {
+        if (brouillon == null || rang < 0 || rang >= brouillon.Phases.Count) return;
+
+        brouillon.Phases.RemoveAt(rang);
+        Renumeroter();
+    }
+
+    // Déplace une phase d'un rang vers le haut (-1) ou vers le bas (+1).
+    private void DeplacerPhase(int rang, int sens)
+    {
+        if (brouillon == null) return;
+
+        int cible = rang + sens;
+        if (rang < 0 || rang >= brouillon.Phases.Count) return;
+        if (cible < 0 || cible >= brouillon.Phases.Count) return;
+
+        (brouillon.Phases[rang], brouillon.Phases[cible]) =
+            (brouillon.Phases[cible], brouillon.Phases[rang]);
+
+        Renumeroter();
+    }
+
+    // Renumérote les phases à partir de 1, pour que l'affichage ne laisse pas de
+    // trou après un retrait ou un déplacement. Le serveur refait le même calcul
+    // à l'enregistrement : c'est lui qui fait foi.
+    private void Renumeroter()
+    {
+        if (brouillon == null) return;
+
+        for (int i = 0; i < brouillon.Phases.Count; i++)
+            brouillon.Phases[i].Ordre = i + 1;
+    }
+
+    private async Task Enregistrer()
+    {
+        if (brouillon == null || enregistrement) return;
+
+        // Le titre identifie la fiche dans la liste ; le serveur le refuse vide,
+        // autant le dire tout de suite plutôt qu'après un aller-retour.
+        if (string.IsNullOrWhiteSpace(brouillon.Titre))
+        {
+            erreurFenetre = "Le titre de la leçon est obligatoire.";
+            return;
+        }
+
+        enregistrement = true;
+        erreurFenetre  = null;
+
+        // La cascade peut porter des entrées choisies dans les tables complètes, qui
+        // n'existent pas encore comme visées de ce champ : on les crée en base avant
+        // d'enregistrer, pour que la fiche pointe sur une visée réelle.
+        if (cascadeRef?.ReferentielAComplete == true)
+        {
+            var erreurRef = await cascadeRef.SynchroniserReferentielAsync();
+            if (erreurRef != null) { enregistrement = false; erreurFenetre = erreurRef; return; }
+        }
+
+        // La sélection devient la section Compétences de la fiche, figée sous la forme
+        // qui s'imprimera. Sans nouvelle sélection, celle déjà enregistrée est conservée.
+        if (cascadeSelection?.ADesVisees == true)
+        {
+            brouillon.Competences = cascadeSelection.EnTexte();
+            if (cascadeSelection.IdVisee > 0) brouillon.IdViseeFk = cascadeSelection.IdVisee;
+        }
+
+        var (ok, _, err) = await Api.SaveLeconAsync(brouillon);
+
+        enregistrement = false;
+
+        if (!ok) { erreurFenetre = err ?? "L'enregistrement a échoué."; return; }
+
+        brouillon        = null;
+        cascadeSelection = null;
+        await Recharger();
+    }
+
+    @* ══════════════════════════════════════════════════════════════════════════
+       SUPPRESSION
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    private void DemanderSuppression(Lecon lecon) => aSupprimer = lecon;
+
+    private async Task Supprimer()
+    {
+        if (aSupprimer == null) return;
+
+        var (ok, err) = await Api.DeleteLeconAsync(aSupprimer.Id);
+        aSupprimer = null;
+
+        if (!ok) { erreur = err ?? "La suppression a échoué."; return; }
+
+        await Recharger();
+    }
+
+    @* ══════════════════════════════════════════════════════════════════════════
+       SORTIE PAPIER
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    // Construit le PDF côté client et le télécharge, comme l'export du calendrier.
+    private async Task ExporterPdf(Lecon lecon)
+    {
+        var octets = LeconPdfExporter.Generer(lecon);
+        await JS.InvokeVoidAsync("telechargerFichier",
+                                 LeconPdfExporter.NomFichier(lecon), octets, "application/pdf");
+    }
+
+    // Passe par la boîte de dialogue du navigateur. Le bloc .lecon-print doit être
+    // rendu avant l'appel, sinon la feuille sortirait vide : d'où le rendu explicite
+    // avant l'impression, et le nettoyage juste après.
+    private async Task Imprimer(Lecon lecon)
+    {
+        aImprimer = lecon;
+        StateHasChanged();
+
+        // Laisse le navigateur peindre le bloc avant d'ouvrir la boîte de dialogue
+        await Task.Yield();
+
+        await JS.InvokeVoidAsync("imprimerCalendrier", "portrait");
+
+        aImprimer = null;
+    }
+
+    @* ══════════════════════════════════════════════════════════════════════════
+       AFFICHAGE
+       ══════════════════════════════════════════════════════════════════════════ *@
+
+    // Les informations d'une fiche qui méritent d'apparaître dans la liste.
+    // Un champ vide est simplement omis.
+    private static IEnumerable<string> Resume(Lecon lecon)
+    {
+        if (!string.IsNullOrWhiteSpace(lecon.Niveaux)) yield return lecon.Niveaux;
+        if (!string.IsNullOrWhiteSpace(lecon.Duree))   yield return lecon.Duree;
+
+        if (lecon.NombreSeances > 1) yield return $"{lecon.NombreSeances} séances";
+
+        // Seules les phases réellement remplies sont comptées : une fiche vierge
+        // en porte quatre vides, les annoncer serait trompeur.
+        int remplies = lecon.Phases.Count(p => !string.IsNullOrWhiteSpace(p.Intitule));
+        if (remplies > 0) yield return remplies == 1 ? "1 phase" : $"{remplies} phases";
+
+        yield return $"modifiée le {lecon.ModifiedAt.ToLocalTime():dd/MM/yyyy}";
+    }
+}

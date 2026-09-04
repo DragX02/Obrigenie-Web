@@ -768,7 +768,7 @@
                 {
                     <div class="cascade-recap">
                         <div class="cascade-recap-titre">✔ Sera enregistré :</div>
-                        <span class="note-visee-recap">@BuildViseeContexte(cascadeSelection)</span>
+                        <span class="note-visee-recap">@cascadeSelection.EnTexte()</span>
                     </div>
                 }
                 else if (editingNote?.IdViseeFk > 0)
@@ -1886,11 +1886,10 @@
         // Sans nouvelle sélection, on conserve la visée déjà liée à la note en modification.
         // La clé étrangère ne peut porter qu'une visée : on y met la première retenue
         // quand elle existe en base, le détail complet vit dans le texte du contexte.
-        if (cascadeSelection != null &&
-            (cascadeSelection.IdVisee > 0 || cascadeSelection.NomVisees.Count > 0))
+        if (cascadeSelection?.ADesVisees == true)
         {
             if (cascadeSelection.IdVisee > 0) note.IdViseeFk = cascadeSelection.IdVisee;
-            note.ViseeContexte = BuildViseeContexte(cascadeSelection);
+            note.ViseeContexte = cascadeSelection.EnTexte();
         }
     }
 
@@ -1927,46 +1926,6 @@
     // Reçoit la sélection courante remontée par le composant CascadeSelector.
     private void OnCascadeChanged(CascadeSelector.CascadeSelection selection)
         => cascadeSelection = selection;
-
-    // Compose le contexte complet de la cascade en texte multi-lignes (une ligne par niveau
-    // renseigné), figé au moment de l'enregistrement et affiché ensuite dans le calendrier.
-    private static string BuildViseeContexte(CascadeSelector.CascadeSelection s)
-    {
-        var lignes = new List<string>();
-        void Ajouter(string label, string? valeur)
-        {
-            if (!string.IsNullOrWhiteSpace(valeur)) lignes.Add($"{label} : {valeur}");
-        }
-
-        // Intitulé d'un bloc : la compétence choisie, à défaut le libellé générique.
-        static string Libelle(string? competence, string defaut) =>
-            string.IsNullOrWhiteSpace(competence) ? defaut : competence;
-
-        // Bloc à valeurs multiples : le libellé n'est écrit qu'une fois, les valeurs
-        // suivantes sont alignées dessous, sous la première (indentation conservée
-        // à l'affichage comme à l'impression).
-        void AjouterBloc(string label, IReadOnlyList<string> valeurs)
-        {
-            if (valeurs.Count == 0) return;
-            var marge = new string(' ', label.Length + 3);   // largeur de « label : »
-            lignes.Add($"{label} : {valeurs[0]}");
-            for (var i = 1; i < valeurs.Count; i++) lignes.Add(marge + valeurs[i]);
-        }
-
-        Ajouter("Année", s.NomNiveau);
-        Ajouter("Cours", s.NomCours);
-        Ajouter("Langue", s.Langue);
-        Ajouter("Champ", s.NomDomaine);
-        Ajouter("Domaine", s.NomSousDomaine);
-
-        // Les compétences choisies ne s'écrivent pas sur une ligne à elles : ce sont
-        // elles qui intitulent les blocs qu'elles qualifient (« Savoirs : … » plutôt
-        // que « Visée : … »). Sans choix, on retombe sur le libellé générique.
-        AjouterBloc(Libelle(s.NomCompetence, "Visée"), s.NomVisees);
-        AjouterBloc(Libelle(s.NomCompetenceVm, "Visée à maîtriser"), s.NomsViseesMaitriser);
-
-        return string.Join("\n", lignes);
-    }
 
     @* ══════════════════════════════════════════════════════════════════════════
        REPORT DE LEÇONS

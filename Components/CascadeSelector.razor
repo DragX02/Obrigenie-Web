@@ -711,5 +711,63 @@
         // Première visée cochée : c'est elle qui alimente la clé étrangère de la note
         // (la table note ne référence qu'une visée ; le détail complet vit dans le texte).
         public int IdVisee => IdVisees.Count > 0 ? IdVisees[0] : 0;
+
+        // Vrai dès qu'une visée est retenue, sous forme d'identifiant ou de simple
+        // intitulé (une entrée choisie hors du référentiel du champ n'a pas encore d'id).
+        public bool ADesVisees => IdVisee > 0 || NomVisees.Count > 0;
+
+        /// <summary>
+        /// La sélection en texte, une ligne par niveau renseigné :
+        ///
+        ///     Année : 1ère primaire
+        ///     Cours : Français
+        ///     Champ : Orienter sa prise de parole, son écoute, sa lecture, son écrit
+        ///     Savoir-faire : Assigner un but à sa lecture ou son écoute
+        ///     Compétences : Déterminer un but d'écoute selon l'intention précisée
+        ///                   Utiliser les termes du support de lecture comme indices
+        ///
+        /// C'est cette forme qui est figée sur la note ou la préparation de leçon au
+        /// moment de l'enregistrement, puis affichée telle quelle à l'écran, à
+        /// l'impression et dans le PDF. Elle vit ici, sur la sélection elle-même, pour
+        /// que les deux écrans qui l'emploient ne puissent pas en donner deux versions.
+        /// </summary>
+        public string EnTexte()
+        {
+            var lignes = new List<string>();
+
+            void Ajouter(string label, string? valeur)
+            {
+                if (!string.IsNullOrWhiteSpace(valeur)) lignes.Add($"{label} : {valeur}");
+            }
+
+            // Intitulé d'un bloc : la compétence choisie, à défaut le libellé générique.
+            static string Libelle(string? competence, string defaut) =>
+                string.IsNullOrWhiteSpace(competence) ? defaut : competence;
+
+            // Bloc à valeurs multiples : le libellé n'est écrit qu'une fois, les valeurs
+            // suivantes sont alignées dessous, sous la première (indentation conservée
+            // à l'affichage comme à l'impression).
+            void AjouterBloc(string label, IReadOnlyList<string> valeurs)
+            {
+                if (valeurs.Count == 0) return;
+                var marge = new string(' ', label.Length + 3);   // largeur de « label : »
+                lignes.Add($"{label} : {valeurs[0]}");
+                for (var i = 1; i < valeurs.Count; i++) lignes.Add(marge + valeurs[i]);
+            }
+
+            Ajouter("Année", NomNiveau);
+            Ajouter("Cours", NomCours);
+            Ajouter("Langue", Langue);
+            Ajouter("Champ", NomDomaine);
+            Ajouter("Domaine", NomSousDomaine);
+
+            // Les compétences choisies ne s'écrivent pas sur une ligne à elles : ce sont
+            // elles qui intitulent les blocs qu'elles qualifient (« Savoirs : … » plutôt
+            // que « Visée : … »). Sans choix, on retombe sur le libellé générique.
+            AjouterBloc(Libelle(NomCompetence, "Visée"), NomVisees);
+            AjouterBloc(Libelle(NomCompetenceVm, "Visée à maîtriser"), NomsViseesMaitriser);
+
+            return string.Join("\n", lignes);
+        }
     }
 }
