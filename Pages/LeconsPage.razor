@@ -242,38 +242,40 @@
 @if (aImprimer != null)
 {
     <div class="lecon-print">
-        <div class="lecon-print-entete">
-            <div class="lecon-print-titre">
-                <strong>Titre de la leçon :</strong> @aImprimer.Titre
-            </div>
-            <div><strong>Enseignant :</strong> @aImprimer.Enseignant</div>
+
+        @* Ligne de titre, sur toute la largeur *@
+        <div class="lecon-print-titre">
+            <span class="lecon-print-libelle">Titre de la leçon :</span>
+            <span class="lecon-print-valeur">@aImprimer.Titre</span>
         </div>
 
-        <div class="lecon-print-cadre">
-            <div><strong>Durée de la leçon :</strong> @aImprimer.Duree</div>
-            <div><strong>Nombre de séances :</strong> @aImprimer.NombreSeances</div>
-            <div><strong>Niveaux :</strong> @aImprimer.Niveaux</div>
-        </div>
+        @* Le cadre flotte à droite, ses quatre lignes bordées, comme sur le modèle *@
+        <table class="lecon-print-cadre">
+            <tr><td><span>Enseignant :</span> @aImprimer.Enseignant</td></tr>
+            <tr><td><span>Durée de la leçon :</span> @aImprimer.Duree</td></tr>
+            <tr><td><span>Nombre de séances :</span> @aImprimer.NombreSeances</td></tr>
+            <tr><td><span>Niveaux :</span> @aImprimer.Niveaux</td></tr>
+        </table>
 
         <div class="lecon-print-bloc">
             <div class="lecon-print-libelle">Compétences :</div>
-            <div class="lecon-print-texte">@aImprimer.Competences</div>
+            @* Le contexte de cascade garde ses retours à la ligne et son indentation *@
+            <div class="lecon-print-contexte">@aImprimer.Competences</div>
         </div>
 
-        <div class="lecon-print-bloc">
-            <div class="lecon-print-libelle">Déroulement de la leçon :</div>
+        @* Seul intitulé centré du formulaire *@
+        <div class="lecon-print-libelle lecon-print-centre">Déroulement de la leçon :</div>
 
+        <table class="lecon-print-phases">
             @foreach (var phase in aImprimer.Phases.OrderBy(p => p.Ordre))
             {
-                <div class="lecon-print-phase">
-                    <div class="lecon-print-phase-entete">
-                        <strong>Phase @phase.Ordre :</strong>
-                        <span><strong>Temps :</strong> @phase.Temps</span>
-                    </div>
-                    <div class="lecon-print-texte">@phase.Intitule</div>
-                </div>
+                <tr>
+                    <td class="lecon-print-phase-nom"><span>Phase @phase.Ordre :</span></td>
+                    <td class="lecon-print-phase-txt">@phase.Intitule</td>
+                    <td class="lecon-print-phase-tps"><span>Temps :</span> @phase.Temps</td>
+                </tr>
             }
-        </div>
+        </table>
     </div>
 }
 

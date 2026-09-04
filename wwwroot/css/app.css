@@ -1764,7 +1764,10 @@ h1:focus { outline: none; }
 }
 
 /* ---- La feuille imprimee ----
-   Masquee a l'ecran ; @media print la revele et masque tout le reste. */
+   Masquee a l'ecran ; @media print la revele et masque tout le reste.
+   La mise en page reprend celle du formulaire papier, comme LeconPdfExporter :
+   titre pleine largeur, cadre borde flottant a droite, intitules souligne,
+   « Deroulement de la lecon » centre, phases sur deux colonnes. */
 .lecon-print { display: none; }
 
 @media print {
@@ -1776,33 +1779,53 @@ h1:focus { outline: none; }
     .lecon-print {
         display: block !important;
         color: #000000; background: #ffffff;
-        font-size: 11pt; line-height: 1.5;
+        font-size: 10.5pt; line-height: 1.45;
     }
 
-    .lecon-print-entete {
-        display: flex; justify-content: space-between; gap: 1rem;
-        margin-bottom: 4mm;
+    /* Les trois intitules du formulaire sont en gras souligne */
+    .lecon-print-libelle {
+        font-weight: 700; text-decoration: underline;
+        margin-bottom: 2mm;
     }
-    .lecon-print-titre { font-size: 13pt; }
 
-    /* Le cadre du formulaire papier autour de duree / seances / niveaux */
+    .lecon-print-centre { text-align: center; margin: 6mm 0 4mm; }
+
+    /* Ligne de titre : l'intitule souligne, la valeur a cote */
+    .lecon-print-titre { font-size: 12pt; margin-bottom: 2mm; }
+    .lecon-print-titre .lecon-print-libelle { display: inline; }
+    .lecon-print-valeur { margin-left: 3mm; }
+
+    /* Le cadre flotte a droite ; le corps de la fiche reprend dessous */
     .lecon-print-cadre {
-        border: 1px solid #000000; border-radius: 2px;
-        padding: 3mm 4mm; margin-bottom: 5mm;
+        float: right; width: 95mm; margin: 0 0 4mm 5mm;
+        border-collapse: collapse;
     }
-    .lecon-print-cadre > div + div { margin-top: 1.5mm; }
-
-    .lecon-print-bloc { margin-bottom: 5mm; }
-    .lecon-print-libelle { font-weight: 700; margin-bottom: 1.5mm; }
-
-    /* Les retours a la ligne saisis par l'enseignant sont conserves tels quels */
-    .lecon-print-texte { white-space: pre-wrap; }
-
-    /* Une phase ne doit pas se couper entre deux pages */
-    .lecon-print-phase { margin-bottom: 3.5mm; break-inside: avoid; }
-    .lecon-print-phase-entete {
-        display: flex; justify-content: space-between; gap: 1rem;
+    .lecon-print-cadre td {
+        border: 1px solid #000000;
+        padding: 1mm 2mm;
     }
+    /* Les libelles du cadre ne sont pas souligne, seulement distincts */
+    .lecon-print-cadre span { font-weight: 600; }
+
+    /* Le bloc Competences passe sous le cadre */
+    .lecon-print-bloc { clear: both; padding-top: 2mm; margin-bottom: 4mm; }
+
+    /* Le contexte de cascade garde ses retours a la ligne ET l'indentation qui
+       aligne les visees sous la premiere : c'est la meme forme qu'en PDF. */
+    .lecon-print-contexte {
+        white-space: pre-wrap;
+        margin-left: 8mm; font-size: 10pt;
+    }
+
+    /* Les phases, sur deux colonnes, nettement espacees : la fiche vierge doit
+       laisser la place d'ecrire a la main. */
+    .lecon-print-phases { width: 100%; border-collapse: collapse; }
+    .lecon-print-phases td { padding: 2.5mm 0; vertical-align: top; break-inside: avoid; }
+
+    .lecon-print-phase-nom { width: 22mm; font-weight: 600; white-space: nowrap; }
+    .lecon-print-phase-txt { white-space: pre-wrap; padding-right: 6mm; }
+    .lecon-print-phase-tps { width: 55mm; white-space: pre-wrap; }
+    .lecon-print-phase-tps span { font-weight: 600; }
 }
 
 /* La cascade dans la fenetre d'une lecon : elle occupe toute la largeur du
