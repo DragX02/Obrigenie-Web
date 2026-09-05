@@ -131,7 +131,7 @@
                                Selected="@ValeursNomVisees"
                                OnToggle="ToggleNomVisee"
                                OnCreate="AjouterNomVisee"
-                               Placeholder="Rechercher une visée…" />
+                               Placeholder="Rechercher un attendu…" />
         </div>
     }
 
@@ -140,7 +140,7 @@
     @if (selectedIdNomVisees.Count > 0)
     {
         <div class="cascade-field">
-            <label>7. Compétences, savoirs, S-F <span class="cascade-opt">(des visées à maîtriser)</span></label>
+            <label>7. Compétences, savoirs, S-F <span class="cascade-opt">(des attendus)</span></label>
             <SearchableSelect Value="@selectedIdCompetenceVm.ToString()"
                               ValueChanged="OnCompetenceVmChanged"
                               OnCreate="AjouterCompetenceVm"
@@ -158,7 +158,7 @@
                                Selected="@ValeursVms"
                                OnToggle="ToggleVm"
                                OnCreate="AjouterViseeMaitriser"
-                               Placeholder="Rechercher une visée à maîtriser…" />
+                               Placeholder="Rechercher un attendu…" />
         </div>
     }
 </div>
