@@ -6,11 +6,12 @@
      1. Année            → Niveau (tous niveaux ayant des visées)
      2. Cours            → tous les cours enseignés à ce niveau (toutes catégories)
      3. Champ            → table domaine, pour la combinaison cours + niveau
-     4. Domaine          → table sous_domaine, optionnel
+     4. Domaine          → table sous_domaine, optionnel, masqué si le champ n'en a pas
+                           (sauf en mode élargi, pour y ajouter le premier)
      5. Compétences, savoirs, S-F → champ competence de la visée
-     6. Visées           → NomVisée, filtrées par la compétence choisie —
+     6. Visées           → tous les NomVisée du cours et de l'année, sans doublon —
                            sélection multiple avec recherche (MultiSelectSearch)
-     7. Visées à maîtriser → celles des visées retenues (fusionnées, dédoublonnées) —
+     7. Visées à maîtriser → toutes celles du cours et de l'année, sans doublon —
                            sélection multiple avec recherche également
 
    Tout ce qui est retenu aux étapes 6 et 7 est remonté au parent et finit dans le
@@ -96,8 +97,9 @@
     }
 
     @* Étape 4 : domaine (table sous_domaine du référentiel), optionnel.
-       Affichée même quand la liste est vide, pour pouvoir y ajouter le premier. *@
-    @if (selectedIdDomaine > 0)
+       Masquée tant que le champ choisi n'a aucun domaine à proposer ; le mode élargi
+       la rouvre, c'est là qu'on ajoute le premier domaine d'un champ. *@
+    @if (selectedIdDomaine > 0 && (listeSousDomaines.Count > 0 || elargir))
     {
         <div class="cascade-field">
             <label>4. Domaine <span class="cascade-opt">(optionnel)</span></label>
@@ -227,6 +229,11 @@
     private List<ViseeRefDto>           listeVisees          = new();
     private List<ViseesMaitriserRefDto> listeViseesMaitriser = new();
 
+    // Tout le référentiel du cours et de l'année choisis, tous champs confondus :
+    // c'est lui qui alimente les étapes 6 et 8, dédoublonné.
+    private List<ViseeRefDto>           viseesDuCours = new();
+    private List<ViseesMaitriserRefDto> vmDuCours     = new();
+
     // ── Options des listes déroulantes cherchables ─────────────────────────
     private static SearchableSelect.SelectOption Opt(string value, string label) => new(value, label);
 
@@ -284,23 +291,38 @@
             ? Fusionner(ListeNomVisees.Select(nv => Opt(nv.Id.ToString(), nv.Nom)),
                         tousNomVisees.OrderBy(nv => nv.NomVisee)
                                      .Select(nv => Opt(nv.IdNomVisee.ToString(), nv.NomVisee)))
-            : ListeNomVisees.Select(nv => Opt(nv.Id.ToString(), nv.Nom));
+            : Fusionner(ListeNomVisees.Select(nv => Opt(nv.Id.ToString(), nv.Nom)),
+                        Enumerable.Empty<SearchableSelect.SelectOption>());
+
+    // Étape 8 : les visées à maîtriser des visées cochées d'abord, puis toutes celles
+    // du cours et de l'année, sans doublon.
+    private IEnumerable<SearchableSelect.SelectOption> OptionsVmDuCours =>
+        Fusionner(listeViseesMaitriser.Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser)),
+                  vmDuCours.OrderBy(vm => vm.NomViseesMaitriser)
+                           .Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser)));
 
     private IEnumerable<SearchableSelect.SelectOption> OptionsViseesMaitriser =>
         elargir
-            ? Fusionner(listeViseesMaitriser.Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser)),
+            ? Fusionner(OptionsVmDuCours,
                         toutesVm.OrderBy(vm => vm.NomViseesMaitriser)
                                 .Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser)))
-            : listeViseesMaitriser.Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser));
+            : OptionsVmDuCours;
 
-    // Concatène deux listes d'options en écartant les doublons de valeur.
+    // Concatène deux listes d'options en écartant les doublons, de valeur comme
+    // d'intitulé : la même entrée ne doit jamais figurer deux fois dans une liste.
     private static IEnumerable<SearchableSelect.SelectOption> Fusionner(
         IEnumerable<SearchableSelect.SelectOption> tete,
         IEnumerable<SearchableSelect.SelectOption> reste)
     {
-        var vues = new HashSet<string>();
+        var valeurs  = new HashSet<string>();
+        var intitules = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var o in tete.Concat(reste))
-            if (vues.Add(o.Value)) yield return o;
+        {
+            if (!valeurs.Add(o.Value)) continue;
+            if (!intitules.Add(o.Label.Trim())) continue;
+            yield return o;
+        }
     }
 
     // ── Sélections vues comme des chaînes, pour MultiSelectSearch ──────────
@@ -316,11 +338,13 @@
                    .Select(g => (Id: g.Key, Nom: g.First().NomCompetence))
                    .OrderBy(x => x.Nom);
 
+    // Étape 6 : tous les attendus du cours et de l'année, tous champs et toutes
+    // compétences confondus. La compétence de l'étape 5 ne filtre plus la liste,
+    // elle ne fait qu'intituler le bloc dans la note.
     private IEnumerable<(int Id, string Nom)> ListeNomVisees =>
-        listeVisees.Where(v => v.IdCompetence == selectedIdCompetence)
-                   .GroupBy(v => v.IdNomVisee)
-                   .Select(g => (Id: g.Key, Nom: g.First().NomVisee))
-                   .OrderBy(x => x.Nom);
+        viseesDuCours.GroupBy(v => v.IdNomVisee)
+                     .Select(g => (Id: g.Key, Nom: g.First().NomVisee))
+                     .OrderBy(x => x.Nom);
 
     // ── Gestionnaires ──────────────────────────────────────────────────────
 
@@ -337,6 +361,7 @@
         selectedCours = value ?? "";
         ResetFrom(2);
         await ChargerDomaines();
+        await ChargerViseesDuCours();
         await Notify();
     }
 
@@ -511,7 +536,7 @@
     private void ResetFrom(int level)
     {
         if (level <= 1) { selectedCours = ""; listeCours.Clear(); selectedLangue = ""; }
-        if (level <= 2) { selectedIdDomaine = 0; domainesFiltres.Clear(); }
+        if (level <= 2) { selectedIdDomaine = 0; domainesFiltres.Clear(); viseesDuCours.Clear(); vmDuCours.Clear(); }
         if (level <= 3) { selectedIdSousD = 0; listeSousDomaines.Clear(); }
         selectedIdCompetence = 0;
         listeVisees.Clear();
@@ -548,6 +573,31 @@
         catch (Exception ex) { loadError = ex.Message; }
     }
 
+    // Tout le référentiel du cours et de l'année : les visées de chacun de ses champs,
+    // puis les visées à maîtriser de ces visées. C'est ce que proposent les étapes 6 et 8,
+    // quel que soit le champ choisi ensuite.
+    private async Task ChargerViseesDuCours()
+    {
+        viseesDuCours.Clear();
+        vmDuCours.Clear();
+
+        foreach (var domaine in domainesFiltres)
+        {
+            try
+            {
+                var visees = await Api.GetViseesRefAsync(domaine.IdDom);
+                foreach (var visee in visees) viseesDuCours.Add(visee);
+            }
+            catch (Exception ex) { loadError = ex.Message; return; }
+        }
+
+        var idVisees = new List<int>();
+        foreach (var visee in viseesDuCours) idVisees.Add(visee.IdVisee);
+
+        try { vmDuCours = await Api.GetViseesMaitriserParViseesAsync(idVisees); }
+        catch (Exception ex) { loadError = ex.Message; }
+    }
+
     private async Task ChargerVisees()
     {
         listeVisees.Clear();
@@ -572,6 +622,8 @@
         if (elargir) return;
 
         var proposees = listeViseesMaitriser.Select(vm => vm.IdViseesMaitriser).ToHashSet();
+        foreach (var vm in vmDuCours) proposees.Add(vm.IdViseesMaitriser);
+
         selectedIdVms.RemoveWhere(id => !proposees.Contains(id));
     }
 
