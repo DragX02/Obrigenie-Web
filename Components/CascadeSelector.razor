@@ -112,7 +112,7 @@
     }
 
     @* Étape 5 : compétences, savoirs, savoir-faire (champ competence de la visée) *@
-    @if (selectedIdDomaine > 0 && (listeVisees.Count > 0 || elargir))
+    @if (selectedIdDomaine > 0)
     {
         <div class="cascade-field">
             <label>5. Compétences, savoirs, S-F</label>
@@ -147,7 +147,7 @@
                               ValueChanged="OnCompetenceVmChanged"
                               OnCreate="AjouterCompetenceVm"
                               Placeholder="-- Choisir --"
-                              Options="OptionsCompetences" EmptyValue="0" />
+                              Options="OptionsCompetencesVm" EmptyValue="0" />
         </div>
     }
 
@@ -256,23 +256,23 @@
     private IEnumerable<SearchableSelect.SelectOption> OptionsSousDomaines =>
         listeSousDomaines.Select(s => Opt(s.IdSousDomaine.ToString(), s.NomComp));
 
-    // En mode élargi, les trois dernières listes viennent des tables complètes plutôt
-    // que du seul référentiel du champ choisi. Les entrées déjà rattachées restent en
+    // En mode élargi, les listes de visées viennent des tables complètes plutôt que
+    // du seul référentiel du champ choisi. Les entrées déjà rattachées restent en
     // tête pour rester repérables.
-    // Trois entrées toujours proposées à l'étape 5, en plus de celles du champ.
-    // Elles sont résolues en compétences réelles du référentiel ; celle qui n'existe
-    // pas encore dans la table est créée au moment où l'utilisateur la choisit.
-    private static readonly string[] CompetencesToujoursProposees =
+    // Les étapes 5 et 7 ne proposent que ces intitulés : ils nomment le bloc de la
+    // note, ils ne filtrent rien. Ils sont résolus en compétences réelles du
+    // référentiel ; celui qui n'existe pas encore est créé à la sélection.
+    private static readonly string[] CompetencesProposees =
         { "Compétences", "Savoirs", "Savoir-faire" };
 
+    private static readonly string[] CompetencesVmProposees =
+        { "Attendus", "Compétences", "Savoirs", "Savoir-faire" };
+
     private IEnumerable<SearchableSelect.SelectOption> OptionsCompetences =>
-        Fusionner(
-            elargir
-                ? Fusionner(ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom)),
-                            toutesCompetences.OrderBy(c => c.NomCompetence)
-                                             .Select(c => Opt(c.IdCompetence.ToString(), c.NomCompetence)))
-                : ListeCompetences.Select(c => Opt(c.Id.ToString(), c.Nom)),
-            CompetencesToujoursProposees.Select(OptionCompetenceFigee));
+        CompetencesProposees.Select(OptionCompetenceFigee);
+
+    private IEnumerable<SearchableSelect.SelectOption> OptionsCompetencesVm =>
+        CompetencesVmProposees.Select(OptionCompetenceFigee);
 
     // Option d'une entrée toujours proposée : son identifiant si la table la connaît,
     // sinon une valeur « nouveau:… » qui déclenche sa création à la sélection.
@@ -333,10 +333,6 @@
         selectedIdVms.Select(i => i.ToString()).ToList();
 
     // ── Listes dérivées ────────────────────────────────────────────────────
-    private IEnumerable<(int Id, string Nom)> ListeCompetences =>
-        listeVisees.GroupBy(v => v.IdCompetence)
-                   .Select(g => (Id: g.Key, Nom: g.First().NomCompetence))
-                   .OrderBy(x => x.Nom);
 
     // Étape 6 : tous les attendus du cours et de l'année, tous champs et toutes
     // compétences confondus. La compétence de l'étape 5 ne filtre plus la liste,
