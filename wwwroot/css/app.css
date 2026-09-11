@@ -1784,6 +1784,29 @@ h1:focus { outline: none; }
         padding: 6mm;
     }
 
+    /* En-tete de la feuille : marque a gauche, intitule au centre, annee a droite */
+    .lecon-print-entete {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 4mm;
+        padding-bottom: 1.5mm;
+        border-bottom: 1px solid #999999;
+    }
+
+    .lecon-print-marque { display: flex; align-items: center; }
+
+    /* Le logo doit s'imprimer en couleur */
+    .lecon-print-logo {
+        height: 9mm; width: auto; margin-right: 2mm;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+
+    .lecon-print-app { font-weight: 700; font-size: 11pt; }
+    .lecon-print-doc { font-weight: 700; font-size: 13pt; }
+    .lecon-print-annee { font-size: 9pt; color: #5a5a5a; }
+
     /* Les trois intitules du formulaire sont en gras souligne */
     .lecon-print-libelle {
         font-weight: 700; text-decoration: underline;

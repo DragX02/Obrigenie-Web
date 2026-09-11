@@ -71,7 +71,7 @@ namespace Obrigenie.Services
             BordurePage(pdf);
 
             float largeurUtile = pdf.PageWidth - 2 * Marge;
-            float y = Marge;
+            float y = EnTete(pdf);
 
             // ── Ligne de titre, sur toute la largeur ─────────────────────────
             y = ChampSouligne(pdf, Marge, y, largeurUtile,
@@ -139,6 +139,31 @@ namespace Obrigenie.Services
             float hauteur = pdf.PageHeight - 2 * MargeBordure;
 
             pdf.Rect(MargeBordure, MargeBordure, largeur, hauteur, 2f, "0 0 0");
+        }
+
+        private static float EnTete(PdfWriter pdf)
+        {
+            float tailleLogo = 20f;
+            float yLogo = MargeBordure + 10f;
+
+            pdf.Image(Marge, yLogo, tailleLogo, tailleLogo,
+                      LogoObrigenie.Jpeg, LogoObrigenie.Largeur, LogoObrigenie.Hauteur);
+
+            pdf.Text(Marge + tailleLogo + 5f, yLogo + 6f, 11f, "Obrigenie", true);
+
+            string titre = "Préparation de leçon";
+            float largeurTitre = PdfWriter.LargeurApprox(titre, 14f);
+            pdf.Text((pdf.PageWidth - largeurTitre) / 2f, yLogo + 4f, 14f, titre, true);
+
+            int debut = CalendarService.AnneeScolaire(DateTime.Now);
+            string annee = $"Année scolaire {debut}-{debut + 1}";
+            pdf.Text(pdf.PageWidth - Marge - PdfWriter.LargeurApprox(annee, 9f), yLogo + 8f, 9f,
+                     annee, false, "0.35 0.35 0.35");
+
+            float yTrait = yLogo + tailleLogo + 8f;
+            pdf.Line(Marge, yTrait, pdf.PageWidth - Marge, yTrait, 0.7f, "0.6 0.6 0.6");
+
+            return yTrait + 16f;
         }
 
         // ── Blocs ────────────────────────────────────────────────────────────
@@ -296,7 +321,7 @@ namespace Obrigenie.Services
             pdf.NewPage();
             BordurePage(pdf);
 
-            return Marge;
+            return EnTete(pdf);
         }
 
         // Nom de fichier proposé au téléchargement, dérivé du titre de la leçon.

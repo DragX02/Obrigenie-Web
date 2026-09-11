@@ -243,6 +243,17 @@
 {
     <div class="lecon-print">
 
+        @* En-tête de la feuille : logo et nom de l'application à gauche,
+           l'intitulé du document au centre, l'année scolaire à droite *@
+        <div class="lecon-print-entete">
+            <span class="lecon-print-marque">
+                <img class="lecon-print-logo" src="icon-192.png" alt="" />
+                <span class="lecon-print-app">Obrigenie</span>
+            </span>
+            <span class="lecon-print-doc">Préparation de leçon</span>
+            <span class="lecon-print-annee">Année scolaire @AnneeScolaire</span>
+        </div>
+
         @* Ligne de titre, sur toute la largeur *@
         <div class="lecon-print-titre">
             <span class="lecon-print-libelle">Titre de la leçon :</span>
@@ -310,6 +321,16 @@
 
     @* Nombre de phases d'une fiche vierge : celui du formulaire papier *@
     private const int PhasesParDefaut = 4;
+
+    @* Année scolaire du jour, affichée à droite de l'en-tête de la feuille *@
+    private string AnneeScolaire
+    {
+        get
+        {
+            int debut = CalendarService.AnneeScolaire(DateTime.Now);
+            return $"{debut}-{debut + 1}";
+        }
+    }
 
     @* ══════════════════════════════════════════════════════════════════════════
        CHARGEMENT
