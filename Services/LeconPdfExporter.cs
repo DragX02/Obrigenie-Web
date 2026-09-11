@@ -38,6 +38,8 @@ namespace Obrigenie.Services
         // Marge extérieure de la feuille
         private const float Marge = 45f;
 
+        private const float MargeBordure = 22f;
+
         // Hauteurs de police
         private const float TailleTitre   = 13f;   // « Titre de la leçon : »
         private const float TailleSection = 11.5f; // « Compétences : », « Déroulement… »
@@ -65,6 +67,8 @@ namespace Obrigenie.Services
         public static byte[] Generer(Lecon lecon)
         {
             var pdf = new PdfWriter(landscape: false);
+
+            BordurePage(pdf);
 
             float largeurUtile = pdf.PageWidth - 2 * Marge;
             float y = Marge;
@@ -127,6 +131,14 @@ namespace Obrigenie.Services
             }
 
             return pdf.Build();
+        }
+
+        private static void BordurePage(PdfWriter pdf)
+        {
+            float largeur = pdf.PageWidth - 2 * MargeBordure;
+            float hauteur = pdf.PageHeight - 2 * MargeBordure;
+
+            pdf.Rect(MargeBordure, MargeBordure, largeur, hauteur, 2f, "0 0 0");
         }
 
         // ── Blocs ────────────────────────────────────────────────────────────
@@ -282,6 +294,8 @@ namespace Obrigenie.Services
             if (y + hauteurBloc <= pdf.PageHeight - Marge) return y;
 
             pdf.NewPage();
+            BordurePage(pdf);
+
             return Marge;
         }
 

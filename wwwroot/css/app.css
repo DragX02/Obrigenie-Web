@@ -1780,6 +1780,8 @@ h1:focus { outline: none; }
         display: block !important;
         color: #000000; background: #ffffff;
         font-size: 10.5pt; line-height: 1.45;
+        border: 2pt solid #000000;
+        padding: 6mm;
     }
 
     /* Les trois intitules du formulaire sont en gras souligne */
