@@ -961,6 +961,21 @@ namespace Obrigenie.Services
         // Endpoint : GET api/ref/categories
         // Lève HttpRequestException si le serveur retourne un code de statut non-succès.
         // Retourne une liste de CategorieDto triée par ordre d'affichage.
+        public async Task<List<EmojiItem>> GetEmojisAsync()
+        {
+            try
+            {
+                var request = await BuildAuthRequest(HttpMethod.Get, "api/emojis");
+                var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode) return new();
+                return await response.Content.ReadFromJsonAsync<List<EmojiItem>>() ?? new();
+            }
+            catch
+            {
+                return new();
+            }
+        }
+
         public async Task<List<CategorieDto>> GetCategoriesAsync()
         {
             var request = await BuildAuthRequest(HttpMethod.Get, "api/ref/categories");

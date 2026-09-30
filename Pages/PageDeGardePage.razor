@@ -1,0 +1,201 @@
+@page "/page-de-garde"
+
+@inject ApiService Api
+
+<div class="garde-page">
+
+    <div class="garde-menu">
+        <h2 class="garde-title">Page de garde</h2>
+
+        <div class="garde-section-title">Cadre</div>
+
+        <label class="garde-check">
+            <input type="checkbox" @bind="avecCadre" />
+            Ajouter un cadre
+        </label>
+
+        @if (avecCadre)
+        {
+            <label class="garde-label">Type de ligne</label>
+            <select class="garde-input" @bind="typeLigne">
+                <option value="solid">Trait plein</option>
+                <option value="dashed">Tirets</option>
+                <option value="dotted">Pointillés</option>
+                <option value="double">Double trait</option>
+                <option value="emoji">Emoji / symbole</option>
+            </select>
+
+            @if (typeLigne == "emoji")
+            {
+                <label class="garde-label">Symbole</label>
+                @if (chargementEmojis)
+                {
+                    <div class="garde-label">Chargement des emojis…</div>
+                }
+                else if (emojis.Count == 0)
+                {
+                    <div class="garde-label">Impossible de charger les emojis.</div>
+                }
+                else
+                {
+                    <select class="garde-input" @bind="groupe">
+                        @foreach (var g in groupes)
+                        {
+                            <option value="@g.Key">@g.Value</option>
+                        }
+                    </select>
+                    <input class="garde-input" @bind="recherche" @bind:event="oninput" placeholder="Rechercher (ex : coeur, fleur)" />
+                    <div class="garde-emojis">
+                        @foreach (var e in EmojisAffiches())
+                        {
+                            var em = e.Emoji;
+                            <button class="garde-emoji-btn @(symbole == em ? "garde-emoji-actif" : "")" title="@e.Nom" @onclick="() => symbole = em">@em</button>
+                        }
+                    </div>
+                }
+                <input class="garde-input" @bind="symbole" @bind:event="oninput" maxlength="4" placeholder="Ou tape ton symbole" />
+            }
+            else
+            {
+                <label class="garde-label">Couleur</label>
+                <input type="color" class="garde-color" @bind="couleur" @bind:event="oninput" />
+            }
+
+            <label class="garde-label">Épaisseur : @epaisseur px</label>
+            <input type="range" min="1" max="40" @bind="epaisseur" @bind:event="oninput" />
+
+            <label class="garde-label">Marge depuis le bord : @marge px</label>
+            <input type="range" min="0" max="100" @bind="marge" @bind:event="oninput" />
+        }
+    </div>
+
+    <div class="garde-apercu-zone">
+        <div class="garde-feuille" style="width:@(largeurFeuille)px; height:@(hauteurFeuille)px;">
+            @if (avecCadre)
+            {
+                if (typeLigne == "emoji")
+                {
+                    <div class="garde-emoji-ligne" style="@StyleLigne("top")">
+                        @for (int i = 0; i < NbHorizontal(); i++)
+                        {
+                            <span>@symbole</span>
+                        }
+                    </div>
+                    <div class="garde-emoji-ligne" style="@StyleLigne("bottom")">
+                        @for (int i = 0; i < NbHorizontal(); i++)
+                        {
+                            <span>@symbole</span>
+                        }
+                    </div>
+                    <div class="garde-emoji-colonne" style="@StyleColonne("left")">
+                        @for (int i = 0; i < NbVertical(); i++)
+                        {
+                            <span>@symbole</span>
+                        }
+                    </div>
+                    <div class="garde-emoji-colonne" style="@StyleColonne("right")">
+                        @for (int i = 0; i < NbVertical(); i++)
+                        {
+                            <span>@symbole</span>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="garde-cadre" style="top:@(marge)px; left:@(marge)px; right:@(marge)px; bottom:@(marge)px; border:@(epaisseur)px @typeLigne @couleur;"></div>
+                }
+            }
+        </div>
+    </div>
+
+</div>
+
+@code {
+    private int largeurFeuille = 420;
+    private int hauteurFeuille = 594;
+
+    private bool avecCadre = false;
+    private string typeLigne = "solid";
+    private string couleur = "#333333";
+    private int epaisseur = 4;
+    private int marge = 20;
+    private string symbole = "⭐";
+
+    private List<EmojiItem> emojis = new List<EmojiItem>();
+    private bool chargementEmojis = true;
+    private int groupe = 0;
+    private string recherche = "";
+
+    private Dictionary<int, string> groupes = new Dictionary<int, string>
+    {
+        { 0, "Smileys et émotions" },
+        { 1, "Personnes" },
+        { 3, "Animaux et nature" },
+        { 4, "Nourriture" },
+        { 5, "Voyages et lieux" },
+        { 6, "Activités" },
+        { 7, "Objets" },
+        { 8, "Symboles" },
+        { 9, "Drapeaux" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        emojis = await Api.GetEmojisAsync();
+        chargementEmojis = false;
+    }
+
+    private List<EmojiItem> EmojisAffiches()
+    {
+        var resultat = new List<EmojiItem>();
+        foreach (var e in emojis)
+        {
+            if (recherche != "")
+            {
+                if (e.Nom.ToLower().Contains(recherche.ToLower()))
+                    resultat.Add(e);
+            }
+            else if (e.Groupe == groupe)
+            {
+                resultat.Add(e);
+            }
+        }
+        return resultat;
+    }
+
+    private int Taille()
+    {
+        if (epaisseur < 8)
+            return 8;
+        return epaisseur;
+    }
+
+    private int NbHorizontal()
+    {
+        int longueur = largeurFeuille - marge * 2;
+        int nb = longueur / Taille();
+        if (nb < 1)
+            nb = 1;
+        return nb;
+    }
+
+    private int NbVertical()
+    {
+        int longueur = hauteurFeuille - marge * 2 - Taille() * 2;
+        int nb = longueur / Taille();
+        if (nb < 1)
+            nb = 1;
+        return nb;
+    }
+
+    private string StyleLigne(string cote)
+    {
+        return cote + ":" + marge + "px; left:" + marge + "px; right:" + marge + "px; height:" + Taille() + "px; font-size:" + (Taille() - 2) + "px;";
+    }
+
+    private string StyleColonne(string cote)
+    {
+        int debut = marge + Taille();
+        return cote + ":" + marge + "px; top:" + debut + "px; bottom:" + debut + "px; width:" + Taille() + "px; font-size:" + (Taille() - 2) + "px;";
+    }
+}
