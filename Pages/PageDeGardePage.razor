@@ -27,6 +27,75 @@
             </div>
         }
 
+        <button class="garde-menu-item @(menuOuvert == "textes" ? "garde-menu-item-actif" : "")" @onclick='() => OuvrirMenu("textes")'>
+            🔤 Textes
+            <span class="garde-fleche">@(menuOuvert == "textes" ? "▾" : "▸")</span>
+        </button>
+
+        @if (menuOuvert == "textes")
+        {
+            <div class="garde-options">
+                <label class="garde-label">Ajouter</label>
+                <div class="garde-ajout-textes">
+                    <button class="garde-petit-btn" @onclick='() => AjouterTexte("Titre", 40, 150)'>+ Titre</button>
+                    <button class="garde-petit-btn" @onclick='() => AjouterTexte("Nom Prénom", 22, 420)'>+ Nom Prénom</button>
+                    <button class="garde-petit-btn" @onclick='() => AjouterTexte("Année 2026-2027", 18, 470)'>+ Année</button>
+                    <button class="garde-petit-btn" @onclick='() => AjouterTexte("Texte", 18, 300)'>+ Texte libre</button>
+                </div>
+
+                @if (textes.Count > 0)
+                {
+                    <label class="garde-label">Zones de texte</label>
+                    @foreach (var t in textes)
+                    {
+                        var zone = t;
+                        <button class="garde-zone-ligne @(zoneChoisie == zone ? "garde-zone-ligne-actif" : "")" @onclick="() => zoneChoisie = zone">
+                            @(zone.Texte == "" ? "(vide)" : zone.Texte)
+                        </button>
+                    }
+                }
+
+                @if (zoneChoisie != null)
+                {
+                    <div class="garde-section-title">Zone choisie</div>
+
+                    <label class="garde-label">Texte</label>
+                    <textarea class="garde-input" rows="2" @bind="zoneChoisie.Texte" @bind:event="oninput"></textarea>
+
+                    <label class="garde-label">Police</label>
+                    <select class="garde-input" @bind="zoneChoisie.Police" style="font-family:@zoneChoisie.Police;">
+                        @foreach (var p in polices)
+                        {
+                            <option value="@p" style="font-family:@p;">@p</option>
+                        }
+                    </select>
+
+                    <label class="garde-label">Taille : @zoneChoisie.Taille px</label>
+                    <input type="range" min="8" max="120" @bind="zoneChoisie.Taille" @bind:event="oninput" />
+
+                    <label class="garde-label">Couleur</label>
+                    <input type="color" class="garde-color" @bind="zoneChoisie.Couleur" @bind:event="oninput" />
+
+                    <div class="garde-ajout-textes">
+                        <label class="garde-check">
+                            <input type="checkbox" @bind="zoneChoisie.Gras" />
+                            Gras
+                        </label>
+                        <label class="garde-check">
+                            <input type="checkbox" @bind="zoneChoisie.Italique" />
+                            Italique
+                        </label>
+                    </div>
+
+                    <label class="garde-label">Placement : glisse le texte sur la feuille</label>
+                    <div class="garde-ajout-textes">
+                        <button class="garde-petit-btn" @onclick="CentrerTexte">↔ Centrer</button>
+                        <button class="garde-petit-btn garde-btn-supprimer" @onclick="SupprimerTexte">🗑 Supprimer</button>
+                    </div>
+                }
+            </div>
+        }
+
         <button class="garde-menu-item @(menuOuvert == "cadre" ? "garde-menu-item-actif" : "")" @onclick='() => OuvrirMenu("cadre")'>
             🖼️ Cadre
             <span class="garde-fleche">@(menuOuvert == "cadre" ? "▾" : "▸")</span>
@@ -98,7 +167,7 @@
     </div>
 
     <div class="garde-apercu-zone">
-        <div class="garde-apercu-scroll" @onwheel="ZoomMolette" @onwheel:preventDefault="true">
+        <div class="garde-apercu-scroll" @onwheel="ZoomMolette" @onwheel:preventDefault="true" @onmousemove="DeplacerTexte" @onmouseup="FinDeplacement" @onmouseleave="FinDeplacement">
             <div class="garde-zoom-boite" style="width:@(LargeurFeuille() * zoom / 100)px; height:@(HauteurFeuille() * zoom / 100)px;">
                 <div class="garde-feuille" style="width:@(LargeurFeuille())px; height:@(HauteurFeuille())px; transform:scale(@Echelle());">
                     @if (avecCadre)
@@ -135,6 +204,12 @@
                             <div class="garde-cadre" style="top:@(marge)px; left:@(marge)px; right:@(marge)px; bottom:@(marge)px; border:@(epaisseur)px @typeLigne @couleur;"></div>
                         }
                     }
+
+                    @foreach (var t in textes)
+                    {
+                        var zone = t;
+                        <div class="garde-texte @(zoneChoisie == zone ? "garde-texte-choisi" : "")" style="@StyleTexte(zone)" @onmousedown="(e) => DebutDeplacement(e, zone)">@zone.Texte</div>
+                    }
                 </div>
             </div>
         </div>
@@ -156,6 +231,32 @@
     private int zoom = 100;
     private int zoomMin = 30;
     private int zoomMax = 300;
+
+    private List<ZoneTexte> textes = new List<ZoneTexte>();
+    private ZoneTexte? zoneChoisie = null;
+    private ZoneTexte? zoneDeplacee = null;
+    private double departSourisX;
+    private double departSourisY;
+    private double departX;
+    private double departY;
+
+    private List<string> polices = new List<string>
+    {
+        "Arial", "Verdana", "Georgia", "Times New Roman", "Courier New", "Comic Sans MS", "Trebuchet MS", "Impact",
+        "Roboto", "Merriweather", "Pacifico", "Lobster", "Dancing Script", "Indie Flower", "Permanent Marker", "Amatic SC"
+    };
+
+    public class ZoneTexte
+    {
+        public string Texte { get; set; } = "";
+        public string Police { get; set; } = "Arial";
+        public int Taille { get; set; } = 18;
+        public string Couleur { get; set; } = "#222222";
+        public bool Gras { get; set; } = false;
+        public bool Italique { get; set; } = false;
+        public double X { get; set; }
+        public double Y { get; set; }
+    }
 
     private bool avecCadre = false;
     private string typeLigne = "solid";
@@ -212,6 +313,87 @@
             menuOuvert = "";
         else
             menuOuvert = nom;
+    }
+
+    private void AjouterTexte(string texte, int taille, int y)
+    {
+        var zone = new ZoneTexte();
+        zone.Texte = texte;
+        zone.Taille = taille;
+        zone.X = LargeurFeuille() / 2;
+        zone.Y = y;
+        if (zone.Y > HauteurFeuille() - 20)
+            zone.Y = HauteurFeuille() / 2;
+        if (texte == "Titre")
+            zone.Gras = true;
+        textes.Add(zone);
+        zoneChoisie = zone;
+    }
+
+    private void SupprimerTexte()
+    {
+        if (zoneChoisie == null)
+            return;
+        textes.Remove(zoneChoisie);
+        zoneChoisie = null;
+    }
+
+    private void CentrerTexte()
+    {
+        if (zoneChoisie == null)
+            return;
+        zoneChoisie.X = LargeurFeuille() / 2;
+    }
+
+    private string StyleTexte(ZoneTexte zone)
+    {
+        string style = "left:" + ((int)zone.X) + "px; top:" + ((int)zone.Y) + "px;";
+        style = style + " font-family:'" + zone.Police + "';";
+        style = style + " font-size:" + zone.Taille + "px;";
+        style = style + " color:" + zone.Couleur + ";";
+        if (zone.Gras)
+            style = style + " font-weight:bold;";
+        if (zone.Italique)
+            style = style + " font-style:italic;";
+        return style;
+    }
+
+    private void DebutDeplacement(MouseEventArgs e, ZoneTexte zone)
+    {
+        zoneChoisie = zone;
+        zoneDeplacee = zone;
+        menuOuvert = "textes";
+        departSourisX = e.ClientX;
+        departSourisY = e.ClientY;
+        departX = zone.X;
+        departY = zone.Y;
+    }
+
+    private void DeplacerTexte(MouseEventArgs e)
+    {
+        if (zoneDeplacee == null)
+            return;
+
+        double echelle = zoom / 100.0;
+        double x = departX + (e.ClientX - departSourisX) / echelle;
+        double y = departY + (e.ClientY - departSourisY) / echelle;
+
+        if (x < 0)
+            x = 0;
+        if (x > LargeurFeuille())
+            x = LargeurFeuille();
+        if (y < 0)
+            y = 0;
+        if (y > HauteurFeuille())
+            y = HauteurFeuille();
+
+        zoneDeplacee.X = x;
+        zoneDeplacee.Y = y;
+    }
+
+    private void FinDeplacement()
+    {
+        zoneDeplacee = null;
     }
 
     private void ZoomPlus()

@@ -1998,3 +1998,50 @@ h1:focus { outline: none; }
 }
 
 .garde-emoji-colonne { flex-direction: column; }
+
+.garde-ajout-textes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.garde-petit-btn {
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-main);
+    color: var(--text);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.garde-petit-btn:hover { border-color: var(--primary); }
+.garde-btn-supprimer:hover { border-color: #e53935; color: #e53935; }
+
+.garde-zone-ligne {
+    width: 100%;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-main);
+    color: var(--text);
+    font-size: 0.85rem;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.garde-zone-ligne-actif { border-color: var(--primary); font-weight: 600; }
+
+.garde-texte {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    white-space: pre;
+    text-align: center;
+    line-height: 1.2;
+    cursor: move;
+    user-select: none;
+    padding: 2px 4px;
+    border: 1px dashed transparent;
+}
+
+.garde-texte:hover { border-color: rgba(102, 126, 234, 0.5); }
+.garde-texte-choisi { border-color: #667eea; }
