@@ -1479,14 +1479,7 @@ h1:focus { outline: none; }
 }
 .btn-confirm-login:hover { opacity: .88; }
 
-/* ===== IMPRESSION / EXPORT PDF =====
-   L'orientation du papier (@page) est posee dynamiquement par window.imprimerCalendrier :
-   portrait pour la vue jour, paysage pour les grilles semaine / mois / trimestre.
-   Ici on ne s'occupe que du contenu : masquer l'interface et rendre la grille lisible
-   sur du papier blanc, meme quand l'application est en theme sombre. */
 @media print {
-    /* Impression sur fond blanc : on repasse toutes les variables de theme en clair
-       plutot que de surcharger chaque regle une par une. */
     #app-root, .dark, .light {
         --bg-main: #ffffff;
         --bg-card: #ffffff;
@@ -1501,12 +1494,10 @@ h1:focus { outline: none; }
         color: #000000 !important;
     }
 
-    /* Masque tout ce qui n'a pas de sens sur papier : navigation, boutons, modale */
     .flyout, .flyout-overlay, .top-bar, .view-mode-bar, .print-bar,
     .report-bar, .report-flash,
     .nav-btn, .modal-overlay, #blazor-error-ui { display: none !important; }
 
-    /* En-tete du document : application, identite saisie, annee scolaire */
     .print-header {
         display: flex !important;
         justify-content: space-between;
@@ -1518,19 +1509,16 @@ h1:focus { outline: none; }
         font-size: 9pt;
     }
     .print-header-app { font-weight: 700; font-size: 11pt; }
-    /* Logo a gauche du nom de l'application ; il doit s'imprimer en couleur */
     .print-header-logo {
         height: 11mm; width: auto; margin-right: 2mm; vertical-align: middle;
         -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     .print-header-identite { font-weight: 600; }
 
-    /* Texte des notes agrandi de 2 points sur le papier, comme dans les exports PDF */
     .note-block, .note-mini { font-size: 11pt !important; }
     .note-time, .note-visee, .mini-time, .mini-course, .mini-text,
     .note-reporte, .mini-reporte { font-size: 10.5pt !important; }
 
-    /* Le calendrier occupe toute la page, sans marge ni contrainte de hauteur */
     #app-root, .main-wrapper, .content-area, .calendar-container {
         display: block !important;
         width: 100% !important;
@@ -1542,12 +1530,7 @@ h1:focus { outline: none; }
         overflow: visible !important;
     }
 
-    /* La vue trimestre defile horizontalement a l'ecran : tout doit etre visible a l'impression */
     .trimestre-scroll { overflow: visible !important; }
-
-    /* Heures sans note ni cours : retirees du papier.
-       grid-auto-rows repasse en "auto" pour que la ligne liberee se referme,
-       sinon la hauteur minimale de 60px laisserait un blanc a la place. */
     .time-row-vide { display: none !important; }
     .time-grid { grid-auto-rows: auto !important; }
 
@@ -1561,15 +1544,12 @@ h1:focus { outline: none; }
     /* Les puces de cours identifient un cours par leur couleur : on la conserve */
     .course-block, .course-mini { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-    /* Evite qu'une cellule, une note ou une ligne horaire soit coupee entre deux pages */
     .day-cell, .time-cell, .time-label, .note-block, .trim-cell { break-inside: avoid; page-break-inside: avoid; }
 
-    /* Le titre de periode reste en tete de la page imprimee */
     .calendar-header { margin: 0 0 6mm !important; }
     .week-title { font-size: 1.1rem !important; }
 }
 
-/* ===== PAGE CONGES ===== */
 .conges-page { display: flex; justify-content: center; padding: 1.5rem 1rem; }
 
 .conges-card {
@@ -1592,14 +1572,12 @@ h1:focus { outline: none; }
     border-bottom: 1px solid var(--border); padding-bottom: 0.35rem;
 }
 
-/* Une ligne = un conge : nom, plage de dates, actions */
 .conge-row {
     display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
     padding: 0.5rem; margin-bottom: 0.4rem;
     border: 1px solid var(--border); border-radius: 8px;
     background: var(--bg-main);
 }
-/* Un conge masque reste visible ici, mais efface pour montrer qu'il ne sortira pas au calendrier */
 .conge-row-masquee { opacity: 0.55; }
 
 .conge-nom {
@@ -1622,20 +1600,12 @@ h1:focus { outline: none; }
 
 .conge-etat { font-size: 0.72rem; color: var(--text-muted); }
 
-/* Intitule d'annee scolaire separant les groupes de conges */
 .conges-annee {
     margin: 0.9rem 0 0.4rem;
     font-size: 0.78rem; font-weight: 600; letter-spacing: 0.3px;
     color: var(--text-muted); text-transform: uppercase;
 }
 
-/* ===== MES LECONS =====
-   Les preparations de lecon, au format de la fiche papier. La page reprend la
-   presentation en carte de l'ecran des conges ; la fenetre d'edition reutilise
-   la modale commune (.modal-overlay / .modal-content).
-
-   Le bloc .lecon-print, tout en bas, est la feuille imprimee : invisible a
-   l'ecran, il est le seul contenu revele par @media print. */
 
 .lecons-page {
     padding: 1.2rem 1rem 3rem;
@@ -1663,7 +1633,6 @@ h1:focus { outline: none; }
     font-size: .88rem; color: var(--text-muted);
 }
 
-/* ---- Une preparation dans la liste ---- */
 
 .lecon-row {
     display: flex; align-items: center; gap: .8rem;
@@ -1672,7 +1641,6 @@ h1:focus { outline: none; }
 }
 .lecon-row:hover { background: var(--row-hover); }
 
-/* Toute la zone de gauche ouvre la fiche : la cible est large et evidente */
 .lecon-row-main { flex: 1; min-width: 0; cursor: pointer; }
 
 .lecon-row-titre {
@@ -1710,11 +1678,9 @@ h1:focus { outline: none; }
 }
 .btn-lecon-new:hover { opacity: .88; }
 
-/* ---- La fenetre d'edition ---- */
 
 .lecon-modal { max-width: 760px; width: 94vw; max-height: 88vh; overflow-y: auto; }
 
-/* L'en-tete de la fiche : deux colonnes, les champs longs en occupent deux */
 .lecon-grid {
     display: grid; grid-template-columns: 1fr 1fr;
     gap: .7rem .9rem; margin: .9rem 0;
@@ -1734,7 +1700,6 @@ h1:focus { outline: none; }
 }
 .lecon-zone { resize: vertical; line-height: 1.45; }
 
-/* ---- Le deroulement ---- */
 
 .lecon-phases-entete {
     display: flex; align-items: center; justify-content: space-between;
@@ -1753,7 +1718,6 @@ h1:focus { outline: none; }
 }
 .lecon-phase-num { font-weight: 600; font-size: .88rem; margin-right: auto; }
 
-/* Le temps reste etroit : c'est « 10 min », pas une phrase */
 .lecon-phase-temps { display: flex; flex-direction: column; gap: .22rem; width: 110px; }
 .lecon-phase-temps > span { font-size: .72rem; color: var(--text-muted); }
 
@@ -1763,16 +1727,9 @@ h1:focus { outline: none; }
     .lecon-row-btns { justify-content: flex-end; }
 }
 
-/* ---- La feuille imprimee ----
-   Masquee a l'ecran ; @media print la revele et masque tout le reste.
-   La mise en page reprend celle du formulaire papier, comme LeconPdfExporter :
-   titre pleine largeur, cadre borde flottant a droite, intitules souligne,
-   « Deroulement de la lecon » centre, phases sur deux colonnes. */
 .lecon-print { display: none; }
 
 @media print {
-    /* Quand une preparation est en cours d'impression, elle prend toute la page :
-       l'application entiere s'efface derriere elle. */
     body:has(.lecon-print) .lecons-page,
     body:has(.lecon-print) .print-header { display: none !important; }
 
@@ -1784,7 +1741,6 @@ h1:focus { outline: none; }
         padding: 6mm;
     }
 
-    /* En-tete de la feuille : marque a gauche, intitule au centre, annee a droite */
     .lecon-print-entete {
         display: flex;
         justify-content: space-between;
@@ -1797,7 +1753,6 @@ h1:focus { outline: none; }
 
     .lecon-print-marque { display: flex; align-items: center; }
 
-    /* Le logo doit s'imprimer en couleur */
     .lecon-print-logo {
         height: 9mm; width: auto; margin-right: 2mm;
         -webkit-print-color-adjust: exact; print-color-adjust: exact;
@@ -1807,7 +1762,6 @@ h1:focus { outline: none; }
     .lecon-print-doc { font-weight: 700; font-size: 13pt; }
     .lecon-print-annee { font-size: 9pt; color: #5a5a5a; }
 
-    /* Les trois intitules du formulaire sont en gras souligne */
     .lecon-print-libelle {
         font-weight: 700; text-decoration: underline;
         margin-bottom: 2mm;
@@ -1815,12 +1769,10 @@ h1:focus { outline: none; }
 
     .lecon-print-centre { text-align: center; margin: 6mm 0 4mm; }
 
-    /* Ligne de titre : l'intitule souligne, la valeur a cote */
     .lecon-print-titre { font-size: 12pt; margin-bottom: 2mm; }
     .lecon-print-titre .lecon-print-libelle { display: inline; }
     .lecon-print-valeur { margin-left: 3mm; }
 
-    /* Le cadre flotte a droite ; le corps de la fiche reprend dessous */
     .lecon-print-cadre {
         float: right; width: 95mm; margin: 0 0 4mm 5mm;
         border-collapse: collapse;
@@ -1829,21 +1781,13 @@ h1:focus { outline: none; }
         border: 1px solid #000000;
         padding: 1mm 2mm;
     }
-    /* Les libelles du cadre ne sont pas souligne, seulement distincts */
     .lecon-print-cadre span { font-weight: 600; }
 
-    /* Le bloc Competences passe sous le cadre */
     .lecon-print-bloc { clear: both; padding-top: 2mm; margin-bottom: 4mm; }
-
-    /* Le contexte de cascade garde ses retours a la ligne ET l'indentation qui
-       aligne les visees sous la premiere : c'est la meme forme qu'en PDF. */
     .lecon-print-contexte {
         white-space: pre-wrap;
         margin-left: 8mm; font-size: 10pt;
     }
-
-    /* Les phases, sur deux colonnes, nettement espacees : la fiche vierge doit
-       laisser la place d'ecrire a la main. */
     .lecon-print-phases { width: 100%; border-collapse: collapse; }
     .lecon-print-phases td { padding: 2.5mm 0; vertical-align: top; break-inside: avoid; }
 
@@ -1853,8 +1797,6 @@ h1:focus { outline: none; }
     .lecon-print-phase-tps span { font-weight: 600; }
 }
 
-/* La cascade dans la fenetre d'une lecon : elle occupe toute la largeur du
-   formulaire, contrairement au panneau lateral de la modale de note. */
 .lecon-cascade {
     border: 1px solid var(--border); border-radius: 8px;
     padding: .7rem .8rem; margin-bottom: .6rem;
@@ -2045,3 +1987,13 @@ h1:focus { outline: none; }
 
 .garde-texte:hover { border-color: rgba(102, 126, 234, 0.5); }
 .garde-texte-choisi { border-color: #667eea; }
+
+.garde-repere-vertical, .garde-repere-horizontal {
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.garde-repere-vertical { top: 0; bottom: 0; border-left: 1px dashed rgba(102, 126, 234, 0.7); }
+.garde-repere-horizontal { left: 0; right: 0; border-top: 1px dashed rgba(102, 126, 234, 0.7); }
+.garde-repere-aligne { border-color: #e91e63; border-style: solid; }

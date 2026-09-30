@@ -205,6 +205,12 @@
                         }
                     }
 
+                    @if (zoneDeplacee != null)
+                    {
+                        <div class="garde-repere-vertical @(zoneDeplacee.X == LargeurFeuille() / 2 ? "garde-repere-aligne" : "")" style="left:@(LargeurFeuille() / 2)px;"></div>
+                        <div class="garde-repere-horizontal @(zoneDeplacee.Y == HauteurFeuille() / 2 ? "garde-repere-aligne" : "")" style="top:@(HauteurFeuille() / 2)px;"></div>
+                    }
+
                     @foreach (var t in textes)
                     {
                         var zone = t;
@@ -386,6 +392,13 @@
             y = 0;
         if (y > HauteurFeuille())
             y = HauteurFeuille();
+
+        int centreX = LargeurFeuille() / 2;
+        int centreY = HauteurFeuille() / 2;
+        if (Math.Abs(x - centreX) < 6)
+            x = centreX;
+        if (Math.Abs(y - centreY) < 6)
+            y = centreY;
 
         zoneDeplacee.X = x;
         zoneDeplacee.Y = y;

@@ -7,7 +7,7 @@
     <title>Obrigenie</title>
     <base href="/" />
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
-    <link rel="stylesheet" href="css/app.css?v=18" />
+    <link rel="stylesheet" href="css/app.css?v=19" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@400;700&family=Dancing+Script:wght@400;700&family=Indie+Flower&family=Lobster&family=Merriweather:wght@400;700&family=Pacifico&family=Permanent+Marker&family=Roboto:wght@400;700&display=swap" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="Obrigenie.styles.css" rel="stylesheet" />
@@ -29,23 +29,14 @@
     </div>
     <script src="_framework/blazor.webassembly.js"></script>
     <script>
-        // Crée une URL blob à partir d'un tableau d'octets reçu depuis Blazor.
-        // Utilisé par ReferentielPage pour afficher un PDF dans un iframe
-        // sans exposer le token JWT dans l'URL de la requête.
         window.creerUrlBlob = function (octets, typeMime) {
             const blob = new Blob([new Uint8Array(octets)], { type: typeMime });
             return URL.createObjectURL(blob);
         };
 
-        // Libère une URL blob précédemment créée pour éviter les fuites mémoire.
-        // À appeler lorsqu'un nouveau PDF est chargé ou que la page est déchargée.
         window.libererUrlBlob = function (url) {
             if (url) URL.revokeObjectURL(url);
         };
-
-        // Télécharge un fichier construit côté Blazor (tableau d'octets) sous le nom donné.
-        // Le navigateur l'enregistre dans son dossier de téléchargement configuré ;
-        // une page web ne peut pas imposer le dossier de destination, seulement le nom.
         window.telechargerFichier = function (nomFichier, octets, typeMime) {
             const blob = new Blob([new Uint8Array(octets)], { type: typeMime });
             const url = URL.createObjectURL(blob);
@@ -57,15 +48,8 @@
             lien.click();
             lien.remove();
 
-            // Laisse le temps au téléchargement de démarrer avant de libérer l'URL blob
             setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
         };
-
-        // Imprime le calendrier dans l'orientation demandée ("portrait" ou "landscape").
-        // La règle @page ne pouvant pas être posée depuis une feuille de style statique
-        // en fonction de la vue, on injecte (ou met à jour) une balise <style> dédiée
-        // juste avant d'ouvrir la boîte de dialogue d'impression.
-        // Cette même boîte de dialogue sert à l'export PDF ("Enregistrer au format PDF").
         window.imprimerCalendrier = function (orientation) {
             const sens = orientation === 'portrait' ? 'portrait' : 'landscape';
 
