@@ -98,41 +98,52 @@
     </div>
 
     <div class="garde-apercu-zone">
-        <div class="garde-feuille" style="width:@(LargeurFeuille())px; height:@(HauteurFeuille())px;">
-            @if (avecCadre)
-            {
-                if (typeLigne == "emoji")
-                {
-                    <div class="garde-emoji-ligne" style="@StyleLigne("top")">
-                        @for (int i = 0; i < NbHorizontal(); i++)
+        <div class="garde-apercu-scroll" @onwheel="ZoomMolette" @onwheel:preventDefault="true">
+            <div class="garde-zoom-boite" style="width:@(LargeurFeuille() * zoom / 100)px; height:@(HauteurFeuille() * zoom / 100)px;">
+                <div class="garde-feuille" style="width:@(LargeurFeuille())px; height:@(HauteurFeuille())px; transform:scale(@Echelle());">
+                    @if (avecCadre)
+                    {
+                        if (typeLigne == "emoji")
                         {
-                            <span>@symbole</span>
+                            <div class="garde-emoji-ligne" style="@StyleLigne("top")">
+                                @for (int i = 0; i < NbHorizontal(); i++)
+                                {
+                                    <span>@symbole</span>
+                                }
+                            </div>
+                            <div class="garde-emoji-ligne" style="@StyleLigne("bottom")">
+                                @for (int i = 0; i < NbHorizontal(); i++)
+                                {
+                                    <span>@symbole</span>
+                                }
+                            </div>
+                            <div class="garde-emoji-colonne" style="@StyleColonne("left")">
+                                @for (int i = 0; i < NbVertical(); i++)
+                                {
+                                    <span>@symbole</span>
+                                }
+                            </div>
+                            <div class="garde-emoji-colonne" style="@StyleColonne("right")">
+                                @for (int i = 0; i < NbVertical(); i++)
+                                {
+                                    <span>@symbole</span>
+                                }
+                            </div>
                         }
-                    </div>
-                    <div class="garde-emoji-ligne" style="@StyleLigne("bottom")">
-                        @for (int i = 0; i < NbHorizontal(); i++)
+                        else
                         {
-                            <span>@symbole</span>
+                            <div class="garde-cadre" style="top:@(marge)px; left:@(marge)px; right:@(marge)px; bottom:@(marge)px; border:@(epaisseur)px @typeLigne @couleur;"></div>
                         }
-                    </div>
-                    <div class="garde-emoji-colonne" style="@StyleColonne("left")">
-                        @for (int i = 0; i < NbVertical(); i++)
-                        {
-                            <span>@symbole</span>
-                        }
-                    </div>
-                    <div class="garde-emoji-colonne" style="@StyleColonne("right")">
-                        @for (int i = 0; i < NbVertical(); i++)
-                        {
-                            <span>@symbole</span>
-                        }
-                    </div>
-                }
-                else
-                {
-                    <div class="garde-cadre" style="top:@(marge)px; left:@(marge)px; right:@(marge)px; bottom:@(marge)px; border:@(epaisseur)px @typeLigne @couleur;"></div>
-                }
-            }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="garde-zoom-barre">
+            <button class="garde-zoom-btn" @onclick="ZoomMoins">−</button>
+            <input type="range" class="garde-zoom-slider" min="@zoomMin" max="@zoomMax" step="10" @bind="zoom" @bind:event="oninput" />
+            <button class="garde-zoom-pourcent" title="Revenir à 100 %" @onclick="() => zoom = 100">@zoom %</button>
+            <button class="garde-zoom-btn" @onclick="ZoomPlus">+</button>
         </div>
     </div>
 
@@ -141,6 +152,10 @@
 @code {
     private string menuOuvert = "cadre";
     private string orientation = "portrait";
+
+    private int zoom = 100;
+    private int zoomMin = 30;
+    private int zoomMax = 300;
 
     private bool avecCadre = false;
     private string typeLigne = "solid";
@@ -197,6 +212,34 @@
             menuOuvert = "";
         else
             menuOuvert = nom;
+    }
+
+    private void ZoomPlus()
+    {
+        zoom = zoom + 10;
+        if (zoom > zoomMax)
+            zoom = zoomMax;
+    }
+
+    private void ZoomMoins()
+    {
+        zoom = zoom - 10;
+        if (zoom < zoomMin)
+            zoom = zoomMin;
+    }
+
+    private void ZoomMolette(WheelEventArgs e)
+    {
+        if (e.DeltaY < 0)
+            ZoomPlus();
+        else if (e.DeltaY > 0)
+            ZoomMoins();
+    }
+
+    private string Echelle()
+    {
+        double valeur = zoom / 100.0;
+        return valeur.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private int LargeurFeuille()
