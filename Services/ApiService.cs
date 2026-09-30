@@ -961,6 +961,71 @@ namespace Obrigenie.Services
         // Endpoint : GET api/ref/categories
         // Lève HttpRequestException si le serveur retourne un code de statut non-succès.
         // Retourne une liste de CategorieDto triée par ordre d'affichage.
+        public async Task<(List<PageGarde> Pages, string? Err)> GetPagesGardeAsync()
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync("api/pagesgarde");
+                if (!response.IsSuccessStatusCode)
+                    return (new(), await LireMessageErreur(response));
+
+                var pages = await response.Content.ReadFromJsonAsync<List<PageGarde>>();
+                return (pages ?? new(), null);
+            }
+            catch (Exception ex)
+            {
+                return (new(), ex.Message);
+            }
+        }
+
+        public async Task<(PageGarde? Page, string? Err)> GetPageGardeAsync(int id)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"api/pagesgarde/{id}");
+                if (!response.IsSuccessStatusCode)
+                    return (null, await LireMessageErreur(response));
+
+                var page = await response.Content.ReadFromJsonAsync<PageGarde>();
+                return (page, null);
+            }
+            catch (Exception ex)
+            {
+                return (null, ex.Message);
+            }
+        }
+
+        public async Task<(bool Ok, PageGarde? Page, string? Err)> SavePageGardeAsync(PageGarde page)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/pagesgarde", page);
+                if (!response.IsSuccessStatusCode)
+                    return (false, null, await LireMessageErreur(response));
+
+                var enregistree = await response.Content.ReadFromJsonAsync<PageGarde>();
+                return (true, enregistree, null);
+            }
+            catch (Exception ex)
+            {
+                return (false, null, ex.Message);
+            }
+        }
+
+        public async Task<(bool Ok, string? Err)> DeletePageGardeAsync(int id)
+        {
+            try
+            {
+                var response = await _httpClient.DeleteAsync($"api/pagesgarde/{id}");
+                if (response.IsSuccessStatusCode) return (true, null);
+                return (false, await LireMessageErreur(response));
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
+        }
+
         public async Task<List<EmojiItem>> GetEmojisAsync()
         {
             try

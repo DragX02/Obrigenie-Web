@@ -7,7 +7,7 @@
     <title>Obrigenie</title>
     <base href="/" />
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
-    <link rel="stylesheet" href="css/app.css?v=19" />
+    <link rel="stylesheet" href="css/app.css?v=20" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@400;700&family=Dancing+Script:wght@400;700&family=Indie+Flower&family=Lobster&family=Merriweather:wght@400;700&family=Pacifico&family=Permanent+Marker&family=Roboto:wght@400;700&display=swap" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="Obrigenie.styles.css" rel="stylesheet" />
@@ -28,6 +28,35 @@
         <a class="dismiss">🗙</a>
     </div>
     <script src="_framework/blazor.webassembly.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        window.exporterPageGardePdf = async function (idElement, nomFichier, paysage) {
+            const source = document.getElementById(idElement);
+            const copie = source.cloneNode(true);
+            copie.removeAttribute('id');
+            copie.style.transform = 'none';
+            copie.querySelectorAll('.garde-texte-choisi').forEach(function (e) { e.classList.remove('garde-texte-choisi'); });
+            copie.querySelectorAll('.garde-repere-vertical, .garde-repere-horizontal').forEach(function (e) { e.remove(); });
+
+            const boite = document.createElement('div');
+            boite.style.position = 'fixed';
+            boite.style.left = '-10000px';
+            boite.style.top = '0';
+            boite.appendChild(copie);
+            document.body.appendChild(boite);
+
+            await document.fonts.ready;
+            const canvas = await html2canvas(copie, { scale: 4, backgroundColor: '#ffffff' });
+            boite.remove();
+
+            const pdf = new window.jspdf.jsPDF({ orientation: paysage ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+            const largeur = paysage ? 297 : 210;
+            const hauteur = paysage ? 210 : 297;
+            pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, largeur, hauteur);
+            pdf.save(nomFichier);
+        };
+    </script>
     <script>
         window.creerUrlBlob = function (octets, typeMime) {
             const blob = new Blob([new Uint8Array(octets)], { type: typeMime });

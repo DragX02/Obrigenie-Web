@@ -1,0 +1,131 @@
+<div class="garde-zoom-boite" style="width:@(Donnees.Largeur() * Zoom / 100)px; height:@(Donnees.Hauteur() * Zoom / 100)px;">
+    <div id="@IdElement" class="garde-feuille" style="width:@(Donnees.Largeur())px; height:@(Donnees.Hauteur())px; transform:scale(@Echelle());">
+        @if (Donnees.AvecCadre)
+        {
+            if (Donnees.TypeLigne == "emoji")
+            {
+                <div class="garde-emoji-ligne" style="@StyleLigne("top")">
+                    @for (int i = 0; i < NbHorizontal(); i++)
+                    {
+                        <span>@Donnees.Symbole</span>
+                    }
+                </div>
+                <div class="garde-emoji-ligne" style="@StyleLigne("bottom")">
+                    @for (int i = 0; i < NbHorizontal(); i++)
+                    {
+                        <span>@Donnees.Symbole</span>
+                    }
+                </div>
+                <div class="garde-emoji-colonne" style="@StyleColonne("left")">
+                    @for (int i = 0; i < NbVertical(); i++)
+                    {
+                        <span>@Donnees.Symbole</span>
+                    }
+                </div>
+                <div class="garde-emoji-colonne" style="@StyleColonne("right")">
+                    @for (int i = 0; i < NbVertical(); i++)
+                    {
+                        <span>@Donnees.Symbole</span>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="garde-cadre" style="top:@(Donnees.Marge)px; left:@(Donnees.Marge)px; right:@(Donnees.Marge)px; bottom:@(Donnees.Marge)px; border:@(Donnees.Epaisseur)px @Donnees.TypeLigne @Donnees.Couleur;"></div>
+            }
+        }
+
+        @if (ZoneDeplacee != null)
+        {
+            <div class="garde-repere-vertical @(ZoneDeplacee.X == Donnees.Largeur() / 2 ? "garde-repere-aligne" : "")" style="left:@(Donnees.Largeur() / 2)px;"></div>
+            <div class="garde-repere-horizontal @(ZoneDeplacee.Y == Donnees.Hauteur() / 2 ? "garde-repere-aligne" : "")" style="top:@(Donnees.Hauteur() / 2)px;"></div>
+        }
+
+        @foreach (var t in Donnees.Textes)
+        {
+            var zone = t;
+            if (Modifiable)
+            {
+                <div class="garde-texte garde-texte-deplacable @(ZoneChoisie == zone ? "garde-texte-choisi" : "")" style="@StyleTexte(zone)" @onmousedown="(e) => Debut(e, zone)">@zone.Texte</div>
+            }
+            else
+            {
+                <div class="garde-texte" style="@StyleTexte(zone)">@zone.Texte</div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public PageGardeDonnees Donnees { get; set; } = new PageGardeDonnees();
+    [Parameter] public int Zoom { get; set; } = 100;
+    [Parameter] public string IdElement { get; set; } = "";
+    [Parameter] public bool Modifiable { get; set; } = false;
+    [Parameter] public ZoneTexte? ZoneChoisie { get; set; }
+    [Parameter] public ZoneTexte? ZoneDeplacee { get; set; }
+    [Parameter] public EventCallback<DebutDeplacement> OnDebutDeplacement { get; set; }
+
+    private async Task Debut(MouseEventArgs e, ZoneTexte zone)
+    {
+        var debut = new DebutDeplacement();
+        debut.Zone = zone;
+        debut.ClientX = e.ClientX;
+        debut.ClientY = e.ClientY;
+        await OnDebutDeplacement.InvokeAsync(debut);
+    }
+
+    private string Echelle()
+    {
+        double valeur = Zoom / 100.0;
+        return valeur.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private int Taille()
+    {
+        if (Donnees.Epaisseur < 8)
+            return 8;
+        return Donnees.Epaisseur;
+    }
+
+    private int NbHorizontal()
+    {
+        int longueur = Donnees.Largeur() - Donnees.Marge * 2;
+        int nb = longueur / Taille();
+        if (nb < 1)
+            nb = 1;
+        return nb;
+    }
+
+    private int NbVertical()
+    {
+        int longueur = Donnees.Hauteur() - Donnees.Marge * 2 - Taille() * 2;
+        int nb = longueur / Taille();
+        if (nb < 1)
+            nb = 1;
+        return nb;
+    }
+
+    private string StyleLigne(string cote)
+    {
+        return cote + ":" + Donnees.Marge + "px; left:" + Donnees.Marge + "px; right:" + Donnees.Marge + "px; height:" + Taille() + "px; font-size:" + (Taille() - 2) + "px;";
+    }
+
+    private string StyleColonne(string cote)
+    {
+        int debut = Donnees.Marge + Taille();
+        return cote + ":" + Donnees.Marge + "px; top:" + debut + "px; bottom:" + debut + "px; width:" + Taille() + "px; font-size:" + (Taille() - 2) + "px;";
+    }
+
+    private string StyleTexte(ZoneTexte zone)
+    {
+        string style = "left:" + ((int)zone.X) + "px; top:" + ((int)zone.Y) + "px;";
+        style = style + " font-family:'" + zone.Police + "';";
+        style = style + " font-size:" + zone.Taille + "px;";
+        style = style + " color:" + zone.Couleur + ";";
+        if (zone.Gras)
+            style = style + " font-weight:bold;";
+        if (zone.Italique)
+            style = style + " font-style:italic;";
+        return style;
+    }
+}

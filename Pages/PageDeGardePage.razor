@@ -1,223 +1,217 @@
 @page "/page-de-garde"
+@page "/page-de-garde/{Id:int}"
 
 @inject ApiService Api
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <div class="garde-page">
 
     <div class="garde-menu">
+        <a href="/pages-de-garde" class="garde-retour">← Modèles</a>
         <h2 class="garde-title">Page de garde</h2>
 
-        <button class="garde-menu-item @(menuOuvert == "feuille" ? "garde-menu-item-actif" : "")" @onclick='() => OuvrirMenu("feuille")'>
-            📄 Feuille
-            <span class="garde-fleche">@(menuOuvert == "feuille" ? "▾" : "▸")</span>
-        </button>
-
-        @if (menuOuvert == "feuille")
+        @if (chargement)
         {
-            <div class="garde-options">
-                <label class="garde-label">Orientation</label>
-                <label class="garde-check">
-                    <input type="radio" name="orientation" checked="@(orientation == "portrait")" @onchange='() => orientation = "portrait"' />
-                    Portrait
-                </label>
-                <label class="garde-check">
-                    <input type="radio" name="orientation" checked="@(orientation == "paysage")" @onchange='() => orientation = "paysage"' />
-                    Paysage
-                </label>
-            </div>
+            <div class="garde-label">Chargement…</div>
         }
-
-        <button class="garde-menu-item @(menuOuvert == "textes" ? "garde-menu-item-actif" : "")" @onclick='() => OuvrirMenu("textes")'>
-            🔤 Textes
-            <span class="garde-fleche">@(menuOuvert == "textes" ? "▾" : "▸")</span>
-        </button>
-
-        @if (menuOuvert == "textes")
+        else
         {
-            <div class="garde-options">
-                <label class="garde-label">Ajouter</label>
-                <div class="garde-ajout-textes">
-                    <button class="garde-petit-btn" @onclick='() => AjouterTexte("Titre", 40, 150)'>+ Titre</button>
-                    <button class="garde-petit-btn" @onclick='() => AjouterTexte("Nom Prénom", 22, 420)'>+ Nom Prénom</button>
-                    <button class="garde-petit-btn" @onclick='() => AjouterTexte("Année 2026-2027", 18, 470)'>+ Année</button>
-                    <button class="garde-petit-btn" @onclick='() => AjouterTexte("Texte", 18, 300)'>+ Texte libre</button>
+            <button class="garde-menu-item @(menuOuvert == "feuille" ? "garde-menu-item-actif" : "")" @onclick='() => OuvrirMenu("feuille")'>
+                📄 Feuille
+                <span class="garde-fleche">@(menuOuvert == "feuille" ? "▾" : "▸")</span>
+            </button>
+
+            @if (menuOuvert == "feuille")
+            {
+                <div class="garde-options">
+                    <label class="garde-label">Orientation</label>
+                    <label class="garde-check">
+                        <input type="radio" name="orientation" checked="@(d.Orientation == "portrait")" @onchange='() => d.Orientation = "portrait"' />
+                        Portrait
+                    </label>
+                    <label class="garde-check">
+                        <input type="radio" name="orientation" checked="@(d.Orientation == "paysage")" @onchange='() => d.Orientation = "paysage"' />
+                        Paysage
+                    </label>
                 </div>
+            }
 
-                @if (textes.Count > 0)
-                {
-                    <label class="garde-label">Zones de texte</label>
-                    @foreach (var t in textes)
+            <button class="garde-menu-item @(menuOuvert == "textes" ? "garde-menu-item-actif" : "")" @onclick='() => OuvrirMenu("textes")'>
+                🔤 Textes
+                <span class="garde-fleche">@(menuOuvert == "textes" ? "▾" : "▸")</span>
+            </button>
+
+            @if (menuOuvert == "textes")
+            {
+                <div class="garde-options">
+                    <label class="garde-label">Ajouter</label>
+                    <div class="garde-ajout-textes">
+                        <button class="garde-petit-btn" @onclick='() => AjouterTexte("Titre", 40, 150)'>+ Titre</button>
+                        <button class="garde-petit-btn" @onclick='() => AjouterTexte("Nom Prénom", 22, 420)'>+ Nom Prénom</button>
+                        <button class="garde-petit-btn" @onclick='() => AjouterTexte("Année 2026-2027", 18, 470)'>+ Année</button>
+                        <button class="garde-petit-btn" @onclick='() => AjouterTexte("Texte", 18, 300)'>+ Texte libre</button>
+                    </div>
+
+                    @if (d.Textes.Count > 0)
                     {
-                        var zone = t;
-                        <button class="garde-zone-ligne @(zoneChoisie == zone ? "garde-zone-ligne-actif" : "")" @onclick="() => zoneChoisie = zone">
-                            @(zone.Texte == "" ? "(vide)" : zone.Texte)
-                        </button>
+                        <label class="garde-label">Zones de texte</label>
+                        @foreach (var t in d.Textes)
+                        {
+                            var zone = t;
+                            <button class="garde-zone-ligne @(zoneChoisie == zone ? "garde-zone-ligne-actif" : "")" @onclick="() => zoneChoisie = zone">
+                                @(zone.Texte == "" ? "(vide)" : zone.Texte)
+                            </button>
+                        }
                     }
-                }
 
-                @if (zoneChoisie != null)
-                {
-                    <div class="garde-section-title">Zone choisie</div>
-
-                    <label class="garde-label">Texte</label>
-                    <textarea class="garde-input" rows="2" @bind="zoneChoisie.Texte" @bind:event="oninput"></textarea>
-
-                    <label class="garde-label">Police</label>
-                    <select class="garde-input" @bind="zoneChoisie.Police" style="font-family:@zoneChoisie.Police;">
-                        @foreach (var p in polices)
-                        {
-                            <option value="@p" style="font-family:@p;">@p</option>
-                        }
-                    </select>
-
-                    <label class="garde-label">Taille : @zoneChoisie.Taille px</label>
-                    <input type="range" min="8" max="120" @bind="zoneChoisie.Taille" @bind:event="oninput" />
-
-                    <label class="garde-label">Couleur</label>
-                    <input type="color" class="garde-color" @bind="zoneChoisie.Couleur" @bind:event="oninput" />
-
-                    <div class="garde-ajout-textes">
-                        <label class="garde-check">
-                            <input type="checkbox" @bind="zoneChoisie.Gras" />
-                            Gras
-                        </label>
-                        <label class="garde-check">
-                            <input type="checkbox" @bind="zoneChoisie.Italique" />
-                            Italique
-                        </label>
-                    </div>
-
-                    <label class="garde-label">Placement : glisse le texte sur la feuille</label>
-                    <div class="garde-ajout-textes">
-                        <button class="garde-petit-btn" @onclick="CentrerTexte">↔ Centrer</button>
-                        <button class="garde-petit-btn garde-btn-supprimer" @onclick="SupprimerTexte">🗑 Supprimer</button>
-                    </div>
-                }
-            </div>
-        }
-
-        <button class="garde-menu-item @(menuOuvert == "cadre" ? "garde-menu-item-actif" : "")" @onclick='() => OuvrirMenu("cadre")'>
-            🖼️ Cadre
-            <span class="garde-fleche">@(menuOuvert == "cadre" ? "▾" : "▸")</span>
-        </button>
-
-        @if (menuOuvert == "cadre")
-        {
-            <div class="garde-options">
-                <label class="garde-check">
-                    <input type="checkbox" @bind="avecCadre" />
-                    Ajouter un cadre
-                </label>
-
-                @if (avecCadre)
-                {
-                    <label class="garde-label">Type de ligne</label>
-                    <select class="garde-input" @bind="typeLigne">
-                        <option value="solid">Trait plein</option>
-                        <option value="dashed">Tirets</option>
-                        <option value="dotted">Pointillés</option>
-                        <option value="double">Double trait</option>
-                        <option value="emoji">Emoji / symbole</option>
-                    </select>
-
-                    @if (typeLigne == "emoji")
+                    @if (zoneChoisie != null)
                     {
-                        <label class="garde-label">Symbole</label>
-                        @if (chargementEmojis)
+                        <div class="garde-section-title">Zone choisie</div>
+
+                        <label class="garde-label">Texte</label>
+                        <textarea class="garde-input" rows="2" @bind="zoneChoisie.Texte" @bind:event="oninput"></textarea>
+
+                        <label class="garde-label">Police</label>
+                        <select class="garde-input" @bind="zoneChoisie.Police" style="font-family:@zoneChoisie.Police;">
+                            @foreach (var p in polices)
+                            {
+                                <option value="@p" style="font-family:@p;">@p</option>
+                            }
+                        </select>
+
+                        <label class="garde-label">Taille : @zoneChoisie.Taille px</label>
+                        <input type="range" min="8" max="120" @bind="zoneChoisie.Taille" @bind:event="oninput" />
+
+                        <label class="garde-label">Couleur</label>
+                        <input type="color" class="garde-color" @bind="zoneChoisie.Couleur" @bind:event="oninput" />
+
+                        <div class="garde-ajout-textes">
+                            <label class="garde-check">
+                                <input type="checkbox" @bind="zoneChoisie.Gras" />
+                                Gras
+                            </label>
+                            <label class="garde-check">
+                                <input type="checkbox" @bind="zoneChoisie.Italique" />
+                                Italique
+                            </label>
+                        </div>
+
+                        <label class="garde-label">Placement : glisse le texte sur la feuille</label>
+                        <div class="garde-ajout-textes">
+                            <button class="garde-petit-btn" @onclick="CentrerTexte">↔ Centrer</button>
+                            <button class="garde-petit-btn garde-btn-supprimer" @onclick="SupprimerTexte">🗑 Supprimer</button>
+                        </div>
+                    }
+                </div>
+            }
+
+            <button class="garde-menu-item @(menuOuvert == "cadre" ? "garde-menu-item-actif" : "")" @onclick='() => OuvrirMenu("cadre")'>
+                🖼️ Cadre
+                <span class="garde-fleche">@(menuOuvert == "cadre" ? "▾" : "▸")</span>
+            </button>
+
+            @if (menuOuvert == "cadre")
+            {
+                <div class="garde-options">
+                    <label class="garde-check">
+                        <input type="checkbox" @bind="d.AvecCadre" />
+                        Ajouter un cadre
+                    </label>
+
+                    @if (d.AvecCadre)
+                    {
+                        <label class="garde-label">Type de ligne</label>
+                        <select class="garde-input" @bind="d.TypeLigne">
+                            <option value="solid">Trait plein</option>
+                            <option value="dashed">Tirets</option>
+                            <option value="dotted">Pointillés</option>
+                            <option value="double">Double trait</option>
+                            <option value="emoji">Emoji / symbole</option>
+                        </select>
+
+                        @if (d.TypeLigne == "emoji")
                         {
-                            <div class="garde-label">Chargement des emojis…</div>
-                        }
-                        else if (emojis.Count == 0)
-                        {
-                            <div class="garde-label">Impossible de charger les emojis.</div>
+                            <label class="garde-label">Symbole</label>
+                            @if (chargementEmojis)
+                            {
+                                <div class="garde-label">Chargement des emojis…</div>
+                            }
+                            else if (emojis.Count == 0)
+                            {
+                                <div class="garde-label">Impossible de charger les emojis.</div>
+                            }
+                            else
+                            {
+                                <select class="garde-input" @bind="groupe">
+                                    @foreach (var g in groupes)
+                                    {
+                                        <option value="@g.Key">@g.Value</option>
+                                    }
+                                </select>
+                                <input class="garde-input" @bind="recherche" @bind:event="oninput" placeholder="Rechercher (ex : coeur, fleur)" />
+                                <div class="garde-emojis">
+                                    @foreach (var e in EmojisAffiches())
+                                    {
+                                        var em = e.Emoji;
+                                        <button class="garde-emoji-btn @(d.Symbole == em ? "garde-emoji-actif" : "")" title="@e.Nom" @onclick="() => d.Symbole = em">@em</button>
+                                    }
+                                </div>
+                            }
+                            <input class="garde-input" @bind="d.Symbole" @bind:event="oninput" maxlength="4" placeholder="Ou tape ton symbole" />
                         }
                         else
                         {
-                            <select class="garde-input" @bind="groupe">
-                                @foreach (var g in groupes)
-                                {
-                                    <option value="@g.Key">@g.Value</option>
-                                }
-                            </select>
-                            <input class="garde-input" @bind="recherche" @bind:event="oninput" placeholder="Rechercher (ex : coeur, fleur)" />
-                            <div class="garde-emojis">
-                                @foreach (var e in EmojisAffiches())
-                                {
-                                    var em = e.Emoji;
-                                    <button class="garde-emoji-btn @(symbole == em ? "garde-emoji-actif" : "")" title="@e.Nom" @onclick="() => symbole = em">@em</button>
-                                }
-                            </div>
+                            <label class="garde-label">Couleur</label>
+                            <input type="color" class="garde-color" @bind="d.Couleur" @bind:event="oninput" />
                         }
-                        <input class="garde-input" @bind="symbole" @bind:event="oninput" maxlength="4" placeholder="Ou tape ton symbole" />
-                    }
-                    else
-                    {
-                        <label class="garde-label">Couleur</label>
-                        <input type="color" class="garde-color" @bind="couleur" @bind:event="oninput" />
-                    }
 
-                    <label class="garde-label">Épaisseur : @epaisseur px</label>
-                    <input type="range" min="1" max="40" @bind="epaisseur" @bind:event="oninput" />
+                        <label class="garde-label">Épaisseur : @d.Epaisseur px</label>
+                        <input type="range" min="1" max="40" @bind="d.Epaisseur" @bind:event="oninput" />
 
-                    <label class="garde-label">Marge depuis le bord : @marge px</label>
-                    <input type="range" min="0" max="100" @bind="marge" @bind:event="oninput" />
+                        <label class="garde-label">Marge depuis le bord : @d.Marge px</label>
+                        <input type="range" min="0" max="100" @bind="d.Marge" @bind:event="oninput" />
+                    }
+                </div>
+            }
+
+            <div class="garde-enregistrer">
+                <label class="garde-label">Nom de la page de garde</label>
+                <input class="garde-input" @bind="nom" @bind:event="oninput" maxlength="150" placeholder="Ex : Cahier de maths" />
+
+                @if (estAdmin)
+                {
+                    <label class="garde-check">
+                        <input type="checkbox" @bind="pourTous" />
+                        Pour tout le monde
+                    </label>
                 }
+
+                @if (Id != null && !modifiable)
+                {
+                    <div class="garde-info">Ce modèle est partagé : l'enregistrer créera ta propre copie.</div>
+                }
+
+                @if (erreur != null)
+                {
+                    <div class="garde-erreur">@erreur</div>
+                }
+                @if (message != null)
+                {
+                    <div class="garde-succes">@message</div>
+                }
+
+                <button class="garde-btn-principal" @onclick="Enregistrer" disabled="@enCours">💾 Enregistrer</button>
+                <button class="garde-petit-btn" @onclick="TelechargerPdf" disabled="@enCours">📥 Télécharger en PDF</button>
             </div>
         }
     </div>
 
     <div class="garde-apercu-zone">
         <div class="garde-apercu-scroll" @onwheel="ZoomMolette" @onwheel:preventDefault="true" @onmousemove="DeplacerTexte" @onmouseup="FinDeplacement" @onmouseleave="FinDeplacement">
-            <div class="garde-zoom-boite" style="width:@(LargeurFeuille() * zoom / 100)px; height:@(HauteurFeuille() * zoom / 100)px;">
-                <div class="garde-feuille" style="width:@(LargeurFeuille())px; height:@(HauteurFeuille())px; transform:scale(@Echelle());">
-                    @if (avecCadre)
-                    {
-                        if (typeLigne == "emoji")
-                        {
-                            <div class="garde-emoji-ligne" style="@StyleLigne("top")">
-                                @for (int i = 0; i < NbHorizontal(); i++)
-                                {
-                                    <span>@symbole</span>
-                                }
-                            </div>
-                            <div class="garde-emoji-ligne" style="@StyleLigne("bottom")">
-                                @for (int i = 0; i < NbHorizontal(); i++)
-                                {
-                                    <span>@symbole</span>
-                                }
-                            </div>
-                            <div class="garde-emoji-colonne" style="@StyleColonne("left")">
-                                @for (int i = 0; i < NbVertical(); i++)
-                                {
-                                    <span>@symbole</span>
-                                }
-                            </div>
-                            <div class="garde-emoji-colonne" style="@StyleColonne("right")">
-                                @for (int i = 0; i < NbVertical(); i++)
-                                {
-                                    <span>@symbole</span>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="garde-cadre" style="top:@(marge)px; left:@(marge)px; right:@(marge)px; bottom:@(marge)px; border:@(epaisseur)px @typeLigne @couleur;"></div>
-                        }
-                    }
-
-                    @if (zoneDeplacee != null)
-                    {
-                        <div class="garde-repere-vertical @(zoneDeplacee.X == LargeurFeuille() / 2 ? "garde-repere-aligne" : "")" style="left:@(LargeurFeuille() / 2)px;"></div>
-                        <div class="garde-repere-horizontal @(zoneDeplacee.Y == HauteurFeuille() / 2 ? "garde-repere-aligne" : "")" style="top:@(HauteurFeuille() / 2)px;"></div>
-                    }
-
-                    @foreach (var t in textes)
-                    {
-                        var zone = t;
-                        <div class="garde-texte @(zoneChoisie == zone ? "garde-texte-choisi" : "")" style="@StyleTexte(zone)" @onmousedown="(e) => DebutDeplacement(e, zone)">@zone.Texte</div>
-                    }
-                </div>
-            </div>
+            <PageGardeFeuille Donnees="d" Zoom="zoom" IdElement="garde-feuille-edition" Modifiable="true"
+                              ZoneChoisie="zoneChoisie" ZoneDeplacee="zoneDeplacee" OnDebutDeplacement="DebutDeplacementTexte" />
         </div>
 
         <div class="garde-zoom-barre">
@@ -231,14 +225,25 @@
 </div>
 
 @code {
-    private string menuOuvert = "cadre";
-    private string orientation = "portrait";
+    [Parameter] public int? Id { get; set; }
+
+    private PageGardeDonnees d = new PageGardeDonnees();
+    private bool chargement = false;
+    private string menuOuvert = "textes";
+
+    private string nom = "";
+    private bool pourTous = false;
+    private bool estAdmin = false;
+    private bool modifiable = true;
+    private int idEnregistre = 0;
+    private bool enCours = false;
+    private string? erreur = null;
+    private string? message = null;
 
     private int zoom = 100;
     private int zoomMin = 30;
     private int zoomMax = 300;
 
-    private List<ZoneTexte> textes = new List<ZoneTexte>();
     private ZoneTexte? zoneChoisie = null;
     private ZoneTexte? zoneDeplacee = null;
     private double departSourisX;
@@ -251,25 +256,6 @@
         "Arial", "Verdana", "Georgia", "Times New Roman", "Courier New", "Comic Sans MS", "Trebuchet MS", "Impact",
         "Roboto", "Merriweather", "Pacifico", "Lobster", "Dancing Script", "Indie Flower", "Permanent Marker", "Amatic SC"
     };
-
-    public class ZoneTexte
-    {
-        public string Texte { get; set; } = "";
-        public string Police { get; set; } = "Arial";
-        public int Taille { get; set; } = 18;
-        public string Couleur { get; set; } = "#222222";
-        public bool Gras { get; set; } = false;
-        public bool Italique { get; set; } = false;
-        public double X { get; set; }
-        public double Y { get; set; }
-    }
-
-    private bool avecCadre = false;
-    private string typeLigne = "solid";
-    private string couleur = "#333333";
-    private int epaisseur = 4;
-    private int marge = 20;
-    private string symbole = "⭐";
 
     private List<EmojiItem> emojis = new List<EmojiItem>();
     private bool chargementEmojis = true;
@@ -291,34 +277,135 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var role = await Auth.GetRoleAsync();
+        estAdmin = role == "ADMIN";
+
         emojis = await Api.GetEmojisAsync();
         chargementEmojis = false;
     }
 
-    private List<EmojiItem> EmojisAffiches()
+    protected override async Task OnParametersSetAsync()
     {
-        var resultat = new List<EmojiItem>();
-        foreach (var e in emojis)
+        erreur = null;
+        message = null;
+        zoneChoisie = null;
+
+        if (Id == null)
         {
-            if (recherche != "")
-            {
-                if (e.Nom.ToLower().Contains(recherche.ToLower()))
-                    resultat.Add(e);
-            }
-            else if (e.Groupe == groupe)
-            {
-                resultat.Add(e);
-            }
+            d = new PageGardeDonnees();
+            nom = "";
+            pourTous = false;
+            modifiable = true;
+            idEnregistre = 0;
+            return;
         }
-        return resultat;
+
+        if (Id == idEnregistre)
+            return;
+
+        chargement = true;
+        var resultat = await Api.GetPageGardeAsync(Id.Value);
+        chargement = false;
+
+        if (resultat.Page == null)
+        {
+            erreur = resultat.Err ?? "Page de garde introuvable.";
+            d = new PageGardeDonnees();
+            return;
+        }
+
+        var page = resultat.Page;
+        d = LireDonnees(page.Contenu);
+        nom = page.Nom;
+        pourTous = page.PourTous;
+        modifiable = page.Modifiable;
+        if (modifiable)
+            idEnregistre = page.Id;
+        else
+            idEnregistre = 0;
     }
 
-    private void OuvrirMenu(string nom)
+    private PageGardeDonnees LireDonnees(string contenu)
     {
-        if (menuOuvert == nom)
+        try
+        {
+            var donnees = System.Text.Json.JsonSerializer.Deserialize<PageGardeDonnees>(contenu);
+            if (donnees != null)
+                return donnees;
+        }
+        catch
+        {
+        }
+        return new PageGardeDonnees();
+    }
+
+    private async Task Enregistrer()
+    {
+        erreur = null;
+        message = null;
+
+        if (nom.Trim() == "")
+        {
+            erreur = "Donne un nom à ta page de garde.";
+            return;
+        }
+
+        enCours = true;
+
+        var page = new PageGarde();
+        page.Id = idEnregistre;
+        page.Nom = nom.Trim();
+        page.Contenu = System.Text.Json.JsonSerializer.Serialize(d);
+        page.PourTous = estAdmin && pourTous;
+
+        var resultat = await Api.SavePageGardeAsync(page);
+        enCours = false;
+
+        if (!resultat.Ok || resultat.Page == null)
+        {
+            erreur = resultat.Err ?? "L'enregistrement a échoué.";
+            return;
+        }
+
+        message = "Page de garde enregistrée.";
+        modifiable = true;
+
+        if (idEnregistre != resultat.Page.Id)
+        {
+            idEnregistre = resultat.Page.Id;
+            Nav.NavigateTo("/page-de-garde/" + idEnregistre);
+        }
+    }
+
+    private async Task TelechargerPdf()
+    {
+        erreur = null;
+        enCours = true;
+        zoneChoisie = null;
+        StateHasChanged();
+
+        string nomFichier = nom.Trim();
+        if (nomFichier == "")
+            nomFichier = "page-de-garde";
+
+        try
+        {
+            await JS.InvokeVoidAsync("exporterPageGardePdf", "garde-feuille-edition", nomFichier + ".pdf", d.Orientation == "paysage");
+        }
+        catch (Exception ex)
+        {
+            erreur = "Impossible de créer le PDF : " + ex.Message;
+        }
+
+        enCours = false;
+    }
+
+    private void OuvrirMenu(string nomMenu)
+    {
+        if (menuOuvert == nomMenu)
             menuOuvert = "";
         else
-            menuOuvert = nom;
+            menuOuvert = nomMenu;
     }
 
     private void AjouterTexte(string texte, int taille, int y)
@@ -326,13 +413,13 @@
         var zone = new ZoneTexte();
         zone.Texte = texte;
         zone.Taille = taille;
-        zone.X = LargeurFeuille() / 2;
+        zone.X = d.Largeur() / 2;
         zone.Y = y;
-        if (zone.Y > HauteurFeuille() - 20)
-            zone.Y = HauteurFeuille() / 2;
+        if (zone.Y > d.Hauteur() - 20)
+            zone.Y = d.Hauteur() / 2;
         if (texte == "Titre")
             zone.Gras = true;
-        textes.Add(zone);
+        d.Textes.Add(zone);
         zoneChoisie = zone;
     }
 
@@ -340,7 +427,7 @@
     {
         if (zoneChoisie == null)
             return;
-        textes.Remove(zoneChoisie);
+        d.Textes.Remove(zoneChoisie);
         zoneChoisie = null;
     }
 
@@ -348,31 +435,18 @@
     {
         if (zoneChoisie == null)
             return;
-        zoneChoisie.X = LargeurFeuille() / 2;
+        zoneChoisie.X = d.Largeur() / 2;
     }
 
-    private string StyleTexte(ZoneTexte zone)
+    private void DebutDeplacementTexte(DebutDeplacement debut)
     {
-        string style = "left:" + ((int)zone.X) + "px; top:" + ((int)zone.Y) + "px;";
-        style = style + " font-family:'" + zone.Police + "';";
-        style = style + " font-size:" + zone.Taille + "px;";
-        style = style + " color:" + zone.Couleur + ";";
-        if (zone.Gras)
-            style = style + " font-weight:bold;";
-        if (zone.Italique)
-            style = style + " font-style:italic;";
-        return style;
-    }
-
-    private void DebutDeplacement(MouseEventArgs e, ZoneTexte zone)
-    {
-        zoneChoisie = zone;
-        zoneDeplacee = zone;
+        zoneChoisie = debut.Zone;
+        zoneDeplacee = debut.Zone;
         menuOuvert = "textes";
-        departSourisX = e.ClientX;
-        departSourisY = e.ClientY;
-        departX = zone.X;
-        departY = zone.Y;
+        departSourisX = debut.ClientX;
+        departSourisY = debut.ClientY;
+        departX = debut.Zone.X;
+        departY = debut.Zone.Y;
     }
 
     private void DeplacerTexte(MouseEventArgs e)
@@ -386,15 +460,15 @@
 
         if (x < 0)
             x = 0;
-        if (x > LargeurFeuille())
-            x = LargeurFeuille();
+        if (x > d.Largeur())
+            x = d.Largeur();
         if (y < 0)
             y = 0;
-        if (y > HauteurFeuille())
-            y = HauteurFeuille();
+        if (y > d.Hauteur())
+            y = d.Hauteur();
 
-        int centreX = LargeurFeuille() / 2;
-        int centreY = HauteurFeuille() / 2;
+        int centreX = d.Largeur() / 2;
+        int centreY = d.Hauteur() / 2;
         if (Math.Abs(x - centreX) < 6)
             x = centreX;
         if (Math.Abs(y - centreY) < 6)
@@ -431,59 +505,21 @@
             ZoomMoins();
     }
 
-    private string Echelle()
+    private List<EmojiItem> EmojisAffiches()
     {
-        double valeur = zoom / 100.0;
-        return valeur.ToString(System.Globalization.CultureInfo.InvariantCulture);
-    }
-
-    private int LargeurFeuille()
-    {
-        if (orientation == "paysage")
-            return 594;
-        return 420;
-    }
-
-    private int HauteurFeuille()
-    {
-        if (orientation == "paysage")
-            return 420;
-        return 594;
-    }
-
-    private int Taille()
-    {
-        if (epaisseur < 8)
-            return 8;
-        return epaisseur;
-    }
-
-    private int NbHorizontal()
-    {
-        int longueur = LargeurFeuille() - marge * 2;
-        int nb = longueur / Taille();
-        if (nb < 1)
-            nb = 1;
-        return nb;
-    }
-
-    private int NbVertical()
-    {
-        int longueur = HauteurFeuille() - marge * 2 - Taille() * 2;
-        int nb = longueur / Taille();
-        if (nb < 1)
-            nb = 1;
-        return nb;
-    }
-
-    private string StyleLigne(string cote)
-    {
-        return cote + ":" + marge + "px; left:" + marge + "px; right:" + marge + "px; height:" + Taille() + "px; font-size:" + (Taille() - 2) + "px;";
-    }
-
-    private string StyleColonne(string cote)
-    {
-        int debut = marge + Taille();
-        return cote + ":" + marge + "px; top:" + debut + "px; bottom:" + debut + "px; width:" + Taille() + "px; font-size:" + (Taille() - 2) + "px;";
+        var resultat = new List<EmojiItem>();
+        foreach (var e in emojis)
+        {
+            if (recherche != "")
+            {
+                if (e.Nom.ToLower().Contains(recherche.ToLower()))
+                    resultat.Add(e);
+            }
+            else if (e.Groupe == groupe)
+            {
+                resultat.Add(e);
+            }
+        }
+        return resultat;
     }
 }

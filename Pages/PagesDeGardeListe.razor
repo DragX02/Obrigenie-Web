@@ -1,0 +1,156 @@
+@page "/pages-de-garde"
+
+@inject ApiService Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<div class="garde-liste-page">
+    <h2 class="garde-title">Pages de garde</h2>
+    <p class="garde-liste-intro">Choisis une page vide ou un modèle pour commencer.</p>
+
+    @if (erreur != null)
+    {
+        <div class="garde-erreur">@erreur</div>
+    }
+
+    @if (chargement)
+    {
+        <div class="garde-label">Chargement…</div>
+    }
+    else
+    {
+        <div class="garde-liste-section">Nouveau</div>
+        <div class="garde-grille">
+            <div class="garde-carte" @onclick='() => Nav.NavigateTo("/page-de-garde")'>
+                <div class="garde-carte-apercu garde-carte-vide">
+                    <span>+</span>
+                </div>
+                <div class="garde-carte-nom">Page vide</div>
+            </div>
+        </div>
+
+        <div class="garde-liste-section">Modèles pour tout le monde</div>
+        @if (PagesPourTous().Count == 0)
+        {
+            <div class="garde-label">Aucun modèle partagé pour l'instant.</div>
+        }
+        <div class="garde-grille">
+            @foreach (var p in PagesPourTous())
+            {
+                var modele = p;
+                <div class="garde-carte" @onclick='() => Nav.NavigateTo("/page-de-garde/" + modele.Id)'>
+                    <div class="garde-carte-apercu">
+                        <PageGardeFeuille Donnees="Donnees(modele)" Zoom="35" />
+                    </div>
+                    <div class="garde-carte-nom">@modele.Nom</div>
+                    @if (modele.Modifiable)
+                    {
+                        <button class="garde-carte-supprimer" title="Supprimer" @onclick="() => Supprimer(modele)" @onclick:stopPropagation="true">🗑</button>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="garde-liste-section">Mes pages de garde</div>
+        @if (MesPages().Count == 0)
+        {
+            <div class="garde-label">Tu n'as pas encore enregistré de page de garde.</div>
+        }
+        <div class="garde-grille">
+            @foreach (var p in MesPages())
+            {
+                var modele = p;
+                <div class="garde-carte" @onclick='() => Nav.NavigateTo("/page-de-garde/" + modele.Id)'>
+                    <div class="garde-carte-apercu">
+                        <PageGardeFeuille Donnees="Donnees(modele)" Zoom="35" />
+                    </div>
+                    <div class="garde-carte-nom">@modele.Nom</div>
+                    <button class="garde-carte-supprimer" title="Supprimer" @onclick="() => Supprimer(modele)" @onclick:stopPropagation="true">🗑</button>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<PageGarde> pages = new List<PageGarde>();
+    private Dictionary<int, PageGardeDonnees> donnees = new Dictionary<int, PageGardeDonnees>();
+    private bool chargement = true;
+    private string? erreur = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Charger();
+    }
+
+    private async Task Charger()
+    {
+        chargement = true;
+        var resultat = await Api.GetPagesGardeAsync();
+        pages = resultat.Pages;
+        erreur = resultat.Err;
+
+        donnees = new Dictionary<int, PageGardeDonnees>();
+        foreach (var p in pages)
+        {
+            var d = new PageGardeDonnees();
+            try
+            {
+                var lu = System.Text.Json.JsonSerializer.Deserialize<PageGardeDonnees>(p.Contenu);
+                if (lu != null)
+                    d = lu;
+            }
+            catch
+            {
+            }
+            donnees[p.Id] = d;
+        }
+
+        chargement = false;
+    }
+
+    private PageGardeDonnees Donnees(PageGarde page)
+    {
+        if (donnees.ContainsKey(page.Id))
+            return donnees[page.Id];
+        return new PageGardeDonnees();
+    }
+
+    private List<PageGarde> PagesPourTous()
+    {
+        var liste = new List<PageGarde>();
+        foreach (var p in pages)
+        {
+            if (p.PourTous)
+                liste.Add(p);
+        }
+        return liste;
+    }
+
+    private List<PageGarde> MesPages()
+    {
+        var liste = new List<PageGarde>();
+        foreach (var p in pages)
+        {
+            if (p.EstAMoi && !p.PourTous)
+                liste.Add(p);
+        }
+        return liste;
+    }
+
+    private async Task Supprimer(PageGarde page)
+    {
+        bool ok = await JS.InvokeAsync<bool>("confirm", "Supprimer la page de garde « " + page.Nom + " » ?");
+        if (!ok)
+            return;
+
+        erreur = null;
+        var resultat = await Api.DeletePageGardeAsync(page.Id);
+        if (!resultat.Ok)
+        {
+            erreur = resultat.Err ?? "La suppression a échoué.";
+            return;
+        }
+        await Charger();
+    }
+}
