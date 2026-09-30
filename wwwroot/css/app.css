@@ -1860,19 +1860,49 @@ h1:focus { outline: none; }
     padding: .7rem .8rem; margin-bottom: .6rem;
 }
 
-.garde-page { display: flex; gap: 1.5rem; padding: 1.5rem 1rem; align-items: flex-start; flex-wrap: wrap; }
+.garde-page { display: flex; flex-direction: row; flex-wrap: nowrap; min-height: calc(100vh - 56px); }
 
 .garde-menu {
     background: var(--bg-card);
+    border-right: 1px solid var(--border);
+    padding: 1rem;
+    width: 300px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    color: var(--text);
+    overflow-y: auto;
+    max-height: calc(100vh - 56px);
+    position: sticky;
+    top: 0;
+}
+
+.garde-menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 0.7rem 0.8rem;
     border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 1.2rem;
-    width: 280px;
+    border-radius: 8px;
+    background: var(--bg-main);
+    color: var(--text);
+    font-size: 0.95rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.garde-menu-item:hover { background: var(--row-hover); }
+.garde-menu-item-actif { border-color: var(--primary); font-weight: 600; }
+.garde-fleche { margin-left: auto; color: var(--text-muted); }
+
+.garde-options {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    color: var(--text);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    padding: 0.4rem 0.3rem 0.8rem 0.8rem;
+    border-left: 2px solid var(--primary);
+    margin-left: 0.5rem;
 }
 
 .garde-title { margin: 0 0 0.5rem; color: var(--text); }
@@ -1902,12 +1932,13 @@ h1:focus { outline: none; }
 
 .garde-emoji-actif { border: 2px solid var(--primary); }
 
-.garde-apercu-zone { flex: 1; display: flex; justify-content: center; min-width: 300px; }
+.garde-apercu-zone { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 2rem; overflow: auto; background: var(--bg-main); }
 
 .garde-feuille {
     position: relative;
     background: #ffffff;
     box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    flex-shrink: 0;
     overflow: hidden;
 }
 
