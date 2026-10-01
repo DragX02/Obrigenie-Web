@@ -4,6 +4,8 @@
 @inject LanguageService Lang
 @inject AuthService Auth
 @inject NavigationManager Nav
+@inject ApiService Api
+@inject ILocalStorageService LocalStorage
 
 <div class="account-page">
     <div class="account-card">
@@ -36,6 +38,36 @@
             @if (saved)
             {
                 <div class="lang-saved-msg">✓ @Lang.T("account.saved")</div>
+            }
+        </div>
+
+        <div class="account-section compte-danger">
+            <div class="account-section-title">Supprimer mon compte</div>
+
+            @if (!demandeSuppression)
+            {
+                <button class="btn-compte-supprimer" @onclick="() => demandeSuppression = true">🗑 Supprimer mon compte</button>
+            }
+            else
+            {
+                <div class="compte-danger-texte">
+                    Cette action est <strong>définitive</strong>. Seront supprimés : tes notes et cours du calendrier,
+                    tes leçons, tes corrections de congés, tes pages de garde et tes images importées.
+                </div>
+                <label class="compte-danger-label">Pour confirmer, tape ton adresse email : <strong>@userEmail</strong></label>
+                <input class="compte-danger-input" @bind="confirmation" @bind:event="oninput" placeholder="ton adresse email" />
+
+                @if (erreurSuppression != null)
+                {
+                    <div class="compte-danger-erreur">@erreurSuppression</div>
+                }
+
+                <div class="compte-danger-boutons">
+                    <button class="btn-compte-supprimer" disabled="@(!ConfirmationOk() || suppressionEnCours)" @onclick="SupprimerCompte">
+                        @(suppressionEnCours ? "Suppression…" : "Supprimer définitivement")
+                    </button>
+                    <button class="btn-compte-annuler" @onclick="AnnulerSuppression">Annuler</button>
+                </div>
             }
         </div>
 
@@ -73,4 +105,40 @@
     }
 
     private void GoBack() => Nav.NavigateTo(Nav.BaseUri, forceLoad: false);
+
+    private bool demandeSuppression = false;
+    private bool suppressionEnCours = false;
+    private string confirmation = "";
+    private string? erreurSuppression = null;
+
+    private bool ConfirmationOk()
+    {
+        return confirmation.Trim().ToLower() == userEmail.ToLower() && userEmail != "";
+    }
+
+    private void AnnulerSuppression()
+    {
+        demandeSuppression = false;
+        confirmation = "";
+        erreurSuppression = null;
+    }
+
+    private async Task SupprimerCompte()
+    {
+        erreurSuppression = null;
+        suppressionEnCours = true;
+
+        var resultat = await Api.SupprimerCompteAsync(confirmation.Trim());
+        suppressionEnCours = false;
+
+        if (!resultat.Ok)
+        {
+            erreurSuppression = resultat.Err ?? "La suppression a échoué.";
+            return;
+        }
+
+        await Auth.RemoveTokenAsync();
+        await LocalStorage.RemoveItemAsync("licenseCode");
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
 }

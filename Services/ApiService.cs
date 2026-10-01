@@ -961,6 +961,20 @@ namespace Obrigenie.Services
         // Endpoint : GET api/ref/categories
         // Lève HttpRequestException si le serveur retourne un code de statut non-succès.
         // Retourne une liste de CategorieDto triée par ordre d'affichage.
+        public async Task<(bool Ok, string? Err)> SupprimerCompteAsync(string confirmation)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/compte/supprimer", new { Confirmation = confirmation });
+                if (response.IsSuccessStatusCode) return (true, null);
+                return (false, await LireMessageErreur(response));
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
+        }
+
         public async Task<(List<PageGarde> Pages, string? Err)> GetPagesGardeAsync()
         {
             try
