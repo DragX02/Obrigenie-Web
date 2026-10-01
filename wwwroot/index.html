@@ -7,7 +7,7 @@
     <title>Obrigenie</title>
     <base href="/" />
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
-    <link rel="stylesheet" href="css/app.css?v=21" />
+    <link rel="stylesheet" href="css/app.css?v=22" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@400;700&family=Dancing+Script:wght@400;700&family=Indie+Flower&family=Lobster&family=Merriweather:wght@400;700&family=Pacifico&family=Permanent+Marker&family=Roboto:wght@400;700&display=swap" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="Obrigenie.styles.css" rel="stylesheet" />
@@ -85,7 +85,7 @@
             copie.style.transform = 'none';
             copie.querySelectorAll('.garde-texte-choisi').forEach(function (e) { e.classList.remove('garde-texte-choisi'); });
             copie.querySelectorAll('.garde-image-choisie').forEach(function (e) { e.classList.remove('garde-image-choisie'); });
-            copie.querySelectorAll('.garde-repere-vertical, .garde-repere-horizontal, .garde-poignee').forEach(function (e) { e.remove(); });
+            copie.querySelectorAll('.garde-repere-vertical, .garde-repere-horizontal, .garde-poignee, .garde-poignee-rotation').forEach(function (e) { e.remove(); });
 
             const boite = document.createElement('div');
             boite.style.position = 'fixed';

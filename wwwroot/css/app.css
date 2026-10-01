@@ -2149,3 +2149,21 @@ h1:focus { outline: none; }
 }
 
 .garde-miniature-supprimer:hover { background: #e53935; }
+
+.garde-poignee-rotation {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 16px;
+    height: 16px;
+    line-height: 13px;
+    border-radius: 50%;
+    background: #667eea;
+    border: 2px solid #ffffff;
+    color: #ffffff;
+    font-size: 10px;
+    text-align: center;
+    cursor: grab;
+    user-select: none;
+}

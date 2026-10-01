@@ -57,6 +57,7 @@ namespace Obrigenie.Models
         public double Y { get; set; }
         public double Largeur { get; set; } = 150;
         public double Ratio { get; set; } = 1;
+        public double Rotation { get; set; } = 0;
     }
 
     public class ImageGarde

@@ -167,7 +167,15 @@
                         <label class="garde-label">Taille : @((int)imageChoisie.Largeur) px</label>
                         <input type="range" min="30" max="600" value="@((int)imageChoisie.Largeur)" @oninput="ChangerTailleImage" />
 
-                        <label class="garde-label">Placement : glisse l'image, tire le rond pour l'agrandir</label>
+                        <label class="garde-label">Rotation : @((int)imageChoisie.Rotation)°</label>
+                        <input type="range" min="-180" max="180" value="@((int)imageChoisie.Rotation)" @oninput="ChangerRotationImage" />
+                        <div class="garde-ajout-textes">
+                            <button class="garde-petit-btn" @onclick="() => TournerImage(-90)">↺ 90°</button>
+                            <button class="garde-petit-btn" @onclick="() => TournerImage(90)">↻ 90°</button>
+                            <button class="garde-petit-btn" @onclick="() => imageChoisie.Rotation = 0">0°</button>
+                        </div>
+
+                        <label class="garde-label">Placement : glisse l'image, tire le rond bleu pour l'agrandir, le ↻ pour la tourner</label>
                         <div class="garde-ajout-textes">
                             <button class="garde-petit-btn" @onclick="CentrerImage">↔ Centrer</button>
                             <button class="garde-petit-btn garde-btn-supprimer" @onclick="RetirerImage">🗑 Retirer de la page</button>
@@ -325,6 +333,8 @@
     private double departX;
     private double departY;
     private double departLargeur;
+    private double centreRotationX;
+    private double centreRotationY;
 
     private List<ImageGarde> imagesBiblio = new List<ImageGarde>();
     private Dictionary<string, string> imagesChargees = new Dictionary<string, string>();
@@ -576,6 +586,31 @@
             imageChoisie.Largeur = valeur;
     }
 
+    private void ChangerRotationImage(ChangeEventArgs e)
+    {
+        if (imageChoisie == null)
+            return;
+        int valeur;
+        if (int.TryParse(e.Value?.ToString(), out valeur))
+            imageChoisie.Rotation = valeur;
+    }
+
+    private void TournerImage(int degres)
+    {
+        if (imageChoisie == null)
+            return;
+        imageChoisie.Rotation = NormaliserAngle(imageChoisie.Rotation + degres);
+    }
+
+    private double NormaliserAngle(double angle)
+    {
+        while (angle > 180)
+            angle = angle - 360;
+        while (angle < -180)
+            angle = angle + 360;
+        return angle;
+    }
+
     private void CentrerImage()
     {
         if (imageChoisie == null)
@@ -728,6 +763,15 @@
             departX = debut.Image.X;
             departY = debut.Image.Y;
             departLargeur = debut.Image.Largeur;
+
+            if (debut.Mode == "rotation")
+            {
+                double echelle = zoom / 100.0;
+                double distance = debut.Image.Largeur * debut.Image.Ratio / 2 + 20;
+                double radians = debut.Image.Rotation * Math.PI / 180;
+                centreRotationX = debut.ClientX - Math.Sin(radians) * distance * echelle;
+                centreRotationY = debut.ClientY + Math.Cos(radians) * distance * echelle;
+            }
         }
     }
 
@@ -767,12 +811,26 @@
 
         if (imageDeplacee != null && modeDeplacement == "taille")
         {
-            double largeur = departLargeur + 2 * (e.ClientX - departSourisX) / echelle;
+            double radians = imageDeplacee.Rotation * Math.PI / 180;
+            double dx = e.ClientX - departSourisX;
+            double dy = e.ClientY - departSourisY;
+            double avance = dx * Math.Cos(radians) + dy * Math.Sin(radians);
+            double largeur = departLargeur + 2 * avance / echelle;
             if (largeur < 30)
                 largeur = 30;
             if (largeur > d.Largeur() * 2)
                 largeur = d.Largeur() * 2;
             imageDeplacee.Largeur = largeur;
+            return;
+        }
+
+        if (imageDeplacee != null && modeDeplacement == "rotation")
+        {
+            double angle = Math.Atan2(e.ClientX - centreRotationX, -(e.ClientY - centreRotationY)) * 180 / Math.PI;
+            double proche = Math.Round(angle / 45) * 45;
+            if (Math.Abs(angle - proche) < 4)
+                angle = proche;
+            imageDeplacee.Rotation = NormaliserAngle(Math.Round(angle));
             return;
         }
 

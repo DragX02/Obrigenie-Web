@@ -47,6 +47,7 @@
                         @if (ImageChoisie == image)
                         {
                             <div class="garde-poignee" @onmousedown='(e) => DebutImage(e, image, "taille")' @onmousedown:stopPropagation="true"></div>
+                            <div class="garde-poignee-rotation" title="Tourner l'image" @onmousedown='(e) => DebutImage(e, image, "rotation")' @onmousedown:stopPropagation="true">↻</div>
                         }
                     </div>
                 }
@@ -116,7 +117,8 @@
     {
         int largeur = (int)image.Largeur;
         int hauteur = (int)(image.Largeur * image.Ratio);
-        return "left:" + ((int)image.X) + "px; top:" + ((int)image.Y) + "px; width:" + largeur + "px; height:" + hauteur + "px;";
+        string rotation = image.Rotation.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return "left:" + ((int)image.X) + "px; top:" + ((int)image.Y) + "px; width:" + largeur + "px; height:" + hauteur + "px; transform:translate(-50%, -50%) rotate(" + rotation + "deg);";
     }
 
     private string Echelle()
