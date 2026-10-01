@@ -60,7 +60,7 @@
                         @foreach (var t in d.Textes)
                         {
                             var zone = t;
-                            <button class="garde-zone-ligne @(zoneChoisie == zone ? "garde-zone-ligne-actif" : "")" @onclick="() => zoneChoisie = zone">
+                            <button class="garde-zone-ligne @(zoneChoisie == zone ? "garde-zone-ligne-actif" : "")" @onclick="() => ChoisirTexte(zone)">
                                 @(zone.Texte == "" ? "(vide)" : zone.Texte)
                             </button>
                         }
@@ -102,6 +102,75 @@
                         <div class="garde-ajout-textes">
                             <button class="garde-petit-btn" @onclick="CentrerTexte">↔ Centrer</button>
                             <button class="garde-petit-btn garde-btn-supprimer" @onclick="SupprimerTexte">🗑 Supprimer</button>
+                        </div>
+                    }
+                </div>
+            }
+
+            <button class="garde-menu-item @(menuOuvert == "images" ? "garde-menu-item-actif" : "")" @onclick='() => OuvrirMenu("images")'>
+                🖼️ Images
+                <span class="garde-fleche">@(menuOuvert == "images" ? "▾" : "▸")</span>
+            </button>
+
+            @if (menuOuvert == "images")
+            {
+                <div class="garde-options">
+                    <label class="garde-label">Catégorie</label>
+                    <select class="garde-input" @bind="categorieImage" @bind:after="ChargerMiniatures">
+                        <option value="Toutes">Toutes</option>
+                        @foreach (var c in CategoriesImages())
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                    <input class="garde-input" @bind="rechercheImage" @bind:event="oninput" @bind:after="ChargerMiniatures" placeholder="Rechercher une image" />
+
+                    @if (chargementImages)
+                    {
+                        <div class="garde-label">Chargement des images…</div>
+                    }
+                    else if (ImagesAffichees().Count == 0)
+                    {
+                        <div class="garde-label">Aucune image.</div>
+                    }
+                    else
+                    {
+                        <div class="garde-images-grille">
+                            @foreach (var im in ImagesAffichees())
+                            {
+                                var image = im;
+                                <div class="garde-image-miniature" title="@image.Nom" @onclick="() => AjouterImage(image)">
+                                    @if (imagesChargees.ContainsKey(image.Source))
+                                    {
+                                        <img src="@imagesChargees[image.Source]" />
+                                    }
+                                    @if (image.Perso)
+                                    {
+                                        <button class="garde-miniature-supprimer" title="Supprimer cette image" @onclick="() => SupprimerImagePerso(image)" @onclick:stopPropagation="true">🗑</button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <label class="garde-label">Importer ta propre image</label>
+                    <InputFile class="garde-input" accept="image/png,image/jpeg" OnChange="ImporterImage" disabled="@importEnCours" />
+                    @if (importEnCours)
+                    {
+                        <div class="garde-label">Envoi de l'image…</div>
+                    }
+
+                    @if (imageChoisie != null)
+                    {
+                        <div class="garde-section-title">Image choisie</div>
+
+                        <label class="garde-label">Taille : @((int)imageChoisie.Largeur) px</label>
+                        <input type="range" min="30" max="600" value="@((int)imageChoisie.Largeur)" @oninput="ChangerTailleImage" />
+
+                        <label class="garde-label">Placement : glisse l'image, tire le rond pour l'agrandir</label>
+                        <div class="garde-ajout-textes">
+                            <button class="garde-petit-btn" @onclick="CentrerImage">↔ Centrer</button>
+                            <button class="garde-petit-btn garde-btn-supprimer" @onclick="RetirerImage">🗑 Retirer de la page</button>
                         </div>
                     }
                 </div>
@@ -209,9 +278,11 @@
     </div>
 
     <div class="garde-apercu-zone">
-        <div class="garde-apercu-scroll" @onwheel="ZoomMolette" @onwheel:preventDefault="true" @onmousemove="DeplacerTexte" @onmouseup="FinDeplacement" @onmouseleave="FinDeplacement">
+        <div class="garde-apercu-scroll" @onwheel="ZoomMolette" @onwheel:preventDefault="true" @onmousemove="DeplacerElement" @onmouseup="FinDeplacement" @onmouseleave="FinDeplacement">
             <PageGardeFeuille Donnees="d" Zoom="zoom" IdElement="garde-feuille-edition" Modifiable="true"
-                              ZoneChoisie="zoneChoisie" ZoneDeplacee="zoneDeplacee" OnDebutDeplacement="DebutDeplacementTexte" />
+                              ZoneChoisie="zoneChoisie" ImageChoisie="imageChoisie" Images="imagesChargees"
+                              ReperesVisibles="ReperesVisibles()" AligneX="AligneX()" AligneY="AligneY()"
+                              OnDebutDeplacement="DebutDeplacementElement" />
         </div>
 
         <div class="garde-zoom-barre">
@@ -246,10 +317,21 @@
 
     private ZoneTexte? zoneChoisie = null;
     private ZoneTexte? zoneDeplacee = null;
+    private ZoneImage? imageChoisie = null;
+    private ZoneImage? imageDeplacee = null;
+    private string modeDeplacement = "deplacer";
     private double departSourisX;
     private double departSourisY;
     private double departX;
     private double departY;
+    private double departLargeur;
+
+    private List<ImageGarde> imagesBiblio = new List<ImageGarde>();
+    private Dictionary<string, string> imagesChargees = new Dictionary<string, string>();
+    private bool chargementImages = true;
+    private string categorieImage = "Toutes";
+    private string rechercheImage = "";
+    private bool importEnCours = false;
 
     private List<string> polices = new List<string>
     {
@@ -282,6 +364,11 @@
 
         emojis = await Api.GetEmojisAsync();
         chargementEmojis = false;
+
+        var resultatImages = await Api.GetImagesGardeAsync();
+        imagesBiblio = resultatImages.Images;
+        chargementImages = false;
+        await ChargerMiniatures();
     }
 
     protected override async Task OnParametersSetAsync()
@@ -289,6 +376,7 @@
         erreur = null;
         message = null;
         zoneChoisie = null;
+        imageChoisie = null;
 
         if (Id == null)
         {
@@ -323,6 +411,184 @@
             idEnregistre = page.Id;
         else
             idEnregistre = 0;
+
+        foreach (var image in d.Images)
+            await ChargerImage(image.Source);
+    }
+
+    private async Task<string?> ChargerImage(string source)
+    {
+        if (imagesChargees.ContainsKey(source))
+            return imagesChargees[source];
+
+        var dataUrl = await Api.GetImageGardeDataUrlAsync(source);
+        if (dataUrl != null)
+            imagesChargees[source] = dataUrl;
+        return dataUrl;
+    }
+
+    private List<string> CategoriesImages()
+    {
+        var liste = new List<string>();
+        foreach (var image in imagesBiblio)
+        {
+            if (!liste.Contains(image.Categorie))
+                liste.Add(image.Categorie);
+        }
+        return liste;
+    }
+
+    private List<ImageGarde> ImagesAffichees()
+    {
+        var resultat = new List<ImageGarde>();
+        foreach (var image in imagesBiblio)
+        {
+            if (rechercheImage != "")
+            {
+                if (image.Nom.ToLower().Contains(rechercheImage.ToLower()))
+                    resultat.Add(image);
+            }
+            else if (categorieImage == "Toutes" || image.Categorie == categorieImage)
+            {
+                resultat.Add(image);
+            }
+        }
+        return resultat;
+    }
+
+    private async Task ChargerMiniatures()
+    {
+        foreach (var image in ImagesAffichees())
+        {
+            if (!imagesChargees.ContainsKey(image.Source))
+            {
+                await ChargerImage(image.Source);
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task AjouterImage(ImageGarde image)
+    {
+        var dataUrl = await ChargerImage(image.Source);
+        if (dataUrl == null)
+        {
+            erreur = "Impossible de charger l'image.";
+            return;
+        }
+
+        var taille = await JS.InvokeAsync<TailleImage>("tailleImage", dataUrl);
+
+        var zone = new ZoneImage();
+        zone.Source = image.Source;
+        zone.Largeur = 150;
+        zone.Ratio = 1;
+        if (taille.Largeur > 0)
+            zone.Ratio = (double)taille.Hauteur / taille.Largeur;
+        zone.X = d.Largeur() / 2;
+        zone.Y = d.Hauteur() / 2;
+        d.Images.Add(zone);
+        ChoisirImage(zone);
+    }
+
+    private async Task ImporterImage(InputFileChangeEventArgs e)
+    {
+        erreur = null;
+        var fichier = e.File;
+        if (fichier.ContentType != "image/png" && fichier.ContentType != "image/jpeg")
+        {
+            erreur = "Choisis une image PNG ou JPEG.";
+            return;
+        }
+
+        importEnCours = true;
+        try
+        {
+            var flux = fichier.OpenReadStream(15 * 1024 * 1024);
+            var memoire = new MemoryStream();
+            await flux.CopyToAsync(memoire);
+            byte[] octets = memoire.ToArray();
+
+            var reduite = await JS.InvokeAsync<TailleImage>("redimensionnerImage", octets, fichier.ContentType, 1200);
+            int virgule = reduite.DataUrl.IndexOf(',');
+            string base64 = reduite.DataUrl.Substring(virgule + 1);
+            string typeMime = reduite.DataUrl.StartsWith("data:image/png") ? "image/png" : "image/jpeg";
+
+            string nomImage = Path.GetFileNameWithoutExtension(fichier.Name);
+            var resultat = await Api.UploadImagePersoAsync(nomImage, typeMime, base64);
+            if (resultat.Image == null)
+            {
+                erreur = resultat.Err ?? "L'envoi de l'image a échoué.";
+            }
+            else
+            {
+                imagesBiblio.Add(resultat.Image);
+                imagesChargees[resultat.Image.Source] = reduite.DataUrl;
+                categorieImage = "Mes images";
+                rechercheImage = "";
+                await AjouterImage(resultat.Image);
+            }
+        }
+        catch (Exception ex)
+        {
+            erreur = "Impossible d'importer l'image : " + ex.Message;
+        }
+        importEnCours = false;
+    }
+
+    private async Task SupprimerImagePerso(ImageGarde image)
+    {
+        bool ok = await JS.InvokeAsync<bool>("confirm", "Supprimer l'image « " + image.Nom + " » ? Elle disparaîtra aussi des pages qui l'utilisent.");
+        if (!ok)
+            return;
+
+        var resultat = await Api.DeleteImagePersoAsync(image.Source);
+        if (!resultat.Ok)
+        {
+            erreur = resultat.Err ?? "La suppression a échoué.";
+            return;
+        }
+
+        imagesBiblio.Remove(image);
+        imagesChargees.Remove(image.Source);
+        d.Images.RemoveAll(z => z.Source == image.Source);
+        imageChoisie = null;
+    }
+
+    private void ChoisirTexte(ZoneTexte zone)
+    {
+        zoneChoisie = zone;
+        imageChoisie = null;
+    }
+
+    private void ChoisirImage(ZoneImage image)
+    {
+        imageChoisie = image;
+        zoneChoisie = null;
+    }
+
+    private void ChangerTailleImage(ChangeEventArgs e)
+    {
+        if (imageChoisie == null)
+            return;
+        int valeur;
+        if (int.TryParse(e.Value?.ToString(), out valeur))
+            imageChoisie.Largeur = valeur;
+    }
+
+    private void CentrerImage()
+    {
+        if (imageChoisie == null)
+            return;
+        imageChoisie.X = d.Largeur() / 2;
+    }
+
+    private void RetirerImage()
+    {
+        if (imageChoisie == null)
+            return;
+        d.Images.Remove(imageChoisie);
+        imageChoisie = null;
     }
 
     private PageGardeDonnees LireDonnees(string contenu)
@@ -382,6 +648,7 @@
         erreur = null;
         enCours = true;
         zoneChoisie = null;
+        imageChoisie = null;
         StateHasChanged();
 
         string nomFichier = nom.Trim();
@@ -420,7 +687,7 @@
         if (texte == "Titre")
             zone.Gras = true;
         d.Textes.Add(zone);
-        zoneChoisie = zone;
+        ChoisirTexte(zone);
     }
 
     private void SupprimerTexte()
@@ -438,23 +705,77 @@
         zoneChoisie.X = d.Largeur() / 2;
     }
 
-    private void DebutDeplacementTexte(DebutDeplacement debut)
+    private void DebutDeplacementElement(DebutDeplacement debut)
     {
-        zoneChoisie = debut.Zone;
-        zoneDeplacee = debut.Zone;
-        menuOuvert = "textes";
         departSourisX = debut.ClientX;
         departSourisY = debut.ClientY;
-        departX = debut.Zone.X;
-        departY = debut.Zone.Y;
+        modeDeplacement = debut.Mode;
+
+        if (debut.Zone != null)
+        {
+            ChoisirTexte(debut.Zone);
+            zoneDeplacee = debut.Zone;
+            menuOuvert = "textes";
+            departX = debut.Zone.X;
+            departY = debut.Zone.Y;
+        }
+
+        if (debut.Image != null)
+        {
+            ChoisirImage(debut.Image);
+            imageDeplacee = debut.Image;
+            menuOuvert = "images";
+            departX = debut.Image.X;
+            departY = debut.Image.Y;
+            departLargeur = debut.Image.Largeur;
+        }
     }
 
-    private void DeplacerTexte(MouseEventArgs e)
+    private bool ReperesVisibles()
     {
-        if (zoneDeplacee == null)
+        if (zoneDeplacee != null)
+            return true;
+        if (imageDeplacee != null && modeDeplacement == "deplacer")
+            return true;
+        return false;
+    }
+
+    private bool AligneX()
+    {
+        if (zoneDeplacee != null)
+            return zoneDeplacee.X == d.Largeur() / 2;
+        if (imageDeplacee != null)
+            return imageDeplacee.X == d.Largeur() / 2;
+        return false;
+    }
+
+    private bool AligneY()
+    {
+        if (zoneDeplacee != null)
+            return zoneDeplacee.Y == d.Hauteur() / 2;
+        if (imageDeplacee != null)
+            return imageDeplacee.Y == d.Hauteur() / 2;
+        return false;
+    }
+
+    private void DeplacerElement(MouseEventArgs e)
+    {
+        if (zoneDeplacee == null && imageDeplacee == null)
             return;
 
         double echelle = zoom / 100.0;
+
+        if (imageDeplacee != null && modeDeplacement == "taille")
+        {
+            double largeur = departLargeur + 2 * (e.ClientX - departSourisX) / echelle;
+            if (largeur < 30)
+                largeur = 30;
+            if (largeur > d.Largeur() * 2)
+                largeur = d.Largeur() * 2;
+            imageDeplacee.Largeur = largeur;
+            return;
+        }
+
         double x = departX + (e.ClientX - departSourisX) / echelle;
         double y = departY + (e.ClientY - departSourisY) / echelle;
 
@@ -474,13 +795,22 @@
         if (Math.Abs(y - centreY) < 6)
             y = centreY;
 
-        zoneDeplacee.X = x;
-        zoneDeplacee.Y = y;
+        if (zoneDeplacee != null)
+        {
+            zoneDeplacee.X = x;
+            zoneDeplacee.Y = y;
+        }
+        if (imageDeplacee != null)
+        {
+            imageDeplacee.X = x;
+            imageDeplacee.Y = y;
+        }
     }
 
     private void FinDeplacement()
     {
         zoneDeplacee = null;
+        imageDeplacee = null;
     }
 
     private void ZoomPlus()

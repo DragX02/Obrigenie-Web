@@ -35,10 +35,34 @@
             }
         }
 
-        @if (ZoneDeplacee != null)
+        @foreach (var im in Donnees.Images)
         {
-            <div class="garde-repere-vertical @(ZoneDeplacee.X == Donnees.Largeur() / 2 ? "garde-repere-aligne" : "")" style="left:@(Donnees.Largeur() / 2)px;"></div>
-            <div class="garde-repere-horizontal @(ZoneDeplacee.Y == Donnees.Hauteur() / 2 ? "garde-repere-aligne" : "")" style="top:@(Donnees.Hauteur() / 2)px;"></div>
+            var image = im;
+            if (Images.ContainsKey(image.Source))
+            {
+                if (Modifiable)
+                {
+                    <div class="garde-image garde-image-deplacable @(ImageChoisie == image ? "garde-image-choisie" : "")" style="@StyleImage(image)" @onmousedown='(e) => DebutImage(e, image, "deplacer")'>
+                        <img src="@Images[image.Source]" draggable="false" />
+                        @if (ImageChoisie == image)
+                        {
+                            <div class="garde-poignee" @onmousedown='(e) => DebutImage(e, image, "taille")' @onmousedown:stopPropagation="true"></div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="garde-image" style="@StyleImage(image)">
+                        <img src="@Images[image.Source]" />
+                    </div>
+                }
+            }
+        }
+
+        @if (ReperesVisibles)
+        {
+            <div class="garde-repere-vertical @(AligneX ? "garde-repere-aligne" : "")" style="left:@(Donnees.Largeur() / 2)px;"></div>
+            <div class="garde-repere-horizontal @(AligneY ? "garde-repere-aligne" : "")" style="top:@(Donnees.Hauteur() / 2)px;"></div>
         }
 
         @foreach (var t in Donnees.Textes)
@@ -62,7 +86,11 @@
     [Parameter] public string IdElement { get; set; } = "";
     [Parameter] public bool Modifiable { get; set; } = false;
     [Parameter] public ZoneTexte? ZoneChoisie { get; set; }
-    [Parameter] public ZoneTexte? ZoneDeplacee { get; set; }
+    [Parameter] public ZoneImage? ImageChoisie { get; set; }
+    [Parameter] public Dictionary<string, string> Images { get; set; } = new Dictionary<string, string>();
+    [Parameter] public bool ReperesVisibles { get; set; } = false;
+    [Parameter] public bool AligneX { get; set; } = false;
+    [Parameter] public bool AligneY { get; set; } = false;
     [Parameter] public EventCallback<DebutDeplacement> OnDebutDeplacement { get; set; }
 
     private async Task Debut(MouseEventArgs e, ZoneTexte zone)
@@ -72,6 +100,23 @@
         debut.ClientX = e.ClientX;
         debut.ClientY = e.ClientY;
         await OnDebutDeplacement.InvokeAsync(debut);
+    }
+
+    private async Task DebutImage(MouseEventArgs e, ZoneImage image, string mode)
+    {
+        var debut = new DebutDeplacement();
+        debut.Image = image;
+        debut.Mode = mode;
+        debut.ClientX = e.ClientX;
+        debut.ClientY = e.ClientY;
+        await OnDebutDeplacement.InvokeAsync(debut);
+    }
+
+    private string StyleImage(ZoneImage image)
+    {
+        int largeur = (int)image.Largeur;
+        int hauteur = (int)(image.Largeur * image.Ratio);
+        return "left:" + ((int)image.X) + "px; top:" + ((int)image.Y) + "px; width:" + largeur + "px; height:" + hauteur + "px;";
     }
 
     private string Echelle()

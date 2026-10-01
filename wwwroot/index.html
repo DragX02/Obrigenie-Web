@@ -7,7 +7,7 @@
     <title>Obrigenie</title>
     <base href="/" />
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
-    <link rel="stylesheet" href="css/app.css?v=20" />
+    <link rel="stylesheet" href="css/app.css?v=21" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@400;700&family=Dancing+Script:wght@400;700&family=Indie+Flower&family=Lobster&family=Merriweather:wght@400;700&family=Pacifico&family=Permanent+Marker&family=Roboto:wght@400;700&display=swap" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link href="Obrigenie.styles.css" rel="stylesheet" />
@@ -31,13 +31,61 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
+        window.tailleImage = function (dataUrl) {
+            return new Promise(function (resolve) {
+                const image = new Image();
+                image.onload = function () {
+                    resolve({ largeur: image.naturalWidth, hauteur: image.naturalHeight, dataUrl: '' });
+                };
+                image.onerror = function () {
+                    resolve({ largeur: 0, hauteur: 0, dataUrl: '' });
+                };
+                image.src = dataUrl;
+            });
+        };
+
+        window.redimensionnerImage = function (octets, typeMime, maxCote) {
+            return new Promise(function (resolve, reject) {
+                const blob = new Blob([octets], { type: typeMime });
+                const url = URL.createObjectURL(blob);
+                const image = new Image();
+                image.onload = function () {
+                    let largeur = image.naturalWidth;
+                    let hauteur = image.naturalHeight;
+                    if (largeur > maxCote || hauteur > maxCote) {
+                        const echelle = Math.min(maxCote / largeur, maxCote / hauteur);
+                        largeur = Math.round(largeur * echelle);
+                        hauteur = Math.round(hauteur * echelle);
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = largeur;
+                    canvas.height = hauteur;
+                    canvas.getContext('2d').drawImage(image, 0, 0, largeur, hauteur);
+                    URL.revokeObjectURL(url);
+                    let dataUrl;
+                    if (typeMime === 'image/png') {
+                        dataUrl = canvas.toDataURL('image/png');
+                    } else {
+                        dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                    }
+                    resolve({ largeur: largeur, hauteur: hauteur, dataUrl: dataUrl });
+                };
+                image.onerror = function () {
+                    URL.revokeObjectURL(url);
+                    reject('Image illisible');
+                };
+                image.src = url;
+            });
+        };
+
         window.exporterPageGardePdf = async function (idElement, nomFichier, paysage) {
             const source = document.getElementById(idElement);
             const copie = source.cloneNode(true);
             copie.removeAttribute('id');
             copie.style.transform = 'none';
             copie.querySelectorAll('.garde-texte-choisi').forEach(function (e) { e.classList.remove('garde-texte-choisi'); });
-            copie.querySelectorAll('.garde-repere-vertical, .garde-repere-horizontal').forEach(function (e) { e.remove(); });
+            copie.querySelectorAll('.garde-image-choisie').forEach(function (e) { e.classList.remove('garde-image-choisie'); });
+            copie.querySelectorAll('.garde-repere-vertical, .garde-repere-horizontal, .garde-poignee').forEach(function (e) { e.remove(); });
 
             const boite = document.createElement('div');
             boite.style.position = 'fixed';

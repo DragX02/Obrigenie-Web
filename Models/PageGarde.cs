@@ -21,6 +21,7 @@ namespace Obrigenie.Models
         public int Marge { get; set; } = 20;
         public string Symbole { get; set; } = "⭐";
         public List<ZoneTexte> Textes { get; set; } = new List<ZoneTexte>();
+        public List<ZoneImage> Images { get; set; } = new List<ZoneImage>();
 
         public int Largeur()
         {
@@ -49,9 +50,35 @@ namespace Obrigenie.Models
         public double Y { get; set; }
     }
 
+    public class ZoneImage
+    {
+        public string Source { get; set; } = "";
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double Largeur { get; set; } = 150;
+        public double Ratio { get; set; } = 1;
+    }
+
+    public class ImageGarde
+    {
+        public string Source { get; set; } = "";
+        public string Nom { get; set; } = "";
+        public string Categorie { get; set; } = "";
+        public bool Perso { get; set; }
+    }
+
+    public class TailleImage
+    {
+        public int Largeur { get; set; }
+        public int Hauteur { get; set; }
+        public string DataUrl { get; set; } = "";
+    }
+
     public class DebutDeplacement
     {
-        public ZoneTexte Zone { get; set; } = new ZoneTexte();
+        public ZoneTexte? Zone { get; set; }
+        public ZoneImage? Image { get; set; }
+        public string Mode { get; set; } = "deplacer";
         public double ClientX { get; set; }
         public double ClientY { get; set; }
     }

@@ -40,7 +40,7 @@
                 var modele = p;
                 <div class="garde-carte" @onclick='() => Nav.NavigateTo("/page-de-garde/" + modele.Id)'>
                     <div class="garde-carte-apercu">
-                        <PageGardeFeuille Donnees="Donnees(modele)" Zoom="35" />
+                        <PageGardeFeuille Donnees="Donnees(modele)" Zoom="35" Images="images" />
                     </div>
                     <div class="garde-carte-nom">@modele.Nom</div>
                     @if (modele.Modifiable)
@@ -62,7 +62,7 @@
                 var modele = p;
                 <div class="garde-carte" @onclick='() => Nav.NavigateTo("/page-de-garde/" + modele.Id)'>
                     <div class="garde-carte-apercu">
-                        <PageGardeFeuille Donnees="Donnees(modele)" Zoom="35" />
+                        <PageGardeFeuille Donnees="Donnees(modele)" Zoom="35" Images="images" />
                     </div>
                     <div class="garde-carte-nom">@modele.Nom</div>
                     <button class="garde-carte-supprimer" title="Supprimer" @onclick="() => Supprimer(modele)" @onclick:stopPropagation="true">🗑</button>
@@ -75,6 +75,7 @@
 @code {
     private List<PageGarde> pages = new List<PageGarde>();
     private Dictionary<int, PageGardeDonnees> donnees = new Dictionary<int, PageGardeDonnees>();
+    private Dictionary<string, string> images = new Dictionary<string, string>();
     private bool chargement = true;
     private string? erreur = null;
 
@@ -107,6 +108,23 @@
         }
 
         chargement = false;
+        StateHasChanged();
+
+        foreach (var d in donnees.Values)
+        {
+            foreach (var zone in d.Images)
+            {
+                if (!images.ContainsKey(zone.Source))
+                {
+                    var dataUrl = await Api.GetImageGardeDataUrlAsync(zone.Source);
+                    if (dataUrl != null)
+                    {
+                        images[zone.Source] = dataUrl;
+                        StateHasChanged();
+                    }
+                }
+            }
+        }
     }
 
     private PageGardeDonnees Donnees(PageGarde page)

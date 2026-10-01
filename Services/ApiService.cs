@@ -1026,6 +1026,87 @@ namespace Obrigenie.Services
             }
         }
 
+        private Dictionary<string, string> imagesChargees = new Dictionary<string, string>();
+
+        public async Task<(List<ImageGarde> Images, string? Err)> GetImagesGardeAsync()
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync("api/imagesgarde");
+                if (!response.IsSuccessStatusCode)
+                    return (new(), await LireMessageErreur(response));
+
+                var images = await response.Content.ReadFromJsonAsync<List<ImageGarde>>();
+                return (images ?? new(), null);
+            }
+            catch (Exception ex)
+            {
+                return (new(), ex.Message);
+            }
+        }
+
+        public async Task<string?> GetImageGardeDataUrlAsync(string source)
+        {
+            if (imagesChargees.ContainsKey(source))
+                return imagesChargees[source];
+
+            try
+            {
+                var response = await _httpClient.GetAsync("api/imagesgarde/fichier?source=" + Uri.EscapeDataString(source));
+                if (!response.IsSuccessStatusCode)
+                    return null;
+
+                var octets = await response.Content.ReadAsByteArrayAsync();
+                string type = "image/png";
+                if (source.EndsWith(".jpg"))
+                    type = "image/jpeg";
+
+                string dataUrl = "data:" + type + ";base64," + Convert.ToBase64String(octets);
+                imagesChargees[source] = dataUrl;
+                return dataUrl;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public async Task<(ImageGarde? Image, string? Err)> UploadImagePersoAsync(string nom, string typeMime, string donneesBase64)
+        {
+            try
+            {
+                var envoi = new { Nom = nom, TypeMime = typeMime, DonneesBase64 = donneesBase64 };
+                var response = await _httpClient.PostAsJsonAsync("api/imagesgarde/perso", envoi);
+                if (!response.IsSuccessStatusCode)
+                    return (null, await LireMessageErreur(response));
+
+                var image = await response.Content.ReadFromJsonAsync<ImageGarde>();
+                return (image, null);
+            }
+            catch (Exception ex)
+            {
+                return (null, ex.Message);
+            }
+        }
+
+        public async Task<(bool Ok, string? Err)> DeleteImagePersoAsync(string source)
+        {
+            try
+            {
+                var response = await _httpClient.DeleteAsync("api/imagesgarde/perso?source=" + Uri.EscapeDataString(source));
+                if (response.IsSuccessStatusCode)
+                {
+                    imagesChargees.Remove(source);
+                    return (true, null);
+                }
+                return (false, await LireMessageErreur(response));
+            }
+            catch (Exception ex)
+            {
+                return (false, ex.Message);
+            }
+        }
+
         public async Task<List<EmojiItem>> GetEmojisAsync()
         {
             try
