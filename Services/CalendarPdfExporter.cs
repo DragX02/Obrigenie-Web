@@ -423,6 +423,9 @@ namespace Obrigenie.Services
                                           float x, float y, float largeur, float hauteur,
                                           float taille, bool complet)
         {
+            while (taille > 5.5f && HauteurNotes(notes, largeur, taille, complet) > hauteur)
+                taille -= 0.5f;
+
             float yCourant = y;
             float yMax     = y + hauteur;
             float interligne = taille + 1.5f;
@@ -468,6 +471,28 @@ namespace Obrigenie.Services
 
                 yCourant += 3;
             }
+        }
+
+        private static float HauteurNotes(IReadOnlyList<Note> notes, float largeur, float taille, bool complet)
+        {
+            float interligne = taille + 1.5f;
+            float total = 0;
+
+            foreach (var note in notes)
+            {
+                int nbLignes = 1;
+                if (ReportNote.Cible(note.Content) != null) nbLignes++;
+
+                var contexte = complet
+                    ? PdfWriter.Nettoyer(note.ViseeContexte)
+                    : PdfWriter.Nettoyer(NoteLayout.CourseLabel(note));
+                nbLignes += PdfWriter.Decouper(contexte, taille - 0.5f, largeur).Count;
+                nbLignes += PdfWriter.Decouper(PdfWriter.Nettoyer(ReportNote.Texte(note.Content)), taille - 0.5f, largeur).Count;
+
+                total += nbLignes * interligne + 3;
+            }
+
+            return total;
         }
 
         // Abrège un nom de jour ("lundi" → "Lun") pour les en-têtes de cellules.

@@ -652,7 +652,43 @@
                         <button type="button" class="btn-copie-toggle" @onclick="OuvrirCopieLecon">
                             ⧉ Copier vers d'autres dates
                         </button>
+
+                        <button type="button" class="btn-copie-toggle" @onclick="ToggleCopieHeurePanel">
+                            ⧉ Copier sur ce jour @(showCopieHeurePanel ? "▴" : "▾")
+                        </button>
                     </div>
+
+                    @if (showCopieHeurePanel)
+                    {
+                        <div class="report-panel">
+                            <div class="report-cible">
+                                <label>De</label>
+                                <input type="time" class="date-box" @bind="copieHeureDebut" />
+                                <label>à</label>
+                                <input type="time" class="date-box" @bind="copieHeureFin" />
+                            </div>
+
+                            <div class="report-raccourcis">
+                                <button type="button" class="dow-btn" @onclick="() => DecalerCopieHeure(new TimeOnly(8, 0))">Matin</button>
+                                <button type="button" class="dow-btn" @onclick="() => DecalerCopieHeure(new TimeOnly(13, 0))">Après-midi</button>
+                                <button type="button" class="dow-btn" @onclick="() => DecalerCopieHeure(noteEnd)">Juste après</button>
+                            </div>
+
+                            <button class="btn-save btn-report" @onclick="CopierSurLeMemeJour"
+                                    disabled="@(noteSaving || copieHeureFin <= copieHeureDebut || LeconQuiChevauche() != null)">
+                                @(noteSaving ? "Copie en cours…" : $"Copier de {copieHeureDebut:HH\\:mm} à {copieHeureFin:HH\\:mm}")
+                            </button>
+
+                            @if (copieHeureFin <= copieHeureDebut)
+                            {
+                                <p class="modal-error">L'heure de fin doit être postérieure à l'heure de début.</p>
+                            }
+                            else if (LeconQuiChevauche() is Note chevauche)
+                            {
+                                <p class="modal-error">Ce créneau chevauche la leçon de @NoteLayout.PlageHoraire(chevauche). Choisis une autre heure.</p>
+                            }
+                        </div>
+                    }
 
                     @* Mention déjà portée par la leçon, visible même panneau fermé *@
                     @if (editingNoteReport is DateTime dejaReporte)
@@ -1164,6 +1200,10 @@
 
     @* Panneau "reporter cette leçon" déplié dans la modale de note *@
     private bool showReportPanel = false;
+
+    private bool showCopieHeurePanel = false;
+    private TimeOnly copieHeureDebut = new(13, 0);
+    private TimeOnly copieHeureFin = new(14, 0);
 
     @* Date de report choisie pour la leçon ouverte dans la modale *@
     private DateTime reportNoteCible = DateTime.Today.AddDays(7);
@@ -1773,6 +1813,7 @@
 
         // Panneau de report replié, visant par défaut le même jour la semaine suivante
         showReportPanel = false;
+        showCopieHeurePanel = false;
         reportNoteCible = currentDate.Date.AddDays(7);
         reportErreur    = null;
         noteStart   = editingNote != null
@@ -1916,8 +1957,74 @@
         showNoteModal = false;
         showCascadePanel = false;
         showReportPanel = false;
+        showCopieHeurePanel = false;
         cascadeSelection = null;
         reportErreur = null;
+    }
+
+    private void ToggleCopieHeurePanel()
+    {
+        showCopieHeurePanel = !showCopieHeurePanel;
+        noteSaveError = null;
+        if (showCopieHeurePanel)
+        {
+            if (noteStart.Hour < 12) DecalerCopieHeure(new TimeOnly(13, 0));
+            else DecalerCopieHeure(new TimeOnly(8, 0));
+        }
+    }
+
+    private void DecalerCopieHeure(TimeOnly debut)
+    {
+        var duree = noteEnd - noteStart;
+        if (duree <= TimeSpan.Zero) duree = TimeSpan.FromHours(1);
+        copieHeureDebut = debut;
+        copieHeureFin = debut.Add(duree);
+        if (copieHeureFin < copieHeureDebut) copieHeureFin = new TimeOnly(23, 59);
+    }
+
+    private Note? LeconQuiChevauche()
+    {
+        if (currentDay == null) return null;
+
+        foreach (var n in currentDay.Notes)
+        {
+            var debut = new TimeOnly(n.Hour, n.Minute);
+            var fin = n.EndHour > 0 ? new TimeOnly(n.EndHour, n.EndMinute) : new TimeOnly(Math.Min(n.Hour + 1, 23), n.Minute);
+            if (copieHeureDebut < fin && debut < copieHeureFin) return n;
+        }
+
+        return null;
+    }
+
+    private async Task CopierSurLeMemeJour()
+    {
+        if (currentDay == null || noteSaving || copieHeureFin <= copieHeureDebut) return;
+        if (LeconQuiChevauche() is Note chevauche)
+        {
+            noteSaveError = $"Ce créneau chevauche la leçon de {NoteLayout.PlageHoraire(chevauche)}.";
+            return;
+        }
+
+        noteSaveError = null;
+        var copie = ReportNote.Copier(editingNote ?? new Note(), currentDate);
+        ApplyFormTo(copie);
+        copie.Hour      = copieHeureDebut.Hour;
+        copie.Minute    = copieHeureDebut.Minute;
+        copie.EndHour   = copieHeureFin.Hour;
+        copie.EndMinute = copieHeureFin.Minute;
+
+        noteSaving = true;
+        var (ok, err) = await Api.SaveNoteAsync(copie);
+        noteSaving = false;
+
+        if (!ok) { noteSaveError = err; return; }
+
+        showNoteModal       = false;
+        showCopieHeurePanel = false;
+        showCascadePanel    = false;
+        cascadeSelection    = null;
+        reportInfo = $"Leçon copiée de {copieHeureDebut:HH\\:mm} à {copieHeureFin:HH\\:mm} le {currentDate:dd/MM/yyyy}.";
+        await UpdateCalendarView();
     }
 
     // Affiche / masque le panneau latéral de sélection en cascade.
