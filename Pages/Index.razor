@@ -280,6 +280,7 @@
                             var endM = note.EndHour > 0 ? note.EndMinute : 0;
                             @* Heure à ouvrir dans la modale au clic sur ce bloc précis *@
                             var noteHour = note.Hour;
+                            var noteCliquee = note;
 
                             @* Texte de la note séparé de sa mention de report : la mention
                                s'affiche en tête de la case, pas noyée dans le texte libre *@
@@ -290,7 +291,7 @@
                             <div class="note-block @(cibleReport != null ? "note-block-reporte" : "")"
                                  title="@ReportNote.Infobulle(note)"
                                  @onclick:stopPropagation="true"
-                                 @onclick="() => OnTimeSlotClicked(noteHour)">
+                                 @onclick="() => OnTimeSlotClicked(noteHour, noteCliquee)">
                                 @* Affiche la plage horaire de la note *@
                                 <span class="note-time">@($"{note.Hour:D2}:{note.Minute:D2} → {endH:D2}:{endM:D2}")</span>
                                 @* Mention de report : la leçon a été recopiée sur une autre date *@
@@ -1799,11 +1800,11 @@
     // Appelée quand l'utilisateur clique sur un créneau horaire dans la grille du jour unique.
     // Si une note couvre déjà l'heure cliquée, ouvre la modale en mode modification.
     // Sinon, ouvre la modale en mode création avec l'heure cliquée pré-remplie.
-    private void OnTimeSlotClicked(int hour)
+    private void OnTimeSlotClicked(int hour, Note? noteCliquee = null)
     {
         // Trouve la note dont la plage horaire inclut l'heure cliquée (peut être null si aucune note n'existe)
-        editingNote = currentDay?.Notes.FirstOrDefault(n =>
-            hour >= n.Hour && hour < (n.EndHour > 0 ? n.EndHour : n.Hour + 1));
+        editingNote = noteCliquee ?? currentDay?.Notes.FirstOrDefault(n =>
+            hour >= n.Hour && (hour < n.EndHour || (hour == n.EndHour && n.EndMinute > 0) || (n.EndHour == 0 && hour == n.Hour)));
 
         // Pré-remplit les champs de la modale depuis la note existante (mode modif) ou les valeurs par défaut (mode création).
         // La mention de report est retirée du texte affiché : elle a sa propre ligne dans la modale.
