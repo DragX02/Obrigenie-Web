@@ -115,16 +115,7 @@
     @if (selectedIdDomaine > 0)
     {
         <div class="cascade-field">
-            <label>5. Compétences.</label>
-            <div class="cascade-boutons">
-                @foreach (var option in OptionsCompetences)
-                {
-                    var valeur = option.Value;
-                    <button type="button"
-                            class="dow-btn @(valeur == selectedIdCompetence.ToString() ? "active" : "")"
-                            @onclick="() => OnCompetenceChanged(valeur)">@option.Label</button>
-                }
-            </div>
+            <label>5. Compétences, savoirs, S-F</label>
         </div>
     }
 
@@ -380,8 +371,18 @@
             try { listeSousDomaines = await Api.GetSousDomainesRefAsync(selectedIdDomaine); }
             catch (Exception ex) { loadError = ex.Message; }
             await ChargerVisees();
+            await ChoisirCompetenceParDefaut();
         }
         await Notify();
+    }
+
+    private async Task ChoisirCompetenceParDefaut()
+    {
+        var option = OptionCompetenceFigee("Compétences");
+        if (option.Value.StartsWith(PrefixeNouveau, StringComparison.Ordinal))
+            await AjouterCompetence(option.Label);
+        else
+            selectedIdCompetence = int.TryParse(option.Value, out var id) ? id : 0;
     }
 
     private async Task OnSousDChanged(string? value)
@@ -389,6 +390,7 @@
         selectedIdSousD = int.TryParse(value, out var v) ? v : 0;
         ResetFrom(4);
         await ChargerVisees();
+        if (selectedIdDomaine > 0) await ChoisirCompetenceParDefaut();
         await Notify();
     }
 

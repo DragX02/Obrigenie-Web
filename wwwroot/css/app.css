@@ -821,10 +821,7 @@ h1:focus { outline: none; }
     font-size: 0.8rem; cursor: pointer; transition: background 0.15s, color 0.15s;
 }
 .dow-btn:hover { color: var(--text); }
-.dow-btn.active { background: #4CAF50; border-color: #4CAF50; color: #fff; font-weight: 600; }
-.cascade-boutons { display: flex; flex-direction: row; flex-wrap: nowrap; gap: 6px; }
-.cascade-boutons .dow-btn { flex: 1 1 0; min-width: 0; white-space: nowrap; text-align: center; }
-.modal-repeat-count { font-size: 0.75rem; color: var(--text-muted); }
+.dow-btn.active { background: #4CAF50; border-color: #4CAF50; color: #fff; font-weight: 600; }.modal-repeat-count { font-size: 0.75rem; color: var(--text-muted); }
 
 .modal-char-count { text-align: right; font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
 .modal-error { color: #f44336; font-size: 0.8rem; margin-top: 0.5rem; }
