@@ -137,12 +137,7 @@
     @if (selectedIdNomVisees.Count > 0)
     {
         <div class="cascade-field">
-            <label>7. Compétences, savoirs, S-F <span class="cascade-opt">(des attendus)</span></label>
-            <SearchableSelect Value="@selectedIdCompetenceVm.ToString()"
-                              ValueChanged="OnCompetenceVmChanged"
-                              OnCreate="AjouterCompetenceVm"
-                              Placeholder="-- Choisir --"
-                              Options="OptionsCompetencesVm" EmptyValue="0" />
+            <label>7. Attendus</label>
         </div>
     }
 
@@ -522,6 +517,16 @@
         }
 
         await ChargerViseesMaitriser();
+
+        if (selectedIdCompetenceVm == 0)
+        {
+            var option = OptionCompetenceFigee("Attendus");
+            if (option.Value.StartsWith(PrefixeNouveau, StringComparison.Ordinal))
+                await AjouterCompetenceVm(option.Label);
+            else
+                selectedIdCompetenceVm = int.TryParse(option.Value, out var idVm) ? idVm : 0;
+        }
+
         await Notify();
     }
 
