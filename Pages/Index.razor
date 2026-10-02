@@ -293,7 +293,12 @@
                                  @onclick:stopPropagation="true"
                                  @onclick="() => OnTimeSlotClicked(noteHour, noteCliquee)">
                                 @* Affiche la plage horaire de la note *@
-                                <span class="note-time">@($"{note.Hour:D2}:{note.Minute:D2} → {endH:D2}:{endM:D2}")</span>
+                                <span class="note-time">@($"{note.Hour:D2}:{note.Minute:D2} → {endH:D2}:{endM:D2}")
+                                    @if (!string.IsNullOrEmpty(note.Titre))
+                                    {
+                                        <strong class="note-titre">@note.Titre</strong>
+                                    }
+                                </span>
                                 @* Mention de report : la leçon a été recopiée sur une autre date *@
                                 @if (cibleReport is DateTime dateReport)
                                 {
@@ -484,7 +489,12 @@
 
                             <div class="note-mini note-mini-week @(cibleReport != null ? "note-mini-reporte" : "")"
                                  title="@ReportNote.Infobulle(note)">
-                                <span class="mini-time">@($"{note.Hour:D2}:{note.Minute:D2} → {endH:D2}:{endM:D2}")</span>
+                                <span class="mini-time">@($"{note.Hour:D2}:{note.Minute:D2} → {endH:D2}:{endM:D2}")
+                                    @if (!string.IsNullOrEmpty(note.Titre))
+                                    {
+                                        <strong class="note-titre"> @note.Titre</strong>
+                                    }
+                                </span>
                                 @if (cibleReport is DateTime dateReport)
                                 {
                                     <span class="mini-reporte">↪ Reporté au @dateReport.ToString("dd/MM")</span>
@@ -510,10 +520,12 @@
                             var (texteNote, cibleReport) = ReportNote.Lire(note.Content);
 
                             @* Texte de la note si présent, sinon contexte de cascade condensé sur une ligne *@
-                            var raw = !string.IsNullOrEmpty(texteNote)
+                            var raw = !string.IsNullOrEmpty(note.Titre)
+                                ? note.Titre
+                                : !string.IsNullOrEmpty(texteNote)
                                 ? texteNote
                                 : ContexteSurUneLigne(note.ViseeContexte);
-                            var icon = !string.IsNullOrEmpty(texteNote) ? "📝" : "🎯";
+                            var icon = !string.IsNullOrEmpty(note.Titre) || !string.IsNullOrEmpty(texteNote) ? "📝" : "🎯";
                             var preview = raw.Length > 16 ? raw[..16] + "…" : raw;
 
                             @* La mention de report passe avant l'aperçu : dans une cellule de mois,
@@ -605,6 +617,7 @@
                 {
                     <button type="button" class="dow-btn" title="Ajouter un autre créneau horaire" @onclick="AjouterCreneau">+</button>
                 }
+                <input type="text" class="date-box note-titre-input" placeholder="Titre de la leçon" maxlength="150" @bind="noteTitre" />
             </div>
 
             @if (editingNote == null)
@@ -1234,6 +1247,8 @@
 
     private List<Creneau> creneauxSup = new();
 
+    private string noteTitre = "";
+
     private bool showCopieHeurePanel = false;
     private TimeOnly copieHeureDebut = new(13, 0);
     private TimeOnly copieHeureFin = new(14, 0);
@@ -1848,6 +1863,7 @@
         showReportPanel = false;
         showCopieHeurePanel = false;
         creneauxSup.Clear();
+        noteTitre = editingNote?.Titre ?? "";
         reportNoteCible = currentDate.Date.AddDays(7);
         reportErreur    = null;
         noteStart   = editingNote != null
@@ -1966,6 +1982,7 @@
         note.EndHour   = noteEnd.Hour;
         note.EndMinute = noteEnd.Minute;
         note.Content   = noteContent;
+        note.Titre     = string.IsNullOrWhiteSpace(noteTitre) ? null : noteTitre.Trim();
 
         // Rattache les visées retenues dans la cascade, si une sélection a été faite.
         // Sans nouvelle sélection, on conserve la visée déjà liée à la note en modification.

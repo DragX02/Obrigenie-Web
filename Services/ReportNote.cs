@@ -101,6 +101,7 @@ namespace Obrigenie.Services
             EndHour       = source.EndHour,
             EndMinute     = source.EndMinute,
             Content       = Texte(source.Content),
+            Titre         = source.Titre,
             IdViseeFk     = source.IdViseeFk,
             ViseeContexte = source.ViseeContexte,
         };

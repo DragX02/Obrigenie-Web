@@ -30,6 +30,8 @@ namespace Obrigenie.Models
         // Le contenu textuel de la note. Maximum 2000 caractères (appliqué par la zone de texte de l'interface).
         public string Content { get; set; } = string.Empty;
 
+        public string? Titre { get; set; }
+
         // L'horodatage UTC de la première création de cette note sur le serveur.
         public DateTime CreatedAt { get; set; }
 

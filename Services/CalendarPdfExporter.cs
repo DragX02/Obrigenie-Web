@@ -435,7 +435,14 @@ namespace Obrigenie.Services
                 if (yCourant + interligne > yMax) return;
 
                 // Plage horaire, en gras
-                pdf.Text(x, yCourant, taille, NoteLayout.PlageHoraire(note), true, OrangeNote);
+                var plage = NoteLayout.PlageHoraire(note);
+                pdf.Text(x, yCourant, taille, plage, true, OrangeNote);
+                if (!string.IsNullOrWhiteSpace(note.Titre))
+                {
+                    float decalage = PdfWriter.LargeurApprox(plage, taille) + 6;
+                    pdf.Text(x + decalage, yCourant, taille,
+                             PdfWriter.Tronquer(PdfWriter.Nettoyer(note.Titre), taille, largeur - decalage), true);
+                }
                 yCourant += interligne;
 
                 // Mention de report : sur papier aussi, une leçon recopiée ailleurs
