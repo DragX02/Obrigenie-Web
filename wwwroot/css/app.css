@@ -1001,7 +1001,7 @@ h1:focus { outline: none; }
 /* Note dans la grille horaire */
 .note-time { display: block; font-size: 0.7rem; font-weight: 600; opacity: 0.75; margin-bottom: 2px; }
 .note-titre { margin-left: 8px; font-size: 0.85rem; font-weight: 700; color: #ffb74d; }
-.note-titre-input { flex: 1; min-width: 140px; }
+.note-titre-input { display: block; width: 100%; box-sizing: border-box; margin-bottom: 8px; }
 .note-visee { display: block; font-size: 0.72rem; font-weight: 600; color: #4CAF50; margin-bottom: 2px; white-space: pre-wrap; line-height: 1.35; }
 
 /* ===== TRIMESTRE VIEW ===== */

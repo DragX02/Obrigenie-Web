@@ -617,7 +617,6 @@
                 {
                     <button type="button" class="dow-btn" title="Ajouter un autre créneau horaire" @onclick="AjouterCreneau">+</button>
                 }
-                <input type="text" class="date-box note-titre-input" placeholder="Titre de la leçon" maxlength="150" @bind="noteTitre" />
             </div>
 
             @if (editingNote == null)
@@ -782,6 +781,8 @@
             }
 
             @* Zone de texte de la note : 2000 caractères maximum, un placeholder guide l'utilisateur *@
+            <input type="text" class="date-box note-titre-input" placeholder="Titre de la leçon" maxlength="150" @bind="noteTitre" />
+
             <textarea @bind="noteContent" placeholder="Saisissez votre note ici..." rows="4" maxlength="2000"></textarea>
 
             @* Affichage du nombre de caractères pour que l'utilisateur sache l'espace restant *@
