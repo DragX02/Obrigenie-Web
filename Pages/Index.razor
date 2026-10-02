@@ -601,7 +601,26 @@
                         <button type="button" class="tb-arrow" @onclick="() => StepEndMinute(-1)">▼</button>
                     </span>
                 </span>
+                @if (editingNote == null)
+                {
+                    <button type="button" class="dow-btn" title="Ajouter un autre créneau horaire" @onclick="AjouterCreneau">+</button>
+                }
             </div>
+
+            @if (editingNote == null)
+            {
+                @foreach (var creneau in creneauxSup)
+                {
+                    var c = creneau;
+                    <div class="modal-time-range">
+                        <label>De</label>
+                        <input type="time" class="date-box" step="300" @bind="c.Debut" />
+                        <label>à</label>
+                        <input type="time" class="date-box" step="300" @bind="c.Fin" />
+                        <button type="button" class="copie-chip-x" title="Retirer ce créneau" @onclick="() => creneauxSup.Remove(c)">✕</button>
+                    </div>
+                }
+            }
 
             @* Répétition — uniquement à la création : la note est enregistrée sur chaque jour
                de la semaine coché, de la date de début à la date de fin incluses.
@@ -630,8 +649,8 @@
 
                     @* Récapitulatif du nombre de notes qui seront créées *@
                     <div class="modal-repeat-count">
-                        @{ var nb = RepeatDates().Count; }
-                        @(repeatDays.Count == 0
+                        @{ var nb = RepeatDates().Count * (1 + creneauxSup.Count); }
+                        @(repeatDays.Count == 0 && creneauxSup.Count == 0
                             ? "Aucun jour coché : la note ne sera créée que pour la date affichée."
                             : $"{nb} note(s) seront créées.")
                     </div>
@@ -783,6 +802,11 @@
             @if (editingNote == null && repeatDays.Count > 0 && RepeatDates().Count == 0)
             {
                 <p class="modal-error">Aucune date entre le début et la fin ne correspond aux jours cochés.</p>
+            }
+
+            @if (editingNote == null && creneauxSup.Count > 0 && ErreurCreneaux() is string erreurCreneauxAffichee)
+            {
+                <p class="modal-error">@erreurCreneauxAffichee</p>
             }
 
             @* Erreur API/enregistrement affichée quand le serveur rejette la note *@
@@ -1201,6 +1225,14 @@
 
     @* Panneau "reporter cette leçon" déplié dans la modale de note *@
     private bool showReportPanel = false;
+
+    private class Creneau
+    {
+        public TimeOnly Debut { get; set; }
+        public TimeOnly Fin { get; set; }
+    }
+
+    private List<Creneau> creneauxSup = new();
 
     private bool showCopieHeurePanel = false;
     private TimeOnly copieHeureDebut = new(13, 0);
@@ -1815,6 +1847,7 @@
         // Panneau de report replié, visant par défaut le même jour la semaine suivante
         showReportPanel = false;
         showCopieHeurePanel = false;
+        creneauxSup.Clear();
         reportNoteCible = currentDate.Date.AddDays(7);
         reportErreur    = null;
         noteStart   = editingNote != null
@@ -1878,10 +1911,16 @@
             var dates = RepeatDates();
             if (dates.Count == 0) { noteSaveError = "Aucune date ne correspond aux jours cochés."; return; }
 
+            if (ErreurCreneaux() is string erreurCreneaux) { noteSaveError = erreurCreneaux; return; }
+
             noteSaving = true;
             int creees = 0;
 
+            var creneaux = new List<Creneau> { new Creneau { Debut = noteStart, Fin = noteEnd } };
+            creneaux.AddRange(creneauxSup);
+
             foreach (var jour in dates)
+            foreach (var creneau in creneaux)
             {
                 // Construit un DateTime UTC à minuit pour éviter la dérive horaire dans le corps JSON.
                 // L'utilisation de DateTimeKind.Utc garantit que le sérialiseur n'ajoute pas de décalage +HH:mm.
@@ -1890,6 +1929,10 @@
                     Date = new DateTime(jour.Year, jour.Month, jour.Day, 0, 0, 0, DateTimeKind.Utc)
                 };
                 ApplyFormTo(note);
+                note.Hour      = creneau.Debut.Hour;
+                note.Minute    = creneau.Debut.Minute;
+                note.EndHour   = creneau.Fin.Hour;
+                note.EndMinute = creneau.Fin.Minute;
 
                 // Soumet la note à l'API ; en cas d'échec on s'arrête en signalant ce qui a déjà été créé
                 var (ok, err) = await Api.SaveNoteAsync(note);
@@ -1961,6 +2004,38 @@
         showCopieHeurePanel = false;
         cascadeSelection = null;
         reportErreur = null;
+    }
+
+    private void AjouterCreneau()
+    {
+        var dernierFin = creneauxSup.Count > 0 ? creneauxSup[^1].Fin : noteEnd;
+        var debut = dernierFin.Add(TimeSpan.FromMinutes(15));
+        var fin = debut.Add(TimeSpan.FromMinutes(15));
+        if (fin < debut) fin = new TimeOnly(23, 59);
+        creneauxSup.Add(new Creneau { Debut = debut, Fin = fin });
+    }
+
+    private string? ErreurCreneaux()
+    {
+        var tous = new List<Creneau> { new Creneau { Debut = noteStart, Fin = noteEnd } };
+        tous.AddRange(creneauxSup);
+
+        foreach (var c in tous)
+        {
+            if (c.Fin <= c.Debut)
+                return $"Le créneau {c.Debut:HH\\:mm} – {c.Fin:HH\\:mm} : l'heure de fin doit être après l'heure de début.";
+        }
+
+        for (int i = 0; i < tous.Count; i++)
+        {
+            for (int j = i + 1; j < tous.Count; j++)
+            {
+                if (tous[i].Debut < tous[j].Fin && tous[j].Debut < tous[i].Fin)
+                    return $"Les créneaux {tous[i].Debut:HH\\:mm} – {tous[i].Fin:HH\\:mm} et {tous[j].Debut:HH\\:mm} – {tous[j].Fin:HH\\:mm} se chevauchent.";
+            }
+        }
+
+        return null;
     }
 
     private void ToggleCopieHeurePanel()
