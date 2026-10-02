@@ -115,12 +115,16 @@
     @if (selectedIdDomaine > 0)
     {
         <div class="cascade-field">
-            <label>5. Compétences, savoirs, S-F</label>
-            <SearchableSelect Value="@selectedIdCompetence.ToString()"
-                              ValueChanged="OnCompetenceChanged"
-                              OnCreate="AjouterCompetence"
-                              Placeholder="-- Choisir --"
-                              Options="OptionsCompetences" EmptyValue="0" />
+            <label>5. Compétences.</label>
+            <div class="cascade-boutons">
+                @foreach (var option in OptionsCompetences)
+                {
+                    var valeur = option.Value;
+                    <button type="button"
+                            class="dow-btn @(valeur == selectedIdCompetence.ToString() ? "active" : "")"
+                            @onclick="() => OnCompetenceChanged(valeur)">@option.Label</button>
+                }
+            </div>
         </div>
     }
 
