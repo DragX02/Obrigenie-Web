@@ -1,22 +1,7 @@
 namespace Obrigenie.Services
 {
-    // ─────────────────────────────────────────────────────────────────────────
-    // Couleur d'affichage d'un congé scolaire.
-    //
-    // Chaque congé reçoit une couleur stable déduite de son nom : les vacances de
-    // Noël sont toujours rouges, celles de Carnaval toujours violettes, dans toutes
-    // les vues et d'un chargement à l'autre. Un nom inconnu (congé ajouté par
-    // l'utilisateur, jour férié local) prend une couleur de la palette choisie par
-    // empreinte du nom — donc elle aussi stable.
-    //
-    // Les teintes sont volontairement moyennes en luminosité : lisibles en texte sur
-    // fond clair comme sur fond sombre, et utilisables en fond une fois transparentes.
-    // ─────────────────────────────────────────────────────────────────────────
     public static class HolidayColors
     {
-        // Couleurs par mot-clé, testées dans l'ordre sur le nom sans accent en minuscules.
-        // Les libellés officiels varient ("Conge d'automne (Toussaint)", "Vacances d'automne"),
-        // d'où la recherche par mot-clé plutôt que par nom exact.
         private static readonly (string MotCle, string Couleur)[] ParMotCle =
         {
             ("rentree",   "#2E7D32"),   // vert : reprise de l'année
@@ -35,19 +20,11 @@ namespace Obrigenie.Services
             ("pedagogiq", "#5D4037"),   // brun journée pédagogique
         };
 
-        // Palette de repli pour les noms non reconnus, indexée par empreinte du nom.
         private static readonly string[] Palette =
         {
             "#0277BD", "#6A1B9A", "#AD1457", "#EF6C00", "#2E7D32", "#00838F", "#5D4037",
         };
 
-        // Clé identifiant le congé derrière ses variantes de libellé.
-        //
-        // Le calendrier officiel contient plusieurs écritures du même congé
-        // ("Vacances d'automne (Toussaint)" et "Conge d'automne (Toussaint)",
-        // "Jour de l'Armistice" et "Commemoration de l'Armistice"). Elles partagent
-        // le même mot-clé, ce qui permet de les reconnaître comme un seul congé.
-        // Un nom sans mot-clé connu est sa propre clé.
         public static string Cle(string? nom)
         {
             if (string.IsNullOrWhiteSpace(nom)) return string.Empty;
@@ -62,7 +39,6 @@ namespace Obrigenie.Services
             return normalise;
         }
 
-        // Couleur hexadécimale (#RRGGBB) associée à un nom de congé.
         public static string Pour(string? nom)
         {
             if (string.IsNullOrWhiteSpace(nom)) return Palette[0];
@@ -74,21 +50,14 @@ namespace Obrigenie.Services
                 if (normalise.Contains(motCle, StringComparison.Ordinal)) return couleur;
             }
 
-            // Empreinte simple et déterministe : le même nom donne toujours la même
-            // couleur, y compris entre deux sessions ou deux navigateurs.
             int empreinte = 0;
             foreach (var c in normalise) empreinte = (empreinte * 31 + c) & 0x7FFFFFFF;
 
             return Palette[empreinte % Palette.Length];
         }
 
-        // Même couleur en version fond translucide, posée sur la cellule du jour.
-        // L'alpha en notation #RRGGBBAA garde une teinte lisible sur les deux thèmes :
-        // assez visible sur fond blanc, sans écraser le texte sur fond sombre.
         public static string Fond(string? nom, string alpha = "2E") => Pour(nom) + alpha;
 
-        // Composantes rouge/vert/bleu normalisées (0–1), au format attendu par le
-        // flux de contenu PDF ("0.9 0.45 0").
         public static string VersPdf(string? nom)
         {
             var hex = Pour(nom);

@@ -18,17 +18,6 @@ namespace Obrigenie.Services
             _auth = auth;
         }
 
-        // ──────────────────────────────────────────────────────────────────
-        // AUTHENTIFICATION
-        // ──────────────────────────────────────────────────────────────────
-
-        // Échange le cookie HttpOnly temporaire "auth_pending" (défini par le serveur après une
-        // redirection OAuth réussie) contre le jeton JWT et les données utilisateur de l'application.
-        // Le jeton n'est jamais transmis via l'URL ; cet endpoint lit le cookie côté serveur
-        // et retourne le payload d'auth directement au client.
-        // Appelé par AuthCallback.razor immédiatement après la redirection du fournisseur OAuth.
-        // Endpoint : GET api/auth/exchange
-        // Retourne un AuthResponse avec le JWT et les détails utilisateur en cas de succès ; null en cas d'échec.
         public async Task<AuthResponse?> ExchangeOAuthTokenAsync()
         {
             try
@@ -47,16 +36,6 @@ namespace Obrigenie.Services
                 return null;
             }
         }
-
-        // Envoie les identifiants email/mot de passe à l'endpoint de connexion et retourne la réponse
-        // d'authentification du serveur si les identifiants sont valides.
-        // Le message d'erreur du serveur est remonté tel quel : un échec de connexion n'est pas
-        // toujours un mauvais mot de passe (compte non confirmé, limite de tentatives atteinte…)
-        // et l'utilisateur ne peut pas se dépanner si l'interface affiche toujours le même texte.
-        // Endpoint : POST api/auth/login
-        // loginDto : DTO contenant l'email et le mot de passe de l'utilisateur.
-        // Retourne (AuthResponse, null) avec le JWT et les détails utilisateur en cas de succès ;
-        // (null, messageErreur) si les identifiants sont refusés ou en cas d'erreur réseau.
         public async Task<(AuthResponse? Auth, string? Error)> LoginAsync(LoginDto loginDto)
         {
             try
@@ -72,27 +51,15 @@ namespace Obrigenie.Services
                 if ((int)response.StatusCode == 429)
                     return (null, "Trop de tentatives. Veuillez réessayer dans quelques minutes.");
 
-                // Le serveur renvoie une chaîne explicite ("Email ou mot de passe incorrect.",
-                // "Veuillez confirmer votre email avant de vous connecter.", …)
                 var message = await ReadMessageAsync(response);
                 return (null, message ?? "Email ou mot de passe incorrect.");
             }
             catch
             {
-                // Panne réseau ou serveur inaccessible
                 return (null, "Impossible de contacter le serveur. Veuillez réessayer plus tard.");
             }
         }
 
-        // Envoie les données d'inscription au serveur pour créer un nouveau compte utilisateur.
-        // Le serveur valide la robustesse du mot de passe et l'unicité de l'email.
-        // Attention : l'inscription ne connecte PAS l'utilisateur. Le compte est créé inactif et
-        // le serveur répond { "message": "..." } sans jeton — la connexion n'est possible qu'après
-        // le clic sur le lien de confirmation reçu par e-mail.
-        // Endpoint : POST api/auth/register
-        // registerDto : DTO avec tous les champs d'inscription incluant la confirmation du mot de passe.
-        // Retourne (true, messageServeur) si le compte a été créé ;
-        // (false, messageErreur) en cas d'erreur de validation, d'email déjà pris ou de panne réseau.
         public async Task<(bool Success, string Message)> RegisterAsync(RegisterDto registerDto)
         {
             try
@@ -107,8 +74,6 @@ namespace Obrigenie.Services
                 if ((int)response.StatusCode == 429)
                     return (false, "Trop de tentatives. Veuillez réessayer dans quelques minutes.");
 
-                // Le serveur détaille la raison du refus ("Un compte avec cet email existe déjà.",
-                // "Le nom contient des caractères non autorisés…", …)
                 return (false, message ?? "Impossible de créer le compte. Veuillez réessayer.");
             }
             catch
@@ -117,14 +82,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // Demande l'envoi d'un e-mail de réinitialisation de mot de passe à l'adresse indiquée.
-        // Le serveur répond toujours par le même message de succès, que l'adresse soit inscrite
-        // ou non, afin de ne pas révéler quels comptes existent : l'interface se contente donc
-        // d'afficher le message renvoyé.
-        // Endpoint : POST api/auth/forgot-password
-        // email : l'adresse e-mail du compte à récupérer.
-        // Retourne (true, messageServeur) si la demande a été acceptée ;
-        // (false, messageErreur) en cas de validation refusée, de limite de débit atteinte ou d'erreur réseau.
         public async Task<(bool Success, string Message)> ForgotPasswordAsync(string email)
         {
             try
@@ -132,13 +89,11 @@ namespace Obrigenie.Services
                 var response = await _httpClient.PostAsJsonAsync(
                     "api/auth/forgot-password", new ForgotPasswordDto { Email = email });
 
-                // Le serveur renvoie { "message": "..." } aussi bien en succès qu'en erreur métier
                 var message = await ReadMessageAsync(response);
 
                 if (response.IsSuccessStatusCode)
                     return (true, message ?? "Si un compte existe avec cette adresse, un e-mail vient d'être envoyé.");
 
-                // 429 : la politique de limitation de débit du serveur a rejeté la requête
                 if ((int)response.StatusCode == 429)
                     return (false, "Trop de tentatives. Veuillez réessayer dans quelques minutes.");
 
@@ -146,18 +101,10 @@ namespace Obrigenie.Services
             }
             catch
             {
-                // Panne réseau ou serveur inaccessible
                 return (false, "Impossible de contacter le serveur. Veuillez réessayer plus tard.");
             }
         }
 
-        // Vérifie qu'un jeton de réinitialisation reçu par e-mail est encore valide, sans rien modifier.
-        // Permet à la page de réinitialisation d'afficher "lien expiré" avant que l'utilisateur
-        // ne saisisse un nouveau mot de passe.
-        // Endpoint : GET api/auth/validate-reset-token?token=...
-        // token : le jeton extrait de l'URL du lien e-mail.
-        // Retourne (true, null) si le jeton est exploitable ;
-        // (false, messageErreur) si le lien est invalide, expiré ou si le serveur est inaccessible.
         public async Task<(bool Valid, string? Error)> ValidateResetTokenAsync(string token)
         {
             try
@@ -176,14 +123,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // Enregistre le nouveau mot de passe choisi par l'utilisateur en présentant le jeton
-        // reçu par e-mail. Le jeton est à usage unique : il est effacé côté serveur en cas de succès.
-        // Endpoint : POST api/auth/reset-password
-        // token : le jeton extrait de l'URL du lien e-mail.
-        // password : le nouveau mot de passe en clair.
-        // confirmPassword : la confirmation du nouveau mot de passe (revalidée côté serveur).
-        // Retourne (true, messageServeur) si le mot de passe a été changé ;
-        // (false, messageErreur) sinon.
         public async Task<(bool Success, string Message)> ResetPasswordAsync(
             string token, string password, string confirmPassword)
         {
@@ -212,11 +151,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // Extrait le texte lisible d'une réponse des endpoints d'authentification.
-        // Ces endpoints renvoient soit un objet JSON { "message": "..." }, soit une chaîne brute
-        // (les BadRequest("texte") d'ASP.NET Core). Les deux formes sont ramenées à une simple chaîne.
-        // response : la réponse HTTP dont le corps doit être lu.
-        // Retourne le message du serveur, ou null si le corps est vide.
         private static async Task<string?> ReadMessageAsync(HttpResponseMessage response)
         {
             var body = await response.Content.ReadAsStringAsync();
@@ -225,7 +159,6 @@ namespace Obrigenie.Services
 
             try
             {
-                // Cas du JSON structuré : on cherche la propriété "message"
                 using var json = System.Text.Json.JsonDocument.Parse(body);
                 if (json.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object &&
                     json.RootElement.TryGetProperty("message", out var msg))
@@ -233,49 +166,27 @@ namespace Obrigenie.Services
                     return msg.GetString();
                 }
 
-                // JSON valide mais sans propriété "message" (ex. une chaîne JSON) : on renvoie le corps tel quel
                 return body.Trim('"');
             }
             catch
             {
-                // Corps non JSON (texte brut renvoyé par BadRequest) : utilisable directement
                 return body;
             }
         }
 
-        // ──────────────────────────────────────────────────────────────────
-        // COURS
-        // ──────────────────────────────────────────────────────────────────
-
-        // Récupère la liste des cours planifiés pour une date calendaire spécifique.
-        // Le serveur filtre les cours récurrents par leur masque de bits DaysOfWeek et la plage de dates.
-        // Endpoint : GET api/courses/date/{yyyy-MM-dd}
-        // date : la date pour laquelle charger les cours.
-        // Retourne une liste de cours pour cette date, ou une liste vide en cas d'erreur.
         public async Task<List<Course>> GetCoursesForDateAsync(DateTime date)
         {
             try
             {
-                // Formate la date en ISO 8601 (yyyy-MM-dd) tel qu'attendu par la route API
                 return await _httpClient.GetFromJsonAsync<List<Course>>(
                     $"api/courses/date/{date:yyyy-MM-dd}") ?? new();
             }
             catch
             {
-                // Retourne une liste vide pour que le calendrier s'affiche sans planter en cas d'erreur API
                 return new();
             }
         }
 
-        // Récupère les cours de tous les jours d'une plage de dates en une seule requête.
-        //
-        // La vue Trimestre demandait ses cours jour par jour : une cinquantaine de requêtes
-        // simultanées pour une seule période, alors que les notes de la même période
-        // tenaient déjà en un appel. Le serveur développe la récurrence (masque des jours
-        // + plage de dates du cours), comme il le fait déjà pour la variante par date.
-        // Endpoint : GET api/courses/range?start={yyyy-MM-dd}&end={yyyy-MM-dd}
-        // Retourne les cours indexés par date, ou un dictionnaire vide en cas d'erreur —
-        // le calendrier s'affiche alors sans les cours plutôt que de planter.
         public async Task<Dictionary<DateTime, List<Course>>> GetCoursesForRangeAsync(DateTime start, DateTime end)
         {
             try
@@ -293,13 +204,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // Récupère toutes les notes utilisateur dont la date se situe dans la plage de dates inclusive donnée.
-        // Utilisé par les vues semaine et mois pour charger les notes de tous les jours affichés en une seule
-        // requête, ce qui est plus efficace qu'une requête par jour.
-        // Endpoint : GET api/notes/range?start={yyyy-MM-dd}&end={yyyy-MM-dd}
-        // start : la première date de la plage (inclusive).
-        // end : la dernière date de la plage (inclusive).
-        // Retourne toutes les notes dont la date est dans [start, end], ou une liste vide en cas d'erreur.
         public async Task<List<Note>> GetNotesForRangeAsync(DateTime start, DateTime end)
         {
             try
@@ -312,33 +216,16 @@ namespace Obrigenie.Services
                 return new();
             }
         }
-
-        // Sauvegarde un nouveau cours ou met à jour un cours existant en le postant à l'endpoint des cours.
-        // Le serveur détermine création ou mise à jour selon la valeur de Course.Id.
-        // Endpoint : POST api/courses
-        // course : le modèle de cours à créer ou mettre à jour.
         public async Task SaveCourseAsync(Course course)
         {
             await _httpClient.PostAsJsonAsync("api/courses", course);
         }
 
-        // Supprime définitivement un cours par son identifiant assigné par le serveur.
-        // Endpoint : DELETE api/courses/{id}
-        // id : l'identifiant unique du cours à supprimer.
         public async Task DeleteCourseAsync(int id)
         {
             await _httpClient.DeleteAsync($"api/courses/{id}");
         }
 
-        // ──────────────────────────────────────────────────────────────────
-        // NOTES
-        // ──────────────────────────────────────────────────────────────────
-
-        // Récupère toutes les notes pour une seule date spécifique.
-        // Utilisé par la vue journalière lorsqu'on n'a besoin que des notes d'un seul jour.
-        // Endpoint : GET api/notes/date/{yyyy-MM-dd}
-        // date : la date pour laquelle charger les notes.
-        // Retourne toutes les notes pour cette date, ou une liste vide en cas d'erreur.
         public async Task<List<Note>> GetNotesForDateAsync(DateTime date)
         {
             try
@@ -352,13 +239,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // Crée une nouvelle note ou met à jour une existante (déterminé par Note.Id valant 0 ou non).
-        // Retourne un indicateur de succès et un message d'erreur optionnel pour que l'interface
-        // puisse afficher un retour inline.
-        // Endpoint : POST api/notes
-        // note : la note à sauvegarder. Id == 0 signifie une nouvelle note.
-        // Retourne (true, null) en cas de succès ;
-        // (false, messageErreur) si le serveur retourne un statut non-succès ou en cas d'erreur réseau.
         public async Task<(bool Success, string? Error)> SaveNoteAsync(Note note)
         {
             try
@@ -367,34 +247,15 @@ namespace Obrigenie.Services
 
                 if (response.IsSuccessStatusCode) return (true, null);
 
-                // Lit le corps brut de la réponse pour inclure la description d'erreur du serveur
                 var body = await response.Content.ReadAsStringAsync();
                 return (false, $"Error {(int)response.StatusCode}: {body}");
             }
             catch (Exception ex)
             {
-                // Panne réseau ou de sérialisation : remonte le message de l'exception
                 return (false, ex.Message);
             }
         }
 
-        // Recopie des leçons sur d'autres dates, en une requête et une transaction.
-        //
-        // Le report et la copie partaient auparavant en un POST par copie, plus un POST
-        // par originale à marquer : reporter une semaine de dix leçons faisait vingt
-        // allers-retours, et une coupure au milieu laissait la moitié du travail fait
-        // sans moyen d'y revenir. Le serveur écrit désormais tout ou rien.
-        //
-        // Endpoint : POST api/notes/copier
-        // idsNotes  : les leçons enregistrées à recopier.
-        // decalages : les destinations, en jours par rapport à la date de chaque leçon.
-        //             Un multiple de 7 conserve le jour de la semaine.
-        // marquer   : vrai pour un report (l'originale reçoit la mention « Reporté au … »),
-        //             faux pour une copie.
-        // modeles   : leçons sources qui n'existent pas en base — la copie d'une leçon
-        //             depuis sa fenêtre d'édition part des valeurs affichées sans toucher
-        //             à l'originale. Leur date sert de référence aux décalages.
-        // Retourne (true, nombre de copies, null) en cas de succès ; (false, 0, message) sinon.
         public async Task<(bool Ok, int Copiees, string? Err)> CopierNotesAsync(
             IEnumerable<int> idsNotes, IEnumerable<int> decalages, bool marquer,
             IEnumerable<Note>? modeles = null)
@@ -421,23 +282,11 @@ namespace Obrigenie.Services
             }
         }
 
-        // Supprime définitivement une note par son identifiant assigné par le serveur.
-        // Endpoint : DELETE api/notes/{id}
-        // id : l'identifiant unique de la note à supprimer.
         public async Task DeleteNoteAsync(int id)
         {
             await _httpClient.DeleteAsync($"api/notes/{id}");
         }
 
-        // ──────────────────────────────────────────────────────────────────
-        // CONGÉS — CORRECTIONS PERSONNELLES DU CALENDRIER SCOLAIRE
-        // ──────────────────────────────────────────────────────────────────
-
-        // Récupère les corrections de congés de l'utilisateur courant.
-        // Endpoint : GET api/conges
-        // Ne lève jamais : en cas d'échec, retourne une liste vide accompagnée du message
-        // d'erreur. Le calendrier peut ainsi s'afficher avec les congés officiels seuls,
-        // tandis que la page Congés affiche la raison de l'échec au lieu de rester muette.
         public async Task<(List<UserConge> Conges, string? Error)> GetCongesAsync()
         {
             try
@@ -458,11 +307,6 @@ namespace Obrigenie.Services
                 return (new(), ex.Message);
             }
         }
-
-        // Crée ou met à jour une correction de congé (déterminé par UserConge.Id valant 0 ou non).
-        // Endpoint : POST api/conges
-        // Retourne (true, null) en cas de succès ; (false, messageErreur) sinon, pour que
-        // l'interface puisse afficher le refus du serveur inline.
         public async Task<(bool Success, string? Error)> SaveCongeAsync(UserConge conge)
         {
             try
@@ -479,25 +323,11 @@ namespace Obrigenie.Services
                 return (false, ex.Message);
             }
         }
-
-        // Supprime une correction : le congé officiel correspondant réapparaît tel quel,
-        // et un congé ajouté par l'utilisateur disparaît de son calendrier.
-        // Endpoint : DELETE api/conges/{id}
         public async Task DeleteCongeAsync(int id)
         {
             await _httpClient.DeleteAsync($"api/conges/{id}");
         }
 
-        // ──────────────────────────────────────────────────────────────────
-        // LEÇONS — PRÉPARATIONS DE COURS
-        // ──────────────────────────────────────────────────────────────────
-
-        // Récupère les préparations de leçon de l'utilisateur courant, la plus
-        // récemment modifiée en tête.
-        // Endpoint : GET api/lecons
-        // Ne lève jamais : en cas d'échec, retourne une liste vide accompagnée du
-        // message d'erreur, pour que la page affiche la raison au lieu de rester muette
-        // (cause la plus probable : les tables lecon / lecon_phase pas encore créées).
         public async Task<(List<Lecon> Lecons, string? Error)> GetLeconsAsync()
         {
             try
@@ -542,8 +372,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // Supprime définitivement une préparation ; ses phases partent avec elle.
-        // Endpoint : DELETE api/lecons/{id}
         public async Task<(bool Ok, string? Err)> DeleteLeconAsync(int id)
         {
             try
@@ -558,15 +386,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // ──────────────────────────────────────────────────────────────────
-        // LICENCE — VALIDATION ET VÉRIFICATION
-        // ──────────────────────────────────────────────────────────────────
-
-        // Soumet un code d'accès de licence saisi par l'utilisateur sur AccessCodePage pour validation initiale.
-        // Si valide, le code est stocké en localStorage et utilisé pour les appels CheckLicenseAsync suivants.
-        // Endpoint : POST api/access/validate  (body: { code })
-        // code : la chaîne de code d'accès saisie par l'utilisateur.
-        // Retourne true si le serveur accepte le code comme valide ; false sinon.
         public async Task<bool> ValidateAccessCodeAsync(string code)
         {
             try
@@ -581,13 +400,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // Valide qu'un code de licence précédemment accepté est toujours actif sur le serveur.
-        // Appelé à chaque démarrage de l'application (dans MainLayout) pour appliquer la révocation
-        // de licence en temps réel : si un admin révoque une licence, l'utilisateur est redirigé
-        // vers la page de code d'accès au prochain chargement.
-        // Endpoint : GET api/access/check?code={code}
-        // code : le code de licence stocké en localStorage.
-        // Retourne true si la licence est toujours active ; false si révoquée ou introuvable.
         public async Task<bool> CheckLicenseAsync(string code)
         {
             try
@@ -597,7 +409,6 @@ namespace Obrigenie.Services
 
                 if (!response.IsSuccessStatusCode) return false;
 
-                // Le serveur retourne { "valid": true/false } comme corps de réponse
                 var result = await response.Content.ReadFromJsonAsync<LicenseCheckResult>();
                 return result?.Valid == true;
             }
@@ -607,14 +418,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // ──────────────────────────────────────────────────────────────────
-        // ADMIN — GESTION DES LICENCES
-        // ──────────────────────────────────────────────────────────────────
-
-        // Récupère la liste complète de tous les enregistrements de licences pour affichage dans la page admin.
-        // Accessible uniquement aux utilisateurs ayant le rôle ADMIN (appliqué côté serveur).
-        // Endpoint : GET api/admin/licenses
-        // Retourne une liste de tous les enregistrements LicenseDto, ou une liste vide en cas d'erreur.
         public async Task<List<LicenseDto>> GetLicensesAsync()
         {
             try
@@ -627,14 +430,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // Crée une nouvelle licence avec un libellé optionnel, une date d'expiration et un code personnalisé.
-        // Si aucun code personnalisé n'est fourni, le serveur en génère un automatiquement.
-        // Endpoint : POST api/admin/licenses  (body: { code, label, expiresAt })
-        // label : un libellé lisible optionnel (ex. : "PROF-DUPONT").
-        // expiresAt : une date d'expiration optionnelle après laquelle la licence devient inactive.
-        // code : une chaîne de code personnalisée optionnelle ; null laisse le serveur générer automatiquement.
-        // Retourne (LicenseDto, null) en cas de succès ;
-        // (null, messageErreur) si la création échoue, avec le message d'erreur du serveur si disponible.
         public async Task<(LicenseDto? License, string? Error)> CreateLicenseAsync(
             string? label, DateTime? expiresAt, string? code = null)
         {
@@ -646,7 +441,6 @@ namespace Obrigenie.Services
                 if (response.IsSuccessStatusCode)
                     return (await response.Content.ReadFromJsonAsync<LicenseDto>(), null);
 
-                // Tente d'extraire le message d'erreur structuré depuis le corps JSON de la réponse
                 try
                 {
                     var err = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
@@ -655,7 +449,6 @@ namespace Obrigenie.Services
                 }
                 catch
                 {
-                    // Si le corps ne peut pas être parsé en JSON, repli sur le code de statut
                     return (null, $"Error {(int)response.StatusCode}");
                 }
             }
@@ -664,16 +457,10 @@ namespace Obrigenie.Services
                 return (null, ex.Message);
             }
         }
-
-        // Révoque une licence active, empêchant tout utilisateur assigné à ce code d'accéder à l'application.
-        // Endpoint : PUT api/admin/licenses/{id}/revoke  (sans body)
-        // id : l'identifiant unique de la licence à révoquer.
-        // Retourne true si le serveur a accepté la révocation ; false en cas d'échec.
         public async Task<bool> RevokeLicenseAsync(int id)
         {
             try
             {
-                // PUT avec un body null — la route elle-même identifie l'action et la cible
                 var response = await _httpClient.PutAsync($"api/admin/licenses/{id}/revoke", null);
                 return response.IsSuccessStatusCode;
             }
@@ -682,11 +469,6 @@ namespace Obrigenie.Services
                 return false;
             }
         }
-
-        // Réactive une licence précédemment révoquée.
-        // Endpoint : PUT api/admin/licenses/{id}/reactivate  (sans body)
-        // id : l'identifiant unique de la licence à réactiver.
-        // Retourne true si la réactivation a été acceptée ; false en cas d'échec.
         public async Task<bool> ReactivateLicenseAsync(int id)
         {
             try
@@ -699,11 +481,6 @@ namespace Obrigenie.Services
                 return false;
             }
         }
-
-        // Supprime définitivement un enregistrement de licence de la base de données.
-        // Endpoint : DELETE api/admin/licenses/{id}
-        // id : l'identifiant unique de la licence à supprimer.
-        // Retourne true si la suppression a été acceptée ; false en cas d'échec.
         public async Task<bool> DeleteLicenseAsync(int id)
         {
             try
@@ -716,17 +493,6 @@ namespace Obrigenie.Services
                 return false;
             }
         }
-
-        // ──────────────────────────────────────────────────────────────────
-        // ADMIN — SCRAPER DU CALENDRIER SCOLAIRE
-        // ──────────────────────────────────────────────────────────────────
-
-        // Déclenche le scraper côté serveur qui récupère les dernières dates de vacances scolaires
-        // depuis le site officiel enseignement.be et met à jour la base de données.
-        // Cette opération peut prendre plusieurs secondes ; l'interface désactive le bouton pendant son exécution.
-        // Endpoint : GET api/update-scolaire
-        // Retourne (true, messageSucces) lorsque le scraper se termine sans erreur ;
-        // (false, descriptionErreur) lorsque le scraper échoue ou en cas d'erreur réseau.
         public async Task<(bool Success, string Message)> TriggerScraperAsync()
         {
             try
@@ -744,14 +510,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // ──────────────────────────────────────────────────────────────────
-        // VÉRIFICATION DE SANTÉ
-        // ──────────────────────────────────────────────────────────────────
-
-        // Effectue un ping de vérification de santé léger vers le serveur pour déterminer si le
-        // backend est accessible. Le résultat pilote le badge en ligne/hors ligne dans MainLayout.
-        // Endpoint : GET api/health
-        // Retourne true si le serveur répond avec un statut 2xx ; false sinon.
         public async Task<bool> CheckHealthAsync()
         {
             try
@@ -765,17 +523,7 @@ namespace Obrigenie.Services
             }
         }
 
-        // ──────────────────────────────────────────────────────────────────
-        // RÉFÉRENTIEL — LECTEUR DE PDF
-        // ──────────────────────────────────────────────────────────────────
-
-        // URL de base de l'API (ex. : "http://localhost:5276/") utilisée par la page
-        // ReferentielPage pour construire les URLs des fichiers PDF à afficher.
         public string BaseUrl => _httpClient.BaseAddress?.ToString() ?? "";
-
-        // Récupère la liste des noms de fichiers PDF disponibles dans le dossier Referentiel du serveur.
-        // Endpoint : GET api/referentiel
-        // Retourne la liste triée des noms de fichiers, ou une liste vide en cas d'erreur.
         public async Task<List<string>> GetReferentielListAsync()
         {
             try
@@ -791,12 +539,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // Télécharge le contenu binaire d'un fichier PDF depuis le serveur.
-        // Le tableau d'octets est ensuite passé au JS via IJSRuntime pour créer une URL blob
-        // et l'afficher dans un iframe sans exposer le token JWT dans l'URL.
-        // Endpoint : GET api/referentiel/{nomFichier}
-        // nomFichier : le nom du fichier PDF à télécharger (ex. : "referentiel-maths.pdf").
-        // Retourne le contenu du fichier en octets, ou null en cas d'erreur.
         public async Task<byte[]?> GetReferentielPdfAsync(string nomFichier)
         {
             try
@@ -812,12 +554,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // ──────────────────────────────────────────────────────────────────
-        // DONNÉES ADMIN — GESTION DES TABLES PÉDAGOGIQUES
-        // ──────────────────────────────────────────────────────────────────
-
-        // Envoie un GET authentifié et désérialise la liste retournée.
-        // Retourne une liste vide en cas d'erreur réseau ou de statut non-succès.
         private async Task<List<T>> AdminGetListAsync<T>(string url)
         {
             try
@@ -830,8 +566,6 @@ namespace Obrigenie.Services
             catch { return new(); }
         }
 
-        // Envoie un POST authentifié avec un body JSON sérialisé.
-        // Retourne (true, null) en cas de succès, (false, messageErreur) sinon.
         private async Task<(bool Ok, string? Err)> AdminPostAsync<T>(string url, T body)
         {
             try
@@ -850,8 +584,6 @@ namespace Obrigenie.Services
             catch (Exception ex) { return (false, ex.Message); }
         }
 
-        // Envoie un DELETE authentifié sur l'URL donnée.
-        // Retourne (true, null) en cas de succès, (false, messageErreur) sinon.
         private async Task<(bool Ok, string? Err)> AdminDeleteAsync(string url)
         {
             try
@@ -869,7 +601,6 @@ namespace Obrigenie.Services
             catch (Exception ex) { return (false, ex.Message); }
         }
 
-        // Catégories
         public Task<List<CategorieAdminDto>>      GetAdminCategoriesAsync()                   => AdminGetListAsync<CategorieAdminDto>("api/admin-data/categories");
         public Task<(bool Ok, string? Err)>       CreateAdminCategorieAsync(object dto)        => AdminPostAsync("api/admin-data/categories", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminCategorieAsync(int id)            => AdminDeleteAsync($"api/admin-data/categories/{id}");
@@ -937,15 +668,7 @@ namespace Obrigenie.Services
         public Task<(bool Ok, string? Err)>       CreateAdminAppartenirAsync(object dto)       => AdminPostAsync("api/admin-data/appartenir-visee-aptitude", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminAppartenirAsync(int id)          => AdminDeleteAsync($"api/admin-data/appartenir-visee-aptitude/{id}");
 
-        // ──────────────────────────────────────────────────────────────────
-        // DONNÉES DE RÉFÉRENCE — LISTES DÉROULANTES EN CASCADE (TestPage)
-        // ──────────────────────────────────────────────────────────────────
-
-        // Construit un HttpRequestMessage avec l'en-tête Authorization Bearer défini depuis localStorage.
-        // Utilisé par les endpoints de référence comme solution de repli pour s'assurer que le jeton
-        // est toujours attaché, que AuthHeaderHandler ait déjà renseigné l'en-tête ou non.
-        // method : la méthode HTTP (GET, POST, etc.)
-        // url : l'URL relative de l'endpoint API.
+   
         private async Task<HttpRequestMessage> BuildAuthRequest(HttpMethod method, string url)
         {
             var request = new HttpRequestMessage(method, url);
@@ -956,11 +679,6 @@ namespace Obrigenie.Services
             return request;
         }
 
-        // Récupère la liste principale de toutes les catégories de matières depuis la base de données de référence.
-        // Utilisé pour peupler la première liste déroulante (niveau supérieur) de la page de sélection en cascade.
-        // Endpoint : GET api/ref/categories
-        // Lève HttpRequestException si le serveur retourne un code de statut non-succès.
-        // Retourne une liste de CategorieDto triée par ordre d'affichage.
         public async Task<(bool Ok, string? Err)> SupprimerCompteAsync(string confirmation)
         {
             try
@@ -1173,10 +891,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<NiveauDto>>() ?? new();
         }
 
-        // Récupère les catégories ayant au moins un cours enseigné au niveau donné.
-        // Deuxième étape de la cascade réordonnée (Année → Catégorie).
-        // Endpoint : GET api/ref/categories/by-niveau/{codeNiveau}
-        // codeNiveau : le code du niveau sélectionné.
         public async Task<List<CategorieDto>> GetCategoriesByNiveauAsync(string codeNiveau)
         {
             var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/categories/by-niveau/{Uri.EscapeDataString(codeNiveau)}");
@@ -1186,10 +900,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<CategorieDto>>() ?? new();
         }
 
-        // Récupère les cours d'une catégorie enseignés à un niveau donné.
-        // Troisième étape de la cascade réordonnée (Année → Catégorie → Cours).
-        // Endpoint : GET api/ref/cours/by-cat-niveau/{idCat}/{codeNiveau}
-        // idCat : la clé primaire de la catégorie ; codeNiveau : le code du niveau.
         public async Task<List<CoursDto>> GetCoursByCatNiveauAsync(int idCat, string codeNiveau)
         {
             var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/cours/by-cat-niveau/{idCat}/{Uri.EscapeDataString(codeNiveau)}");
@@ -1199,13 +909,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<CoursDto>>() ?? new();
         }
 
-        // Récupère tous les cours enseignés à un niveau, toutes catégories confondues.
-        //
-        // La cascade dressait cette liste elle-même : les catégories du niveau, puis les
-        // cours de chaque catégorie un appel à la fois, puis la fusion et le dédoublonnage
-        // (un cours peut relever de plusieurs catégories). Le serveur rend la même liste
-        // en une jointure.
-        // Endpoint : GET api/ref/cours/by-niveau/{codeNiveau}
         public async Task<List<CoursDto>> GetCoursByNiveauAsync(string codeNiveau)
         {
             var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/cours/by-niveau/{Uri.EscapeDataString(codeNiveau)}");
@@ -1215,12 +918,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<CoursDto>>() ?? new();
         }
 
-        // Récupère les niveaux disponibles pour un code de cours spécifique.
-        // Appelé lorsque l'utilisateur sélectionne un cours dans la première liste déroulante de la page de test.
-        // Endpoint : GET api/ref/niveaux/{codeCours}
-        // Lève HttpRequestException si le serveur retourne un code de statut non-succès.
-        // codeCours : le code de cours (ex. : "LM", "SC") pour filtrer les niveaux.
-        // Retourne une liste de NiveauDto.
         public async Task<List<NiveauDto>> GetNiveauxAsync(string codeCours)
         {
             var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/niveaux/{codeCours}");
@@ -1230,13 +927,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<NiveauDto>>() ?? new();
         }
 
-        // Récupère les domaines disponibles pour une combinaison cours et niveau spécifique.
-        // Appelé lorsque l'utilisateur sélectionne un niveau dans la deuxième liste déroulante de la page de test.
-        // Endpoint : GET api/ref/domaines/{codeCours}/{codeNiveau}
-        // Lève HttpRequestException si le serveur retourne un code de statut non-succès.
-        // codeCours : le code de cours utilisé pour filtrer les domaines.
-        // codeNiveau : le code de niveau utilisé conjointement avec le cours pour filtrer les domaines.
-        // Retourne une liste de DomaineDto.
         public async Task<List<DomaineDto>> GetDomainesAsync(string codeCours, string codeNiveau)
         {
             var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/domaines/{codeCours}/{codeNiveau}");
@@ -1245,9 +935,6 @@ namespace Obrigenie.Services
                 throw new HttpRequestException($"api/ref/domaines/{codeCours}/{codeNiveau} a retourné {(int)response.StatusCode} {response.StatusCode}.");
             return await response.Content.ReadFromJsonAsync<List<DomaineDto>>() ?? new();
         }
-
-        // Retourne les sous-domaines d'un domaine donné.
-        // Endpoint : GET api/ref/sous-domaines/{idDomaine}
         public async Task<List<SousDomaineRefDto>> GetSousDomainesRefAsync(int idDomaine)
         {
             var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/sous-domaines/{idDomaine}");
@@ -1257,8 +944,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<SousDomaineRefDto>>() ?? new();
         }
 
-        // Retourne les visées d'un domaine, filtrées optionnellement par sous-domaine.
-        // Endpoint : GET api/ref/visees/{idDomaine}?sousDomaine={idSousDomaine}
         public async Task<List<ViseeRefDto>> GetViseesRefAsync(int idDomaine, int? idSousDomaine = null)
         {
             var url = $"api/ref/visees/{idDomaine}";
@@ -1271,8 +956,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<ViseeRefDto>>() ?? new();
         }
 
-        // Retourne les visées à maîtriser liées à une visée donnée.
-        // Endpoint : GET api/ref/visees-maitriser/{idVisee}
         public async Task<List<ViseesMaitriserRefDto>> GetViseesMaitriserRefAsync(int idVisee)
         {
             var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/visees-maitriser/{idVisee}");
@@ -1282,18 +965,10 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<ViseesMaitriserRefDto>>() ?? new();
         }
 
-        // Retourne les visées à maîtriser de plusieurs visées à la fois, fusionnées et
-        // dédoublonnées par le serveur.
-        //
-        // La cascade interrogeait la variante à un identifiant une fois par visée cochée,
-        // puis fusionnait les réponses : cocher six visées coûtait six allers-retours pour
-        // une liste que la base rend d'un coup.
-        // Endpoint : GET api/ref/visees-maitriser/par-visees?ids=1&ids=2
         public async Task<List<ViseesMaitriserRefDto>> GetViseesMaitriserParViseesAsync(IEnumerable<int> idVisees)
         {
             var ids = idVisees.Distinct().ToList();
 
-            // Aucune visée cochée : inutile d'interroger le serveur pour une liste vide
             if (ids.Count == 0) return new();
 
             var url = "api/ref/visees-maitriser/par-visees?" + string.Join("&", ids.Select(id => $"ids={id}"));
@@ -1304,10 +979,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<ViseesMaitriserRefDto>>() ?? new();
         }
 
-        // Retourne les entrées appartenir_visee_aptitude d'une visée à maîtriser.
-        // Si idVisee est fourni et qu'aucune entrée n'existe, le serveur retourne
-        // la compétence (Attendus) de la visée comme repli.
-        // Endpoint : GET api/ref/appartenir/{idVm}?idVisee={idVisee}
         public async Task<List<AppartenirRefDto>> GetAppartenirRefAsync(int idVm, int? idVisee = null)
         {
             var url = idVisee.HasValue
@@ -1320,14 +991,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<AppartenirRefDto>>() ?? new();
         }
 
-        // ──────────────────────────────────────────────────────────────────
-        // TABLES COMPLÈTES ET COMPLÉMENT DU RÉFÉRENTIEL
-        // Le référentiel d'un champ est parfois incomplet : ces appels donnent les
-        // tables entières puis créent les liens manquants. Contrairement à
-        // api/admin-data, ils sont ouverts à tout utilisateur connecté.
-        // ──────────────────────────────────────────────────────────────────
-
-        // Toutes les compétences de la table. Endpoint : GET api/ref/competences
         public async Task<List<CompetenceRefDto>> GetCompetencesRefAsync()
         {
             var request = await BuildAuthRequest(HttpMethod.Get, "api/ref/competences");
@@ -1337,7 +1000,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<CompetenceRefDto>>() ?? new();
         }
 
-        // Tous les intitulés de visée. Endpoint : GET api/ref/nom-visees
         public async Task<List<NomViseeRefDto>> GetNomViseesRefAsync()
         {
             var request = await BuildAuthRequest(HttpMethod.Get, "api/ref/nom-visees");
@@ -1347,7 +1009,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<NomViseeRefDto>>() ?? new();
         }
 
-        // Toutes les visées à maîtriser. Endpoint : GET api/ref/visees-maitriser
         public async Task<List<ViseesMaitriserRefDto>> GetToutesViseesMaitriserRefAsync()
         {
             var request = await BuildAuthRequest(HttpMethod.Get, "api/ref/visees-maitriser");
@@ -1357,7 +1018,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<ViseesMaitriserRefDto>>() ?? new();
         }
 
-        // Ajoute un champ (domaine) pour un cours et une année. Endpoint : POST api/ref/domaines
         public async Task<(bool Ok, int Id, string? Err)> CreateRefDomaineAsync(
             string nom, string codeCours, string codeNiveau)
         {
@@ -1377,7 +1037,6 @@ namespace Obrigenie.Services
             catch (Exception ex) { return (false, 0, ex.Message); }
         }
 
-        // Ajoute un domaine (sous-domaine) sous un champ. Endpoint : POST api/ref/sous-domaines
         public async Task<(bool Ok, int Id, string? Err)> CreateRefSousDomaineAsync(string nom, int idDomaine)
         {
             try
@@ -1396,20 +1055,15 @@ namespace Obrigenie.Services
             catch (Exception ex) { return (false, 0, ex.Message); }
         }
 
-        // Ajoute une compétence au référentiel (rejouable : un nom déjà présent rend
-        // simplement son identifiant). Endpoint : POST api/ref/competences
         public Task<(bool Ok, int Id, string? Err)> CreateRefCompetenceAsync(string nom) =>
             CreerEntreeNommeeAsync("api/ref/competences", nom, "idCompetence");
 
-        // Ajoute un intitulé de visée. Endpoint : POST api/ref/nom-visees
         public Task<(bool Ok, int Id, string? Err)> CreateRefNomViseeAsync(string nom) =>
             CreerEntreeNommeeAsync("api/ref/nom-visees", nom, "idNomVisee");
 
-        // Ajoute une visée à maîtriser. Endpoint : POST api/ref/visees-maitriser
         public Task<(bool Ok, int Id, string? Err)> CreateRefViseeMaitriserAsync(string nom) =>
             CreerEntreeNommeeAsync("api/ref/visees-maitriser", nom, "idViseesMaitriser");
 
-        // Corps commun des trois créations ci-dessus : { nom } en entrée, identifiant en sortie.
         private async Task<(bool Ok, int Id, string? Err)> CreerEntreeNommeeAsync(
             string url, string nom, string proprieteId)
         {
@@ -1429,9 +1083,6 @@ namespace Obrigenie.Services
             catch (Exception ex) { return (false, 0, ex.Message); }
         }
 
-        // Rattache un intitulé de visée et une compétence à un champ (et éventuellement
-        // à un domaine). Rejouable : si la visée existe déjà, son id est simplement rendu.
-        // Endpoint : POST api/ref/visees
         public async Task<(bool Ok, int IdVisee, string? Err)> CreateRefViseeAsync(
             int idDomaine, int idSousDomaine, int idNomVisee, int idCompetence)
         {
@@ -1451,8 +1102,6 @@ namespace Obrigenie.Services
             catch (Exception ex) { return (false, 0, ex.Message); }
         }
 
-        // Relie une visée à une visée à maîtriser. Rejouable.
-        // Endpoint : POST api/ref/lien-visee-maitrise
         public async Task<(bool Ok, string? Err)> CreateRefLienViseeMaitriseAsync(int idVisee, int idViseesMaitriser)
         {
             try
@@ -1466,16 +1115,6 @@ namespace Obrigenie.Services
             catch (Exception ex) { return (false, ex.Message); }
         }
 
-        // Complète le référentiel pour que la sélection de la cascade existe en base :
-        // les visées manquantes du champ, puis les liens vers les visées à maîtriser.
-        //
-        // Le client menait cette séquence lui-même — une requête par visée, une relecture
-        // pour récupérer les identifiants, une requête par lien — et une coupure au milieu
-        // laissait des visées créées sans aucun lien. Le serveur fait le tout dans une
-        // transaction : au premier refus, rien n'est écrit.
-        // Endpoint : POST api/ref/selection
-        // Retourne (true, identifiants des visées, null) en cas de succès ;
-        // (false, liste vide, message) sinon.
         public async Task<(bool Ok, List<int> IdVisees, string? Err)> EnregistrerSelectionRefAsync(
             int idDomaine, int idSousDomaine, int idCompetence,
             IEnumerable<int> idNomVisees, IEnumerable<int> idsViseesMaitriser)
@@ -1511,7 +1150,6 @@ namespace Obrigenie.Services
             catch (Exception ex) { return (false, new(), ex.Message); }
         }
 
-        // Extrait la propriété "message" d'une réponse d'erreur, à défaut le code HTTP.
         private static async Task<string> LireMessageErreur(HttpResponseMessage response)
         {
             try
@@ -1525,147 +1163,97 @@ namespace Obrigenie.Services
         }
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // DTO DE SUPPORT ET TYPES DE RÉSULTAT
-    // ──────────────────────────────────────────────────────────────────────
-
-    // Représente le corps JSON retourné par l'endpoint GET api/access/check.
-    // Contient une seule propriété booléenne indiquant si le code de licence est toujours actif.
     public class LicenseCheckResult
     {
-        // True lorsque le code de licence est valide et n'a pas été révoqué ou expiré.
         [JsonPropertyName("valid")]
         public bool Valid { get; set; }
     }
-
-    // Objet de transfert de données représentant un enregistrement de licence retourné par l'API admin.
-    // Tous les noms de propriétés sont explicitement mappés à leurs équivalents JSON en camelCase
-    // pour éviter les erreurs de désérialisation dues aux conventions PascalCase par défaut de .NET.
     public class LicenseDto
     {
-        // Identifiant unique assigné par le serveur pour cette licence.
         [JsonPropertyName("id")]
         public int Id { get; set; }
 
-        // Chaîne de code d'accès unique pour cette licence (ex. : "ABCDE-23456").
         [JsonPropertyName("code")]
         public string Code { get; set; } = string.Empty;
 
-        // Libellé lisible optionnel assigné par l'admin (ex. : "PROF-DUPONT").
         [JsonPropertyName("label")]
         public string? Label { get; set; }
 
-        // True lorsque la licence est actuellement active et accorde l'accès à l'application.
         [JsonPropertyName("isActive")]
         public bool IsActive { get; set; }
 
-        // Chaîne de statut conviviale (ex. : "Active", "Révoqué", "Expiré") dérivée côté serveur.
-        // Utilisée pour afficher un badge coloré dans la liste des licences.
         [JsonPropertyName("status")]
         public string Status { get; set; } = string.Empty;
 
-        // L'adresse email de l'utilisateur auquel cette licence a été assignée, ou null si pas encore assignée.
         [JsonPropertyName("assignedEmail")]
         public string? AssignedEmail { get; set; }
 
-        // L'horodatage UTC de création de cette licence.
         [JsonPropertyName("createdAt")]
         public DateTime CreatedAt { get; set; }
 
-        // La date/heure UTC optionnelle après laquelle cette licence devient automatiquement inactive.
-        // Null signifie que la licence n'expire pas.
         [JsonPropertyName("expiresAt")]
         public DateTime? ExpiresAt { get; set; }
 
-        // L'horodatage UTC de la première utilisation/assignation de la licence à un compte utilisateur.
-        // Null lorsque la licence n'a jamais été activée.
         [JsonPropertyName("assignedAt")]
         public DateTime? AssignedAt { get; set; }
     }
 
-    // Cours d'un jour, tels que renvoyés par GET api/courses/range.
-    // Le serveur développe la récurrence des cours sur toute la plage demandée et rend
-    // une entrée par jour ; le client n'a plus qu'à indexer par date.
     public class CoursesJourDto
     {
-        // Le jour concerné (à minuit).
         [JsonPropertyName("date")]
         public DateTime Date { get; set; }
 
-        // Les cours qui ont lieu ce jour-là ; liste vide les jours sans cours.
         [JsonPropertyName("courses")]
         public List<Course> Courses { get; set; } = new();
     }
-
-    // Objet de transfert de données représentant une catégorie de matière de la table categorie_cours.
-    // Utilisé pour peupler la liste déroulante de catégorie de premier niveau sur la page de test.
     public class CategorieDto
     {
-        // Identifiant unique assigné par le serveur pour cette catégorie.
         [JsonPropertyName("idCat")]
         public int IdCat { get; set; }
 
-        // Nom d'affichage de la catégorie (ex. : "Sciences et techniques").
         [JsonPropertyName("nomCat")]
         public string NomCat { get; set; } = string.Empty;
 
-        // Ordre de tri contrôlant la séquence dans la liste déroulante.
         [JsonPropertyName("ordre")]
         public int Ordre { get; set; }
     }
 
-    // Objet de transfert de données représentant un cours de la base de données de référence.
-    // Utilisé pour peupler la liste déroulante de cours en cascade sur la page de test.
     public class CoursDto
     {
-        // Code court du cours utilisé comme clé unique (ex. : "LM", "SC", "MA").
         [JsonPropertyName("codeCours")]
         public string CodeCours { get; set; } = string.Empty;
 
-        // Nom complet d'affichage du cours (ex. : "Langues Modernes").
         [JsonPropertyName("nomCours")]
         public string NomCours { get; set; } = string.Empty;
 
-        // Chaîne de couleur CSS optionnelle utilisée pour afficher ce cours dans la vue agenda.
-        // Peut être null si aucune couleur n'a été configurée.
         [JsonPropertyName("couleurAgenda")]
         public string? CouleurAgenda { get; set; }
     }
 
-    // Objet de transfert de données représentant un niveau scolaire au sein d'un cours.
-    // Utilisé pour peupler la deuxième liste déroulante après qu'un cours a été sélectionné.
     public class NiveauDto
     {
-        // Code court identifiant ce niveau (ex. : "1A", "2B").
         [JsonPropertyName("codeNiveau")]
         public string CodeNiveau { get; set; } = string.Empty;
 
-        // Nom lisible du niveau (ex. : "Première Année").
         [JsonPropertyName("nomNiveau")]
         public string NomNiveau { get; set; } = string.Empty;
     }
 
-    // Objet de transfert de données représentant un domaine pédagogique au sein d'un cours et d'un niveau.
-    // Utilisé pour peupler la troisième liste déroulante après qu'un cours et un niveau ont été sélectionnés.
     public class DomaineDto
     {
-        // Identifiant unique assigné par le serveur pour ce domaine.
         [JsonPropertyName("idDom")]
         public int IdDom { get; set; }
 
-        // Nom d'affichage du domaine (ex. : "Compréhension écrite").
         [JsonPropertyName("nom")]
         public string Nom { get; set; } = string.Empty;
     }
 
-    // DTO sous-domaine pour la sélection en cascade (ref)
     public class SousDomaineRefDto
     {
         [JsonPropertyName("idSousDomaine")] public int    IdSousDomaine { get; set; }
         [JsonPropertyName("nomComp")]       public string NomComp       { get; set; } = string.Empty;
     }
 
-    // DTO visée pour la sélection en cascade (ref)
     public class ViseeRefDto
     {
         [JsonPropertyName("idVisee")]       public int    IdVisee       { get; set; }
@@ -1676,29 +1264,24 @@ namespace Obrigenie.Services
         [JsonPropertyName("label")]         public string Label         { get; set; } = string.Empty;
     }
 
-    // DTO compétence de la table complète (ref)
     public class CompetenceRefDto
     {
         [JsonPropertyName("idCompetence")]  public int    IdCompetence  { get; set; }
         [JsonPropertyName("nomCompetence")] public string NomCompetence { get; set; } = string.Empty;
     }
 
-    // DTO intitulé de visée de la table complète (ref)
     public class NomViseeRefDto
     {
         [JsonPropertyName("idNomVisee")] public int    IdNomVisee { get; set; }
         [JsonPropertyName("nomVisee")]   public string NomVisee   { get; set; } = string.Empty;
     }
 
-    // DTO visée à maîtriser pour la sélection en cascade (ref)
     public class ViseesMaitriserRefDto
     {
         [JsonPropertyName("idViseesMaitriser")]  public int    IdViseesMaitriser  { get; set; }
         [JsonPropertyName("nomViseesMaitriser")] public string NomViseesMaitriser { get; set; } = string.Empty;
     }
 
-    // DTO appartenir_visee_aptitude pour la sélection en cascade (ref)
-    // Représente une aptitude + compétence liées à une visée à maîtriser
     public class AppartenirRefDto
     {
         [JsonPropertyName("idAppartenirViseeAptitude")] public int     IdAppartenirViseeAptitude { get; set; }
@@ -1708,11 +1291,6 @@ namespace Obrigenie.Services
         [JsonPropertyName("nomCompetence")]             public string  NomCompetence             { get; set; } = string.Empty;
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // DTOs ADMIN — PAGE DE GESTION DES DONNÉES PÉDAGOGIQUES
-    // ──────────────────────────────────────────────────────────────────────
-
-    // DTO représentant une catégorie de cours pour la page admin données
     public class CategorieAdminDto
     {
         [JsonPropertyName("idCat")]  public int    IdCat  { get; set; }
@@ -1720,7 +1298,6 @@ namespace Obrigenie.Services
         [JsonPropertyName("ordre")]  public int    Ordre  { get; set; }
     }
 
-    // DTO représentant un cours pour la page admin données
     public class CoursAdminDto
     {
         [JsonPropertyName("idCours")]       public int     IdCours       { get; set; }
@@ -1732,7 +1309,6 @@ namespace Obrigenie.Services
         [JsonPropertyName("nomCat")]        public string? NomCat        { get; set; }
     }
 
-    // DTO représentant un niveau d'enseignement pour la page admin données
     public class NiveauAdminDto
     {
         [JsonPropertyName("idNiveau")]   public int    IdNiveau   { get; set; }
@@ -1741,7 +1317,6 @@ namespace Obrigenie.Services
         [JsonPropertyName("ordre")]      public int?   Ordre      { get; set; }
     }
 
-    // DTO représentant un utilisateur (professeur) pour les sélecteurs admin
     public class ProfesseurAdminDto
     {
         [JsonPropertyName("idUser")] public int     IdUser { get; set; }
@@ -1750,7 +1325,6 @@ namespace Obrigenie.Services
         [JsonPropertyName("prenom")] public string? Prenom { get; set; }
     }
 
-    // DTO représentant une liaison cours-niveau-professeur pour la page admin données
     public class CoursNiveauAdminDto
     {
         [JsonPropertyName("idCoursNiveau")] public int     IdCoursNiveau { get; set; }
@@ -1763,7 +1337,6 @@ namespace Obrigenie.Services
         [JsonPropertyName("nomProf")]       public string? NomProf       { get; set; }
     }
 
-    // DTO représentant un domaine pédagogique pour la page admin données
     public class DomaineAdminDto
     {
         [JsonPropertyName("idDom")]          public int    IdDom          { get; set; }
@@ -1773,35 +1346,30 @@ namespace Obrigenie.Services
         [JsonPropertyName("nomNiveau")]      public string NomNiveau      { get; set; } = "";
     }
 
-    // DTO représentant une compétence pour la page admin données
     public class CompetenceAdminDto
     {
         [JsonPropertyName("idCompetence")]   public int    IdCompetence   { get; set; }
         [JsonPropertyName("nomCompetence")]  public string NomCompetence  { get; set; } = "";
     }
 
-    // DTO représentant une aptitude pour la page admin données
     public class AptitudeAdminDto
     {
         [JsonPropertyName("idAptitude")]  public int    IdAptitude  { get; set; }
         [JsonPropertyName("nomAptitude")] public string NomAptitude { get; set; } = "";
     }
 
-    // DTO représentant un nom de visée pour la page admin données
     public class NomViseeAdminDto
     {
         [JsonPropertyName("idNomVisee")]  public int    IdNomVisee  { get; set; }
         [JsonPropertyName("nomVisee1")]   public string NomVisee1   { get; set; } = "";
     }
 
-    // DTO représentant une visée à maîtriser pour la page admin données
     public class ViseesMaitriserAdminDto
     {
         [JsonPropertyName("idViseesMaitriser")]  public int    IdViseesMaitriser  { get; set; }
         [JsonPropertyName("nomViseesMaitriser")] public string NomViseesMaitriser { get; set; } = "";
     }
 
-    // DTO représentant un sous-domaine pour la page admin données
     public class SousDomaineAdminDto
     {
         [JsonPropertyName("idSousDomaine")] public int    IdSousDomaine { get; set; }
@@ -1810,7 +1378,6 @@ namespace Obrigenie.Services
         [JsonPropertyName("nomDom")]        public string NomDom        { get; set; } = "";
     }
 
-    // DTO représentant une visée (objectif d'apprentissage) avec son contexte complet
     public class ViseeAdminDto
     {
         [JsonPropertyName("idVisee")]        public int     IdVisee        { get; set; }
@@ -1826,7 +1393,6 @@ namespace Obrigenie.Services
         [JsonPropertyName("nomNiveau")]      public string  NomNiveau      { get; set; } = "";
     }
 
-    // DTO représentant un lien entre une visée et une visée à maîtriser
     public class LienViseeMaitriseAdminDto
     {
         [JsonPropertyName("idVisee")]            public int    IdVisee            { get; set; }
@@ -1835,7 +1401,6 @@ namespace Obrigenie.Services
         [JsonPropertyName("nomViseesMaitriser")] public string NomViseesMaitriser { get; set; } = "";
     }
 
-    // DTO représentant une liaison visée_maitriser ↔ aptitude ↔ compétence
     public class AppartenirAdminDto
     {
         [JsonPropertyName("idAppartenirViseeAptitude")] public int     IdAppartenirViseeAptitude { get; set; }
