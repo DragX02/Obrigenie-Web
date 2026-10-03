@@ -137,6 +137,33 @@ public class PdfExportTests
     }
 
     [Fact]
+    public void Semaine_ToutLeTexteDeLaGrille_EstEnTaille12()
+    {
+        var note = Note(9, 0, 10, 0, "Contenu de la note");
+        note.Titre = "Dictée";
+        var jours = new List<Day> { DayWith(note), DayWith() };
+
+        var texte = Encoding.Latin1.GetString(CalendarPdfExporter.Semaine("Semaine", jours, 8, 18));
+
+        Assert.Matches(@"/F2 12 Tf [^\n]*\(09:00 -> 10:00\) Tj", texte);
+        Assert.Matches(@"/F1 12 Tf [^\n]*\(Contenu de la note\) Tj", texte);
+        Assert.Matches(@"/F1 12 Tf [^\n]*\(09:00\) Tj", texte);
+        Assert.Matches(@"/F2 12 Tf [^\n]*\(Lun 17\) Tj", texte);
+    }
+
+    [Fact]
+    public void Semaine_TropDeContenu_PasseSurUnePageSuivante()
+    {
+        var longue = string.Join("\n", Enumerable.Range(1, 12).Select(i => $"Ligne {i}"));
+        var notes = Enumerable.Range(8, 6).Select(h => Note(h, 0, h + 1, 0, longue)).ToArray();
+
+        var octets = CalendarPdfExporter.Semaine("Semaine", new List<Day> { DayWith(notes) }, 8, 18);
+
+        AssertPdfValide(octets);
+        Assert.DoesNotContain("/Count 1 ", Encoding.Latin1.GetString(octets));
+    }
+
+    [Fact]
     public void Semaine_AvecIdentite_EcritLEnTeteDuDocument()
     {
         var octets = CalendarPdfExporter.Semaine("Semaine 24/08 - 28/08",
