@@ -2,14 +2,6 @@ using Obrigenie.Models;
 
 namespace Obrigenie.Services
 {
-    // ─────────────────────────────────────────────────────────────────────────
-    // Mise en page des exports PDF du calendrier.
-    //
-    // Chaque vue a sa méthode : la vue jour sort en portrait (une colonne, grille
-    // verticale), les grilles semaine / mois / trimestre en paysage. Le dessin
-    // passe par PdfWriter, donc le PDF produit est vectoriel et ne dépend d'aucune
-    // bibliothèque externe.
-    // ─────────────────────────────────────────────────────────────────────────
     public static class CalendarPdfExporter
     {
         // Marges de page et couleurs, communes à toutes les vues
@@ -20,17 +12,12 @@ namespace Obrigenie.Services
         private const string VertCours = "0.11 0.37 0.13";
         private const string OrangeNote = "0.9 0.45 0";
 
-        // ── Vue jour : portrait ──────────────────────────────────────────────
-
-        // Grille horaire d'une journée : colonne d'heures à gauche, notes fusionnées
-        // à droite sur toute leur durée, comme à l'écran.
         public static byte[] Jour(string titre, Day jour, int heureDebut, int heureFin,
                                   string? identite = null, string? anneeScolaire = null)
         {
             var pdf = new PdfWriter(landscape: false);
             Titre(pdf, titre, identite, anneeScolaire);
 
-            // Conge couvrant la journee, rappele sous le titre dans sa couleur
             if (!string.IsNullOrEmpty(jour.HolidayName))
             {
                 var conge = PdfWriter.Nettoyer(jour.HolidayName);
@@ -44,19 +31,15 @@ namespace Obrigenie.Services
             float xContenu     = Marge + largeurLabel;
             float largeurCont  = pdf.PageWidth - Marge - xContenu;
 
-            // Seules les heures qui portent une note ou un cours sont imprimées :
-            // les créneaux vides gaspillaient la page en lignes blanches.
             var heures = HeuresOccupees(new[] { jour }, heureDebut, heureFin);
             var ligneDe = IndexerLignes(heures);
 
             float hauteur   = pdf.PageHeight - HautGrille - Marge;
             float hLigne    = hauteur / heures.Count;
 
-            // Cadre extérieur de la grille
             pdf.Rect(xGrille, HautGrille, pdf.PageWidth - 2 * Marge, hauteur, 0.8f, GrisTrait);
             pdf.Line(xContenu, HautGrille, xContenu, HautGrille + hauteur, 0.8f, GrisTrait);
 
-            // Étiquettes d'heure + séparateurs de lignes
             for (int i = 0; i < heures.Count; i++)
             {
                 float y = HautGrille + i * hLigne;
@@ -64,7 +47,6 @@ namespace Obrigenie.Services
                 pdf.Text(xGrille + 5, y + 5, 8.5f, $"{heures[i]:D2}:00", false, GrisTexte);
             }
 
-            // Blocs de notes fusionnés sur leur durée
             foreach (var bloc in NoteLayout.Blocs(jour.Notes, heureDebut, heureFin))
             {
                 float y = HautGrille + ligneDe[bloc.Start] * hLigne;
@@ -77,10 +59,6 @@ namespace Obrigenie.Services
             return pdf.Build();
         }
 
-        // ── Vues semaine / semaine+ : grille horaire en paysage ──────────────
-
-        // Emploi du temps de la semaine : colonne d'heures à gauche, un jour par
-        // colonne, et chaque note placée dans son créneau en couvrant toute sa durée.
         public static byte[] Semaine(string titre, IReadOnlyList<Day> jours, int heureDebut, int heureFin,
                                      string? identite = null, string? anneeScolaire = null)
         {
@@ -96,19 +74,15 @@ namespace Obrigenie.Services
             float hauteur = pdf.PageHeight - HautGrille - Marge;
             float lCol    = (pdf.PageWidth - Marge - xJours) / jours.Count;
 
-            // Une heure n'est imprimée que si au moins un jour de la semaine y a
-            // quelque chose : sinon la ligne reste blanche sur toute la largeur.
             var heures = HeuresOccupees(jours, heureDebut, heureFin);
             var ligneDe = IndexerLignes(heures);
 
             float hLigne = (hauteur - hEntete) / heures.Count;
 
-            // Cadre extérieur et séparation de la colonne des heures
             pdf.Rect(Marge, HautGrille, pdf.PageWidth - 2 * Marge, hauteur, 0.8f, GrisTrait);
             pdf.Line(xJours, HautGrille, xJours, HautGrille + hauteur, 0.8f, GrisTrait);
             pdf.Line(Marge, HautGrille + hEntete, pdf.PageWidth - Marge, HautGrille + hEntete, 0.8f, GrisTrait);
 
-            // Étiquettes d'heure et lignes horizontales, sur toute la largeur
             for (int i = 0; i < heures.Count; i++)
             {
                 float y = HautGrille + hEntete + i * hLigne;
@@ -121,10 +95,8 @@ namespace Obrigenie.Services
                 var jour = jours[i];
                 float x = xJours + i * lCol;
 
-                // Séparateur vertical entre les jours
                 if (i > 0) pdf.Line(x, HautGrille, x, HautGrille + hauteur, 0.5f, GrisTrait);
 
-                // En-tête de colonne : nom du jour et numéro, plus le congé éventuel
                 var entete = $"{Abreger(jour.DayOfWeek)} {jour.DayOfMonth}";
                 pdf.Text(x + 4, HautGrille + 5, 9f, PdfWriter.Nettoyer(entete), true);
 
@@ -139,8 +111,6 @@ namespace Obrigenie.Services
 
                 float yGrille = HautGrille + hEntete;
 
-                // Cours du jour : bande claire couvrant leurs heures, dessinée avant
-                // les notes pour que celles-ci restent lisibles par-dessus
                 foreach (var cours in jour.Courses)
                 {
                     int debut = Math.Max(cours.StartTime.Hours, heureDebut);
@@ -157,8 +127,6 @@ namespace Obrigenie.Services
                              true, VertCours);
                 }
 
-                // Notes fusionnées sur toute leur durée, fond blanc pour couvrir
-                // proprement une éventuelle bande de cours
                 foreach (var bloc in NoteLayout.Blocs(jour.Notes, heureDebut, heureFin))
                 {
                     float y = yGrille + ligneDe[bloc.Start] * hLigne;
@@ -173,10 +141,6 @@ namespace Obrigenie.Services
             return pdf.Build();
         }
 
-        // ── Vue mois : paysage ───────────────────────────────────────────────
-
-        // Grille de jours en cellules : une case par jour, sur `colonnes` colonnes.
-        // Utilisée pour la vue mois, où une grille horaire n'aurait pas de sens.
         public static byte[] Grille(string titre, IReadOnlyList<Day> jours, int colonnes,
                                     string? identite = null, string? anneeScolaire = null)
         {
@@ -192,8 +156,6 @@ namespace Obrigenie.Services
             float lCell = largeurTotale / colonnes;
             float hCell = hauteurTotale / lignes;
 
-            // Une seule ligne de cellules (semaine) : le détail des notes tient largement,
-            // on peut donc écrire le contexte de cascade complet.
             bool detail = lignes == 1;
 
             for (int i = 0; i < jours.Count; i++)
@@ -204,13 +166,11 @@ namespace Obrigenie.Services
 
                 pdf.Rect(x, y, lCell, hCell, 0.6f, GrisTrait);
 
-                // En-tête de cellule : nom du jour abrégé + numéro
                 var entete = $"{Abreger(jour.DayOfWeek)} {jour.DayOfMonth}";
                 pdf.Text(x + 5, y + 4, 9f, PdfWriter.Nettoyer(entete), true);
 
                 float yTexte = y + 17;
 
-                // Nom de vacances éventuel
                 if (!string.IsNullOrEmpty(jour.ShortHolidayName))
                 {
                     pdf.Text(x + 5, yTexte, 7.5f,
@@ -219,7 +179,6 @@ namespace Obrigenie.Services
                     yTexte += 10;
                 }
 
-                // Cours du jour, avec leur horaire
                 foreach (var cours in jour.Courses)
                 {
                     if (yTexte > y + hCell - 10) break;
@@ -229,17 +188,12 @@ namespace Obrigenie.Services
                     yTexte += 10;
                 }
 
-                // Notes du jour
                 var notes = jour.Notes.OrderBy(n => n.Hour).ThenBy(n => n.Minute).ToList();
                 DessinerNotes(pdf, notes, x + 5, yTexte, lCell - 10, y + hCell - yTexte - 3, 9.5f, complet: detail);
             }
 
             return pdf.Build();
         }
-
-        // ── Vue trimestre : paysage ──────────────────────────────────────────
-
-        // Une semaine de la période scolaire, projetée pour l'export.
         public sealed class PeriodeSemaine
         {
             public string Entete = string.Empty;
@@ -248,18 +202,15 @@ namespace Obrigenie.Services
             public List<PeriodeJour> Jours = new();
         }
 
-        // Un jour d'une semaine de la période scolaire, projeté pour l'export.
         public sealed class PeriodeJour
         {
             public bool DansPeriode;
             public bool Vacances;
-            // Nom du conge couvrant le jour : sert a en deduire la couleur d'affichage
             public string Conge = string.Empty;
             public int  NbNotes;
             public string PremierCours = string.Empty;
         }
 
-        // Tableau semaines (colonnes) × jours Lun–Ven (lignes).
         public static byte[] Periode(string titre, IReadOnlyList<PeriodeSemaine> semaines,
                                      IReadOnlyList<string> nomsJours,
                                      string? identite = null, string? anneeScolaire = null)
@@ -277,7 +228,6 @@ namespace Obrigenie.Services
             float hEntete = 24f;
             float hLigne = (hauteurTotale - hEntete) / Math.Max(1, nomsJours.Count);
 
-            // Colonne fixe des noms de jours
             for (int j = 0; j < nomsJours.Count; j++)
             {
                 float y = HautGrille + hEntete + j * hLigne;
@@ -285,18 +235,15 @@ namespace Obrigenie.Services
                 pdf.Text(Marge + 5, y + hLigne / 2 - 4, 8f, PdfWriter.Nettoyer(nomsJours[j]), true);
             }
 
-            // Une colonne par semaine
             for (int s = 0; s < semaines.Count; s++)
             {
                 var semaine = semaines[s];
                 float x = Marge + largeurJours + s * lCol;
 
-                // En-tête : numéro de semaine et plage de dates
                 pdf.Rect(x, HautGrille, lCol, hEntete, 0.6f, GrisTrait);
                 pdf.Text(x + 3, HautGrille + 4, 7f,
                          PdfWriter.Tronquer(PdfWriter.Nettoyer(semaine.Entete), 7f, lCol - 6), true);
 
-                // Semaine entièrement en vacances : une seule case sur toute la colonne
                 if (semaine.VacancesCompletes)
                 {
                     float hTotale = hLigne * nomsJours.Count;
@@ -340,13 +287,6 @@ namespace Obrigenie.Services
             return pdf.Build();
         }
 
-        // ── Choix des heures imprimées ───────────────────────────────────────
-
-        // Heures de la grille portant une note ou un cours, dans l'ordre croissant.
-        // Les heures vides ne sont pas imprimées : sur une journée de 08:00 à 18:00,
-        // elles occupaient la moitié de la page sans rien apporter.
-        // Quand rien n'est planifié, la grille complète est conservée : une page
-        // entièrement vide serait plus déroutante qu'un horaire vierge.
         private static List<int> HeuresOccupees(IEnumerable<Day> jours, int heureDebut, int heureFin)
         {
             var occupees = new SortedSet<int>();
@@ -372,9 +312,6 @@ namespace Obrigenie.Services
                 : Enumerable.Range(heureDebut, Math.Max(1, heureFin - heureDebut)).ToList();
         }
 
-        // Position de chaque heure retenue dans la grille imprimée.
-        // Les heures d'un même bloc étant toutes retenues, leurs positions restent
-        // consécutives : un bloc reste d'un seul tenant après suppression des lignes vides.
         private static Dictionary<int, int> IndexerLignes(List<int> heures)
         {
             var index = new Dictionary<int, int>();
@@ -382,15 +319,9 @@ namespace Obrigenie.Services
             return index;
         }
 
-        // ── Éléments communs ─────────────────────────────────────────────────
-
-        // En-tête de la page : nom de l'application à gauche, titre de la période au centre,
-        // année scolaire à droite, puis l'identité de l'enseignant sous le titre.
-        // Identité et année sont saisies avant l'impression ; vides, leur ligne est omise.
         private static void Titre(PdfWriter pdf, string titre,
                                   string? identite = null, string? anneeScolaire = null)
         {
-            // Logo à gauche, puis le nom de l'application aligné sur son milieu
             const float tailleLogo = 20f;
             pdf.Image(Marge, 6f, tailleLogo, tailleLogo,
                       LogoObrigenie.Jpeg, LogoObrigenie.Largeur, LogoObrigenie.Hauteur);
@@ -416,9 +347,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // Écrit une liste de notes dans le rectangle donné, en s'arrêtant dès que la
-        // place manque. `complet` ajoute le contexte de cascade complet ; sinon seul
-        // le cours est repris, pour les cellules étroites de la vue mois.
         private static void DessinerNotes(PdfWriter pdf, IReadOnlyList<Note> notes,
                                           float x, float y, float largeur, float hauteur,
                                           float taille, bool complet)
@@ -434,7 +362,6 @@ namespace Obrigenie.Services
             {
                 if (yCourant + interligne > yMax) return;
 
-                // Plage horaire, en gras
                 var plage = NoteLayout.PlageHoraire(note);
                 pdf.Text(x, yCourant, taille, plage, true, OrangeNote);
                 if (!string.IsNullOrWhiteSpace(note.Titre))
@@ -444,9 +371,6 @@ namespace Obrigenie.Services
                              PdfWriter.Tronquer(PdfWriter.Nettoyer(note.Titre), taille, largeur - decalage), true);
                 }
                 yCourant += interligne;
-
-                // Mention de report : sur papier aussi, une leçon recopiée ailleurs
-                // annonce sa nouvelle date juste sous son horaire.
                 if (ReportNote.Cible(note.Content) is DateTime cibleReport)
                 {
                     if (yCourant + interligne > yMax) return;
@@ -455,8 +379,6 @@ namespace Obrigenie.Services
                     yCourant += interligne;
                 }
 
-                // Contexte de cascade : toutes les lignes si la place le permet,
-                // sinon uniquement le cours
                 var contexte = complet
                     ? PdfWriter.Nettoyer(note.ViseeContexte)
                     : PdfWriter.Nettoyer(NoteLayout.CourseLabel(note));
@@ -468,7 +390,6 @@ namespace Obrigenie.Services
                     yCourant += interligne;
                 }
 
-                // Texte libre de la note, sans la ligne de marqueur déjà rendue au-dessus
                 foreach (var ligne in PdfWriter.Decouper(PdfWriter.Nettoyer(ReportNote.Texte(note.Content)), taille - 0.5f, largeur))
                 {
                     if (yCourant + interligne > yMax) return;
@@ -502,7 +423,6 @@ namespace Obrigenie.Services
             return total;
         }
 
-        // Abrège un nom de jour ("lundi" → "Lun") pour les en-têtes de cellules.
         private static string Abreger(string nomJour)
             => string.IsNullOrEmpty(nomJour) ? string.Empty
              : char.ToUpperInvariant(nomJour[0]) + nomJour[1..Math.Min(3, nomJour.Length)];

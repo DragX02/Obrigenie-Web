@@ -3,27 +3,13 @@ using System.Text;
 
 namespace Obrigenie.Services
 {
-    // ─────────────────────────────────────────────────────────────────────────
-    // Générateur PDF minimal (PDF 1.4), sans dépendance externe.
-    //
-    // Il produit exactement ce dont l'export du calendrier a besoin : du texte
-    // Helvetica (normal / gras), des traits et des rectangles, sur des pages A4
-    // portrait ou paysage. Le texte reste vectoriel (sélectionnable, net à
-    // l'impression), contrairement à une capture d'écran convertie en image.
-    //
-    // Le repère exposé a son origine en HAUT à gauche (comme le DOM) ; la
-    // conversion vers le repère PDF (origine en bas à gauche) est interne.
-    // ─────────────────────────────────────────────────────────────────────────
     public sealed class PdfWriter
     {
-        // Dimensions d'une page A4 en points PostScript (1 pt = 1/72 pouce)
         private const float A4Court = 595.28f;
         private const float A4Long  = 841.89f;
 
-        // Un flux de contenu par page ; l'index courant est la dernière page ajoutée
         private readonly List<StringBuilder> pages = new();
 
-        // Largeur et hauteur utiles de la page, orientation déjà appliquée
         public float PageWidth  { get; }
         public float PageHeight { get; }
 
@@ -34,22 +20,14 @@ namespace Obrigenie.Services
             pages.Add(new StringBuilder());
         }
 
-        // Flux de contenu de la page en cours d'écriture
         private StringBuilder Page => pages[^1];
 
-        // Ajoute une page vierge et poursuit le dessin dessus.
         public void NewPage() => pages.Add(new StringBuilder());
 
-        // Image JPEG partagée par toutes les pages, ou null quand le document n'en a pas.
-        // Le PDF affiche un JPEG sans le décoder (filtre DCTDecode) : ses octets sont
-        // recopiés tels quels, ce qui évite d'embarquer un décodeur d'image.
         private byte[]? imageJpeg;
         private int imageLargeurPx;
         private int imageHauteurPx;
 
-        // Dessine le JPEG donné dans le rectangle indiqué, (x, y) étant son coin
-        // supérieur gauche. Un seul JPEG par document : c'est tout ce dont l'en-tête
-        // a besoin, et la table des objets reste simple.
         public void Image(float x, float y, float largeur, float hauteur,
                           byte[] jpeg, int largeurPx, int hauteurPx)
         {
@@ -57,27 +35,18 @@ namespace Obrigenie.Services
             imageLargeurPx = largeurPx;
             imageHauteurPx = hauteurPx;
 
-            // L'opérateur cm porte la taille puis le coin inférieur gauche de l'image ;
-            // q/Q isolent cette transformation du reste de la page.
             Page.Append($"q {N(largeur)} 0 0 {N(hauteur)} {N(x)} {N(Y(y + hauteur))} cm /Im1 Do Q\n");
         }
 
-        // Convertit une ordonnée "depuis le haut" en ordonnée PDF "depuis le bas".
         private float Y(float y) => PageHeight - y;
 
-        // Formate un nombre pour le flux PDF : point décimal, jamais de virgule.
         private static string N(float v) => v.ToString("0.##", CultureInfo.InvariantCulture);
 
-        // ── Dessin ───────────────────────────────────────────────────────────
-
-        // Écrit une ligne de texte dont (x, y) est le coin supérieur gauche.
         public void Text(float x, float y, float taille, string texte,
                          bool gras = false, string couleur = "0 0 0")
         {
             if (string.IsNullOrEmpty(texte)) return;
 
-            // y est donné au sommet du texte : on descend d'une hauteur de police
-            // pour obtenir la ligne de base attendue par l'opérateur Tm.
             var baseLine = Y(y + taille * 0.8f);
 
             Page.Append($"BT {couleur} rg /{(gras ? "F2" : "F1")} {N(taille)} Tf ")
