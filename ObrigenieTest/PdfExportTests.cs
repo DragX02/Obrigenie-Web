@@ -137,7 +137,7 @@ public class PdfExportTests
     }
 
     [Fact]
-    public void Semaine_ToutLeTexteDeLaGrille_EstEnTaille12()
+    public void Semaine_ToutLeTexteDeLaGrille_EstEnTaille10()
     {
         var note = Note(9, 0, 10, 0, "Contenu de la note");
         note.Titre = "Dictée";
@@ -145,10 +145,10 @@ public class PdfExportTests
 
         var texte = Encoding.Latin1.GetString(CalendarPdfExporter.Semaine("Semaine", jours, 8, 18));
 
-        Assert.Matches(@"/F2 12 Tf [^\n]*\(09:00 -> 10:00\) Tj", texte);
-        Assert.Matches(@"/F1 12 Tf [^\n]*\(Contenu de la note\) Tj", texte);
-        Assert.Matches(@"/F1 12 Tf [^\n]*\(09:00\) Tj", texte);
-        Assert.Matches(@"/F2 12 Tf [^\n]*\(Lun 17\) Tj", texte);
+        Assert.Matches(@"/F2 10 Tf [^\n]*\(09:00 -> 10:00\) Tj", texte);
+        Assert.Matches(@"/F1 10 Tf [^\n]*\(Contenu de la note\) Tj", texte);
+        Assert.Matches(@"/F1 10 Tf [^\n]*\(09:00\) Tj", texte);
+        Assert.Matches(@"/F2 10 Tf [^\n]*\(Lundi 17\) Tj", texte);
     }
 
     [Fact]

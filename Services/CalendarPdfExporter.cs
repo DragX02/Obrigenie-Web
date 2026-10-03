@@ -58,7 +58,7 @@ namespace Obrigenie.Services
             return pdf.Build();
         }
 
-        private const float TailleSemaine     = 12f;
+        private const float TailleSemaine     = 10f;
         private const float InterligneSemaine = TailleSemaine + 2f;
         private const float RetraitCadre      = 2f;
         private const float MargeCadre        = 5f;
@@ -130,7 +130,7 @@ namespace Obrigenie.Services
 
                     if (d > 0) pdf.Line(x, HautGrille, x, HautGrille + hauteur, 0.5f, GrisTrait);
 
-                    var entete = PdfWriter.Nettoyer($"{Abreger(jour.DayOfWeek)} {jour.DayOfMonth}");
+                    var entete = PdfWriter.Nettoyer($"{NomComplet(jour.DayOfWeek)} {jour.DayOfMonth}");
                     pdf.Text(x + 4, HautGrille + 5, t, entete, true);
 
                     if (!string.IsNullOrEmpty(jour.ShortHolidayName))
@@ -511,6 +511,10 @@ namespace Obrigenie.Services
 
             return total;
         }
+
+        private static string NomComplet(string nomJour)
+            => string.IsNullOrEmpty(nomJour) ? string.Empty
+             : char.ToUpperInvariant(nomJour[0]) + nomJour[1..];
 
         private static string Abreger(string nomJour)
             => string.IsNullOrEmpty(nomJour) ? string.Empty
