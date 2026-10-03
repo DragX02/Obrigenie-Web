@@ -1,16 +1,7 @@
 namespace Obrigenie.Services
 {
-    // Logo Obrigenie embarqué pour les exports PDF.
-    //
-    // Le PDF sait afficher un JPEG tel quel (filtre DCTDecode) : les octets sont
-    // recopiés sans décodage, ce qui évite d'embarquer un décodeur PNG dans le wasm.
-    // L'image est donc conservée ici en base64 plutôt que chargée depuis wwwroot,
-    // pour qu'un export n'ait aucune requête réseau à faire.
-    //
-    // Source : wwwroot/icon-192.png, aplati sur fond blanc et réduit à 64x64.
     public static class LogoObrigenie
     {
-        // Largeur et hauteur de l'image en pixels
         public const int Largeur = 64;
         public const int Hauteur = 64;
 
@@ -44,7 +35,6 @@ namespace Obrigenie.Services
         + "ukIWizJngciAe6eJmjJxS+bo/CBYToek1iReU1JAbjhxc3nVnsENhLR+ijp2WdUL2vOPHMG1v6PLNaALLDiEpqMxHkENpHJFbOep"
         + "6rPly/FohtHaLbixnkyLatKnxZSe0txJefH0cWSofYjRtrOqq5snlu483G/QZDukySg5XPusJSEoCRnAGBk51nU1NZiQv//Z";
 
-        // Octets JPEG du logo, décodés à la première utilisation.
         public static byte[] Jpeg { get; } = Convert.FromBase64String(Base64);
     }
 }

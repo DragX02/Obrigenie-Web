@@ -54,7 +54,6 @@ namespace Obrigenie.Services
                 .Append($"({Echapper(texte)}) Tj ET\n");
         }
 
-        // Trace un trait entre deux points.
         public void Line(float x1, float y1, float x2, float y2,
                          float epaisseur = 0.5f, string couleur = "0.6 0.6 0.6")
         {
@@ -62,7 +61,6 @@ namespace Obrigenie.Services
                 .Append($"{N(x1)} {N(Y(y1))} m {N(x2)} {N(Y(y2))} l S\n");
         }
 
-        // Trace le contour d'un rectangle dont (x, y) est le coin supérieur gauche.
         public void Rect(float x, float y, float largeur, float hauteur,
                          float epaisseur = 0.5f, string couleur = "0.6 0.6 0.6")
         {
@@ -70,34 +68,21 @@ namespace Obrigenie.Services
                 .Append($"{N(x)} {N(Y(y + hauteur))} {N(largeur)} {N(hauteur)} re S\n");
         }
 
-        // Remplit un rectangle dont (x, y) est le coin supérieur gauche.
         public void FillRect(float x, float y, float largeur, float hauteur, string couleur)
         {
             Page.Append($"{couleur} rg ")
                 .Append($"{N(x)} {N(Y(y + hauteur))} {N(largeur)} {N(hauteur)} re f\n");
         }
 
-        // ── Mesure et découpe du texte ───────────────────────────────────────
-
-        // Largeur approchée d'une chaîne en Helvetica. Le PDF n'embarque pas les
-        // métriques de la police : 0.5 em par caractère est une moyenne suffisante
-        // pour décider des retours à la ligne (le rendu final reste correct même
-        // si une ligne est un peu plus courte que la largeur disponible).
         public static float LargeurApprox(string texte, float taille) => texte.Length * taille * 0.5f;
 
-        // Découpe un texte en lignes tenant dans la largeur donnée.
-        // Un mot plus long que la largeur est coupé brutalement plutôt que de déborder.
         public static List<string> Decouper(string texte, float taille, float largeurMax)
         {
             var lignes = new List<string>();
             if (string.IsNullOrWhiteSpace(texte)) return lignes;
 
-            // Chaque saut de ligne du texte source est respecté
             foreach (var paragraphe in texte.Replace("\r", "").Split('\n'))
             {
-                // L'indentation d'origine est conservée : elle aligne les valeurs
-                // sous leur libellé dans le contexte de cascade. Elle est réappliquée
-                // à chaque ligne produite et retranchée de la largeur disponible.
                 var contenu = paragraphe.TrimStart(' ');
                 var marge   = paragraphe[..(paragraphe.Length - contenu.Length)];
                 var largeurUtile = Math.Max(taille, largeurMax - LargeurApprox(marge, taille));
@@ -112,7 +97,6 @@ namespace Obrigenie.Services
 
                     if (courante.Length > 0) { lignes.Add(marge + courante); courante = ""; }
 
-                    // Mot seul trop long : on le coupe en morceaux de la largeur disponible
                     var reste = mot;
                     while (LargeurApprox(reste, taille) > largeurUtile && reste.Length > 1)
                     {
@@ -129,7 +113,6 @@ namespace Obrigenie.Services
             return lignes;
         }
 
-        // Tronque un texte à la largeur donnée en ajoutant des points de suspension.
         public static string Tronquer(string texte, float taille, float largeurMax)
         {
             if (string.IsNullOrEmpty(texte) || LargeurApprox(texte, taille) <= largeurMax) return texte;
@@ -138,12 +121,8 @@ namespace Obrigenie.Services
             return texte.Length <= max ? texte : texte[..max] + "...";
         }
 
-        // ── Sérialisation ────────────────────────────────────────────────────
-
-        // Assemble le document complet et retourne ses octets.
         public byte[] Build()
         {
-            // Les chaînes du PDF sont écrites en WinAnsi : un octet par caractère.
             var enc = Encoding.Latin1;
             var ms  = new MemoryStream();
             var positions = new Dictionary<int, long>();
@@ -162,8 +141,6 @@ namespace Obrigenie.Services
 
             Ecrire("%PDF-1.4\n");
 
-            // Objets 1 à 4 : catalogue, arbre des pages et les deux polices. Vient
-            // ensuite l'image si le document en contient une, puis les pages et leurs flux.
             int prochainId = 5;
             int idImage = imageJpeg != null ? prochainId++ : 0;
 
@@ -175,7 +152,6 @@ namespace Obrigenie.Services
             Objet(3, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
             Objet(4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
 
-            // Image : les octets JPEG sont écrits bruts, sans passer par l'encodage texte
             if (imageJpeg != null)
             {
                 positions[idImage] = ms.Length;
@@ -192,7 +168,6 @@ namespace Obrigenie.Services
                 int idContenu = idPage + 1;
                 var contenu   = pages[i].ToString();
 
-                // L'image n'est déclarée dans les ressources que si le document en porte une
                 var ressourceImage = imageJpeg != null ? $" /XObject << /Im1 {idImage} 0 R >>" : "";
 
                 Objet(idPage,
@@ -203,7 +178,6 @@ namespace Obrigenie.Services
                 Ecrire($"{idContenu} 0 obj\n<< /Length {enc.GetByteCount(contenu)} >>\nstream\n{contenu}endstream\nendobj\n");
             }
 
-            // Table des références croisées : position de chaque objet dans le fichier
             int nbObjets  = prochainId - 1;
             long debutXref = ms.Length;
 
@@ -216,10 +190,6 @@ namespace Obrigenie.Services
             return ms.ToArray();
         }
 
-        // ── Nettoyage du texte ───────────────────────────────────────────────
-
-        // Prépare une chaîne pour un flux PDF : caractères hors WinAnsi remplacés
-        // (émojis, flèches, tirets typographiques…) puis parenthèses échappées.
         private static string Echapper(string texte)
         {
             var sb = new StringBuilder(texte.Length);
@@ -235,7 +205,6 @@ namespace Obrigenie.Services
                     case '\r':
                     case '\t': sb.Append(' ');    break;
 
-                    // Équivalents ASCII des caractères typographiques courants
                     case '→': sb.Append("->"); break;
                     case '–':
                     case '—': sb.Append('-');  break;
@@ -247,7 +216,6 @@ namespace Obrigenie.Services
                     case '·': sb.Append('-');  break;
 
                     default:
-                        // WinAnsi couvre le Latin-1 : tout le reste (émojis…) est ignoré
                         if (c >= ' ' && c <= 'ÿ') sb.Append(c);
                         break;
                 }
@@ -256,9 +224,6 @@ namespace Obrigenie.Services
             return sb.ToString();
         }
 
-        // Retire les caractères non imprimables en PDF sans les échapper : utilisé
-        // avant de mesurer ou de découper un texte, pour que la largeur estimée
-        // corresponde à ce qui sera réellement écrit.
         public static string Nettoyer(string? texte)
         {
             if (string.IsNullOrEmpty(texte)) return string.Empty;

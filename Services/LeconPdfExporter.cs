@@ -8,11 +8,10 @@ namespace Obrigenie.Services
 
         private const float MargeBordure = 22f;
 
-        // Hauteurs de police
-        private const float TailleTitre   = 13f;   // « Titre de la leçon : »
-        private const float TailleSection = 11.5f; // « Compétences : », « Déroulement… »
-        private const float TailleTexte   = 10f;   // corps des champs
-        private const float TailleContexte = 9.5f; // le contexte de cascade, plus dense
+        private const float TailleTitre   = 13f;
+        private const float TailleSection = 11.5f;
+        private const float TailleTexte   = 10f;
+        private const float TailleContexte = 9.5f;
 
         private const float Interligne = 14f;
 

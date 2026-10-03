@@ -15,19 +15,16 @@
     }
     else if (isLoggedIn && hasAccess)
     {
-        @* Overlay fermeture flyout *@
         @if (flyoutOpen)
         {
             <div class="flyout-overlay" @onclick="CloseFlyout"></div>
         }
 
-        @* Overlay fermeture menu utilisateur *@
         @if (userMenuOpen)
         {
             <div class="flyout-overlay" style="z-index:150" @onclick="CloseUserMenu"></div>
         }
 
-        @* ── Flyout sidebar ── *@
         <nav class="flyout @(flyoutOpen ? "flyout-open" : "")">
             <div class="flyout-header">
                 <div class="flyout-logo-text">Obrigenie</div>
@@ -45,11 +42,9 @@
                 <a href="/referentiel" class="flyout-item" @onclick="CloseFlyout">
                     <span class="flyout-icon">📄</span> @Lang.T("nav.referents")
                 </a>
-                @* Préparations de leçon, au format de la fiche papier *@
                 <a href="/lecons" class="flyout-item" @onclick="CloseFlyout">
                     <span class="flyout-icon">📝</span> Mes leçons
                 </a>
-                @* Corrections personnelles du calendrier des congés scolaires *@
                 <a href="/conges" class="flyout-item" @onclick="CloseFlyout">
                     <span class="flyout-icon">🏖️</span> Congés
                 </a>
@@ -80,13 +75,11 @@
             </div>
         </nav>
 
-        @* ── Zone principale ── *@
         <div class="main-wrapper">
             <div class="top-bar">
                 <button class="btn-hamburger" @onclick="ToggleFlyout">☰</button>
                 <span class="top-bar-title">Obrigenie</span>
 
-                @* ── Avatar utilisateur ── *@
                 <div class="user-menu" style="margin-left:auto; position:relative;">
                     <button class="user-avatar-btn" @onclick="ToggleUserMenu" title="@userEmail">
                         @userInitial
@@ -130,7 +123,6 @@
     private string userEmail      = "";
     private string userInitial    = "U";
 
-    // Clé stockée pour éviter de recalculer à chaque re-render
     private string serverStatusKey = "server.check";
     private string serverStatusText => Lang.T(serverStatusKey);
 
@@ -163,11 +155,9 @@
                 }
             }
 
-            // Charge email et initiale
             userEmail   = await Auth.GetEmailAsync() ?? "";
             userInitial = userEmail.Length > 0 ? userEmail[0].ToString().ToUpper() : "U";
 
-            // Initialise la langue depuis localStorage
             await Lang.InitAsync();
             Lang.OnChange += StateHasChanged;
 

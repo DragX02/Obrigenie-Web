@@ -1,28 +1,8 @@
-@* ─────────────────────────────────────────────────────────────────────────────
-   MultiSelectSearch.razor — Sélection multiple avec recherche.
-
-   Liste d'options que l'on coche en cliquant sur la ligne entière (pas de case
-   à cocher : la ligne sélectionnée est marquée d'un ✓ et surlignée). Au-dessus,
-   un champ de recherche filtre les libellés, en ignorant la casse et les accents
-   ("visee" trouve "Visée"), et les sélections en cours sont rappelées sous forme
-   d'étiquettes cliquables pour les retirer d'un clic.
-
-   Quand la saisie ne correspond à aucune option et que OnCreate est fourni, une
-   entrée « Ajouter … » permet de créer l'entrée manquante au référentiel.
-
-   Utilisation :
-     <MultiSelectSearch Options="mesOptions" Selected="mesValeurs"
-                        OnToggle="Basculer" Placeholder="Rechercher…" />
-   ───────────────────────────────────────────────────────────────────────────── *@
-
 <div class="ms-root">
 
-    @* Toujours affiché, même sur une liste courte : c'est aussi par lui que passe
-       l'ajout d'une entrée absente du référentiel. *@
     <input type="text" class="ms-search" placeholder="@Placeholder"
            value="@search" @oninput="OnInput" />
 
-    @* Rappel des sélections : une étiquette par valeur cochée, ✕ pour la retirer *@
     @if (Selected.Count > 0)
     {
         <div class="ms-tags">
@@ -38,7 +18,6 @@
     }
 
     <div class="ms-list">
-        @* Rien ne correspond à la saisie : proposer de l'ajouter au référentiel. *@
         @if (PeutAjouter)
         {
             <div class="ms-item ms-item-ajout" @onclick="Ajouter">
@@ -68,28 +47,19 @@
 </div>
 
 @code {
-    /// <summary>Options proposées (valeur technique + libellé affiché).</summary>
     [Parameter] public IEnumerable<SearchableSelect.SelectOption> Options { get; set; }
         = Array.Empty<SearchableSelect.SelectOption>();
 
-    /// <summary>Valeurs actuellement sélectionnées.</summary>
     [Parameter] public IReadOnlyCollection<string> Selected { get; set; } = Array.Empty<string>();
 
-    /// <summary>Invoqué avec la valeur dont l'état bascule (cochée ↔ décochée).</summary>
     [Parameter] public EventCallback<string> OnToggle { get; set; }
 
-    /// <summary>Texte du champ de recherche.</summary>
     [Parameter] public string Placeholder { get; set; } = "Rechercher…";
 
-    /// <summary>
-    /// Si renseigné, une entrée « Ajouter … » apparaît quand la saisie ne correspond à
-    /// aucune option ; elle est invoquée avec le texte tapé pour créer l'entrée manquante.
-    /// </summary>
     [Parameter] public EventCallback<string> OnCreate { get; set; }
 
     private string search = "";
 
-    // Vrai quand une saisie non vide ne correspond exactement à aucune option proposée.
     private bool PeutAjouter =>
         OnCreate.HasDelegate
         && !string.IsNullOrWhiteSpace(search)

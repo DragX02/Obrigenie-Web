@@ -1,4 +1,3 @@
-/* ===== THEME VARIABLES ===== */
 :root {
     --bg-main: #f0f2f5;
     --bg-card: #ffffff;
@@ -29,13 +28,11 @@
     --top-bar-bg: #1a1a2e;
 }
 
-/* ===== RESET ===== */
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 h1:focus { outline: none; }
 
-/* ===== APP ROOT ===== */
 #app-root {
     min-height: 100vh;
     background: var(--bg-main);
@@ -43,13 +40,11 @@ h1:focus { outline: none; }
     transition: background 0.3s, color 0.3s;
 }
 
-/* Écran vide pendant la vérification de la licence (évite le flash de contenu) */
 .app-loading {
     min-height: 100vh;
     background: var(--bg-main);
 }
 
-/* ===== FLYOUT ===== */
 .flyout-overlay {
     position: fixed;
     inset: 0;
@@ -65,7 +60,6 @@ h1:focus { outline: none; }
     height: 100vh;
     background: #1e1e1e;
     z-index: 1000;
-    /* transform au lieu de left = GPU layer propre, fiable sur Android */
     transform: translateX(-100%);
     transition: transform 0.28s ease;
     will-change: transform;
@@ -172,7 +166,6 @@ h1:focus { outline: none; }
 }
 .btn-logout-flyout:hover { background: #c82333; }
 
-/* ===== TOP BAR ===== */
 .top-bar {
     height: 56px;
     background: var(--top-bar-bg);
@@ -197,7 +190,6 @@ h1:focus { outline: none; }
     border-radius: 4px;
     line-height: 1;
     transition: background 0.2s;
-    /* Android : évite le délai de 300ms au toucher et le zoom double-tap */
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     min-width: 44px;
@@ -210,7 +202,6 @@ h1:focus { outline: none; }
 
 .top-bar-title { font-size: 1.15rem; font-weight: 600; }
 
-/* ===== USER AVATAR + DROPDOWN ===== */
 .user-avatar-btn {
     width: 36px;
     height: 36px;
@@ -275,7 +266,6 @@ h1:focus { outline: none; }
     border-top: 1px solid var(--border);
 }
 
-/* ===== PAGE MON COMPTE ===== */
 .account-page {
     display: flex;
     justify-content: center;
@@ -385,7 +375,6 @@ h1:focus { outline: none; }
 .main-wrapper { min-height: 100vh; display: flex; flex-direction: column; }
 .content-area { flex: 1; }
 
-/* ===== LOGIN ===== */
 .login-container {
     display: flex;
     justify-content: center;
@@ -432,19 +421,14 @@ h1:focus { outline: none; }
 .error-message { color: #d32f2f; text-align: center; margin-top: 0.5rem; }
 .success-message { color: #2e7d32; text-align: center; margin-top: 0.5rem; line-height: 1.5; }
 
-/* Lien secondaire sous un formulaire (« Mot de passe oublié ? », retour à la connexion) */
 .login-link { text-align: center; margin-top: 1rem; font-size: 0.9rem; }
 .login-link a { color: #667eea; text-decoration: none; }
 .login-link a:hover { text-decoration: underline; }
 
-/* ===== MOT DE PASSE OUBLIÉ / RÉINITIALISATION ===== */
-/* Texte explicatif au-dessus ou en dessous du formulaire */
 .forgot-hint { color: #666; font-size: 0.9rem; line-height: 1.5; text-align: center; margin-bottom: 1rem; }
-/* Bloc affiché après l'envoi de la demande ou une fois le mot de passe changé */
 .forgot-sent { text-align: center; margin-bottom: 1rem; }
 .forgot-icon { font-size: 2.5rem; display: block; margin-bottom: 0.75rem; }
 
-/* ===== CALENDAR ===== */
 .calendar-container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
 
 .calendar-header {
@@ -470,7 +454,6 @@ h1:focus { outline: none; }
 .week-title { user-select: none; text-transform: capitalize; color: var(--text); font-size: 1.1rem; margin: 0; }
 .period-dates-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
 
-/* View mode buttons */
 .view-mode-bar {
     display: flex;
     gap: 4px;
@@ -496,7 +479,6 @@ h1:focus { outline: none; }
 .view-btn:hover { background: var(--row-hover); color: var(--text); }
 .view-btn.active { background: var(--primary); color: white; }
 
-/* Period label */
 .period-label {
     text-align: center;
     font-size: 0.85rem;
@@ -516,8 +498,6 @@ h1:focus { outline: none; }
     color: #1a1a1a;
 }
 
-/* Single Day */
-/* Barre d'impression : boutons Imprimer / PDF + rappel de l'orientation utilisee */
 .print-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
 .print-btn {
     padding: 0.3rem 0.75rem; border: 1px solid var(--border); border-radius: 6px;
@@ -527,9 +507,6 @@ h1:focus { outline: none; }
 .print-btn:hover { background: var(--row-hover); }
 .print-hint { font-size: 0.75rem; color: var(--text-muted); }
 
-/* ── Report de lecons ──────────────────────────────────────────────────────
-   Le violet distingue le report des actions d'impression (neutres) et des
-   notes (orange) : on repere d'un coup d'oeil ce qui a ete reporte. */
 .report-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
 .report-btn {
     padding: 0.3rem 0.75rem; border: 1px solid #7E57C2; border-radius: 6px;
@@ -540,7 +517,6 @@ h1:focus { outline: none; }
 .report-btn:disabled { opacity: 0.45; cursor: default; }
 .report-hint { font-size: 0.75rem; color: var(--text-muted); }
 
-/* Compte rendu du dernier report, au-dessus de la grille */
 .report-flash {
     display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
     padding: 0.4rem 0.7rem; margin-bottom: 0.75rem;
@@ -553,7 +529,6 @@ h1:focus { outline: none; }
 }
 .report-flash-close:hover { color: var(--text); }
 
-/* Panneau de report replie dans la modale de note */
 .modal-report {
     display: flex; flex-direction: column; gap: 0.35rem;
     margin-bottom: 0.75rem;
@@ -582,7 +557,6 @@ h1:focus { outline: none; }
 .dark .report-warn { color: #FFB74D; }
 .btn-report { align-self: flex-start; }
 
-/* Modale de report de la semaine : liste des lecons a recopier */
 .report-modal { max-width: 520px; }
 .report-liste {
     max-height: 40vh; overflow-y: auto;
@@ -604,9 +578,6 @@ h1:focus { outline: none; }
 .dark .report-ligne-heure { color: #FFB74D; }
 .report-ligne-texte { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ── Copie de lecons ───────────────────────────────────────────────────────
-   Le bleu-vert distingue la copie (duplication) du report (violet) : les deux
-   boutons se cotoient dans la meme barre, la couleur evite de les confondre. */
 .copie-btn {
     padding: 0.3rem 0.75rem; border: 1px solid #00897B; border-radius: 6px;
     background: var(--bg-card); color: #00897B; font-size: 0.85rem; font-weight: 600;
@@ -626,7 +597,6 @@ h1:focus { outline: none; }
 .copie-ajout { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
 .copie-ajout label { font-size: 0.85rem; color: var(--text-muted); }
 
-/* Dates retenues, sous forme d'etiquettes retirables */
 .copie-chips {
     display: flex; flex-wrap: wrap; gap: 0.3rem;
     margin: 0.5rem 0; padding: 0.4rem;
@@ -648,7 +618,6 @@ h1:focus { outline: none; }
 }
 .copie-chip-x:hover { color: #f44336; }
 
-/* Marque portee par la lecon d'origine, dans chaque vue du calendrier */
 .note-reporte {
     display: block; font-size: 0.72rem; font-weight: 700; color: #7E57C2; margin-bottom: 2px;
 }
@@ -657,7 +626,6 @@ h1:focus { outline: none; }
 .note-mini-reporte { border-left: 3px solid #7E57C2; }
 .dark .note-reporte, .dark .mini-reporte, .dark .report-deja, .dark .report-jour-fleche { color: #B39DDB; }
 
-/* Modale d'identite affichee avant impression / export PDF */
 .identite-modal { max-width: 420px; }
 .identite-champ { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.6rem; }
 .identite-champ label { width: 70px; font-size: 0.85rem; color: var(--text-muted); }
@@ -666,12 +634,8 @@ h1:focus { outline: none; }
     background: var(--bg-main); color: var(--text); font-size: 0.9rem;
 }
 
-/* En-tete reserve au papier : invisible a l'ecran, affiche a l'impression */
 .print-header { display: none; }
 
-/* Bandeau du conge couvrant la journee, dans la vue jour.
-   Les couleurs (fond, bordure, texte) sont posees en style inline par la page :
-   chaque conge a la sienne, deduite de son nom. */
 .day-holiday-banner {
     text-align: center;
     font-weight: 600;
@@ -682,14 +646,10 @@ h1:focus { outline: none; }
     border-radius: 8px;
 }
 
-/* En-tete du jour : compact, pour ne pas eloigner la grille du titre */
 .single-day-header { text-align: center; margin-bottom: 0.35rem; line-height: 1.15; }
 .day-name { display: block; text-transform: capitalize; color: var(--text-muted); font-size: 0.9rem; }
 .day-number { display: block; font-size: 1.9rem; font-weight: bold; color: var(--text); }
 
-/* Grille horaire : colonne 1 = etiquettes d'heure, colonne 2 = cellules de contenu.
-   Une cellule peut couvrir plusieurs lignes (grid-row: N / span X) : les heures
-   couvertes par une meme note sont ainsi fusionnees en une seule cellule. */
 .time-grid {
     display: grid;
     grid-template-columns: 60px 1fr;
@@ -725,12 +685,9 @@ h1:focus { outline: none; }
 .course-name { font-weight: bold; font-size: 0.9rem; display: block; }
 .course-time { font-size: 0.75rem; opacity: 0.85; display: block; }
 
-/* flex: 1 fait remplir au bloc toute la hauteur de la cellule, y compris quand
-   celle-ci est fusionnee sur plusieurs heures (note de 09:00 a 11:00, etc.) */
 .note-block { flex: 1; background: #FFF3E0; border: 1px solid #FF9800; border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.8rem; color: #E65100; cursor: pointer; }
 .dark .note-block { background: #2d1f0a; border-color: #FF9800; color: #FFB74D; }
 
-/* Grid */
 .grid-header { display: flex; gap: 2px; margin-bottom: 4px; }
 .grid-header-cell { flex: 1; text-align: center; font-weight: 600; font-size: 0.85rem; text-transform: capitalize; color: var(--text-muted); }
 .days-grid { display: grid; gap: 2px; }
@@ -750,17 +707,14 @@ h1:focus { outline: none; }
 .note-mini { font-size: 0.65rem; color: #E65100; background: #FFF3E0; padding: 1px 4px; border-radius: 3px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dark .note-mini { background: #2d1f0a; color: #FFB74D; }
 
-/* Vues semaine / semaine+ : la note detaille horaire, cours et texte sur plusieurs lignes */
 .note-mini-week { white-space: normal; padding: 3px 5px; line-height: 1.35; }
 .note-mini-week .mini-time { display: block; font-weight: 700; }
 .mini-course { display: block; font-weight: 600; color: #4CAF50; }
 .mini-text { display: block; }
 
-/* Horaire prefixe sur la puce de cours (une seule ligne, donc en ligne) */
 .course-mini .mini-time { font-weight: 700; opacity: 0.85; margin-right: 3px; }
 .trim-note-dot { font-size: 0.7rem; line-height: 1; display: block; margin-top: 1px; }
 
-/* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; justify-content: center; align-items: center; z-index: 1000; }
 
 .modal-content { background: var(--modal-bg); color: var(--text); padding: 1.5rem; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
@@ -774,14 +728,11 @@ h1:focus { outline: none; }
 .btn-cancel { background: #9e9e9e; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
 .btn-save:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* Note modal - plage horaire */
 .modal-date { margin: -0.5rem 0 0.75rem; font-size: 0.85rem; color: var(--text-muted); text-transform: capitalize; }
 .modal-time-range { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
 .modal-time-range label { font-size: 0.85rem; color: var(--text-muted); }
 .modal-time-range select { padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-main); color: var(--text); font-size: 0.9rem; cursor: pointer; }
 
-/* Case d'heure compacte : nombres saisissables + petites flèches ▲▼ à l'intérieur du cadre.
-   Garde la taille d'un champ heure classique (heures ±1, minutes ±5). */
 .time-box {
     display: inline-flex; align-items: center; gap: 1px;
     padding: 2px 5px; border: 1px solid var(--border); border-radius: 6px;
@@ -801,7 +752,6 @@ h1:focus { outline: none; }
     display: flex; align-items: center; justify-content: center;
 }
 .tb-arrow:hover { color: var(--text); }
-/* Repetition d'une nouvelle note : plage de dates + boutons de jours de la semaine */
 .modal-repeat {
     display: flex; flex-direction: column; gap: 0.4rem;
     padding: 0.5rem; margin-bottom: 0.75rem;
@@ -826,11 +776,9 @@ h1:focus { outline: none; }
 .modal-char-count { text-align: right; font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
 .modal-error { color: #f44336; font-size: 0.8rem; margin-top: 0.5rem; }
 
-/* Note modal - disposition carte note + panneau cascade côte à côte */
 .note-modal-wrap { display: flex; align-items: stretch; gap: 0.75rem; max-width: 96vw; }
 .note-modal-wrap .modal-content { flex: 0 1 380px; width: 380px; max-width: 90vw; }
 
-/* En-tête de la modale : titre à gauche, bouton cascade à droite */
 .modal-header-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .modal-header-row h3 { margin: 0; }
 .btn-cascade-toggle {
@@ -840,7 +788,6 @@ h1:focus { outline: none; }
 }
 .btn-cascade-toggle:hover { background: var(--text); color: var(--modal-bg); }
 
-/* Panneau latéral de cascade : à droite de la note, même fond de carte */
 .cascade-panel {
     position: relative; background: var(--modal-bg); color: var(--text);
     border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
@@ -856,7 +803,6 @@ h1:focus { outline: none; }
 }
 .cascade-back:hover { background: var(--text); color: var(--modal-bg); }
 
-/* Composant CascadeSelector */
 .cascade-selector { margin-top: 2.2rem; display: flex; flex-direction: column; gap: 0.7rem; }
 .cascade-field { display: flex; flex-direction: column; gap: 0.2rem; }
 .cascade-field label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
@@ -868,8 +814,6 @@ h1:focus { outline: none; }
 .cascade-field-lm select { border-color: #6ea8fe; }
 .cascade-field-lm .ss-input { border-color: #6ea8fe; }
 
-/* Liste déroulante cherchable (SearchableSelect) : même look qu'un <select>,
-   mais le champ accepte la saisie pour filtrer les options. */
 .ss-root { position: relative; }
 .ss-input {
     width: 100%; box-sizing: border-box;
@@ -886,10 +830,8 @@ h1:focus { outline: none; }
 }
 .ss-list {
     position: absolute; z-index: 40; top: calc(100% + 2px); left: 0; right: 0;
-    /* Les libellés de visées sont longs : la liste peut déborder du champ. */
     min-width: 100%; width: max-content; max-width: min(90vw, 620px);
     max-height: 340px; overflow-y: auto;
-    /* Barre de défilement large et visible plutôt que le filet par défaut. */
     scrollbar-width: auto;
     background: var(--bg-main); color: var(--text);
     border: 1px solid var(--border); border-radius: 6px;
@@ -902,19 +844,15 @@ h1:focus { outline: none; }
 .ss-item-active { background: rgba(110,168,254,0.18); }
 .ss-item-selected { font-weight: 600; color: #6ea8fe; }
 .ss-empty { padding: 0.4rem 0.5rem; font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
-/* Entrée « Ajouter … » : ce que l'on tape et qui n'existe pas encore au référentiel */
 .ss-item-ajout { color: #6ea8fe; font-weight: 600; border-bottom: 1px solid var(--border); }
 .ss-item-ajout:hover { background: rgba(110,168,254,0.22); }
-/* Ascenseur de la liste : plus large que le défaut WebKit (7px), donc attrapable. */
 .ss-list::-webkit-scrollbar { width: 14px; }
 .ss-list::-webkit-scrollbar-track { background: transparent; }
 .ss-list::-webkit-scrollbar-thumb {
     background: var(--border); border-radius: 7px;
-    border: 3px solid var(--bg-main);   /* marge visuelle autour du pouce */
+    border: 3px solid var(--bg-main);
 }
 .ss-list::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
-/* Sélection multiple avec recherche (MultiSelectSearch) : champ de recherche,
-   étiquettes des valeurs retenues, puis la liste cliquable. */
 .ms-root { display: flex; flex-direction: column; gap: 0.35rem; }
 .ms-search {
     width: 100%; box-sizing: border-box;
@@ -956,19 +894,16 @@ h1:focus { outline: none; }
 .ms-item-selected:hover { background: rgba(76,175,80,0.22); }
 .ms-check { flex: 0 0 0.9rem; color: #4CAF50; font-weight: 700; }
 .ms-empty { padding: 0.4rem 0.5rem; font-size: 0.82rem; color: var(--text-muted); font-style: italic; }
-/* Entrée « Ajouter … » : ce que l'on tape et qui n'existe pas encore au référentiel */
 .ms-item-ajout { color: #6ea8fe; font-weight: 600; border-bottom: 1px solid var(--border); }
 .ms-item-ajout:hover { background: rgba(110,168,254,0.22); }
 .ms-item-ajout .ms-check { color: #6ea8fe; }
 
-/* Bandeau de complétion, au-dessus du champ : ce qui suit peut être créé */
 .cascade-completion {
     display: flex; flex-direction: column; gap: 0.15rem;
     padding: 0.4rem 0.5rem; border-radius: 6px;
     background: rgba(110,168,254,0.08); border: 1px solid rgba(110,168,254,0.25);
 }
 
-/* Ouverture des listes complètes du référentiel */
 .cascade-elargir {
     align-self: flex-start;
     background: none; border: none; padding: 0; cursor: pointer;
@@ -977,7 +912,6 @@ h1:focus { outline: none; }
 .cascade-elargir:hover { text-decoration: underline; }
 .cascade-elargir-note { color: var(--text-muted); font-size: 0.75rem; line-height: 1.35; }
 
-/* Aptitudes du français, sous la compétence */
 .cascade-aptitudes { margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.2rem; }
 .cascade-aptitudes > label { font-size: 0.82rem; }
 
@@ -986,24 +920,19 @@ h1:focus { outline: none; }
 .cascade-recap { margin-top: 0.9rem; padding: 0.5rem 0.6rem; border-radius: 6px; background: rgba(76,175,80,0.12); color: var(--text); font-size: 0.82rem; }
 .cascade-recap-muted { background: rgba(255,255,255,0.06); color: var(--text-muted); }
 .cascade-recap-titre { font-weight: 600; margin-bottom: 0.25rem; }
-/* pre-wrap (et non pre-line) : l'alignement des valeurs sous leur libellé
-   repose sur des espaces en début de ligne, que pre-line écraserait. */
 .note-visee-recap { display: block; white-space: pre-wrap; line-height: 1.4; }
 
-/* Empilage uniquement sur mobile étroit (sinon on garde côte à côte) */
 @media (max-width: 520px) {
     .note-modal-wrap { flex-direction: column; align-items: center; overflow-y: auto; max-height: 95vh; }
     .note-modal-wrap .modal-content { flex: 0 0 auto; }
     .cascade-panel { flex: 0 0 auto; width: 90vw; max-width: 90vw; }
 }
 
-/* Note dans la grille horaire */
 .note-time { display: block; font-size: 0.7rem; font-weight: 600; opacity: 0.75; margin-bottom: 2px; }
 .note-titre { margin-left: 8px; font-size: 0.85rem; font-weight: 700; color: #ffb74d; }
 .note-titre-input { display: block; width: 100%; box-sizing: border-box; margin-bottom: 8px; }
 .note-visee { display: block; font-size: 0.72rem; font-weight: 600; color: #4CAF50; margin-bottom: 2px; white-space: pre-wrap; line-height: 1.35; }
 
-/* ===== TRIMESTRE VIEW ===== */
 .trim-loading {
     text-align: center;
     padding: 2rem;
@@ -1024,7 +953,6 @@ h1:focus { outline: none; }
     width: 100%;
 }
 
-/* Chaque colonne = une semaine */
 .trim-col {
     display: flex;
     flex-direction: column;
@@ -1034,7 +962,6 @@ h1:focus { outline: none; }
 }
 .trim-col:last-child { border-right: none; }
 
-/* Colonne fixe avec les noms des jours */
 .trim-col-fixed {
     min-width: 42px;
     max-width: 42px;
@@ -1045,14 +972,12 @@ h1:focus { outline: none; }
     border-right: 2px solid var(--border);
 }
 
-/* Colonne de congé */
 .trim-col-holiday {
     min-width: 52px;
     background: #1a1a3e;
 }
 .dark .trim-col-holiday { background: #0e0e28; }
 
-/* Cellule générique */
 .trim-cell {
     min-height: 58px;
     padding: 3px;
@@ -1067,7 +992,6 @@ h1:focus { outline: none; }
 }
 .trim-cell:hover { background: var(--row-hover); }
 
-/* En-tête de colonne semaine */
 .trim-cell-header {
     min-height: 36px;
     background: var(--primary);
@@ -1079,14 +1003,12 @@ h1:focus { outline: none; }
 }
 .trim-cell-header:hover { background: var(--primary); }
 
-/* Coin supérieur gauche (fixe) */
 .trim-corner {
     background: var(--bg-card);
     border-bottom: 2px solid var(--border);
 }
 .trim-corner:hover { background: var(--bg-card); }
 
-/* Nom du jour (colonne fixe) */
 .trim-cell-day {
     align-items: center;
     justify-content: center;
@@ -1098,11 +1020,9 @@ h1:focus { outline: none; }
 }
 .trim-cell-day:hover { background: var(--bg-card); }
 
-/* Numéro et date dans l'en-tête */
 .trim-week-num { font-size: 0.7rem; font-weight: 700; display: block; }
 .trim-week-date { font-size: 0.55rem; display: block; opacity: 0.85; white-space: nowrap; }
 
-/* Cellule de congé qui prend toute la hauteur */
 .trim-cell-holiday-span {
     flex: 1;
     color: rgba(255,255,255,0.85);
@@ -1120,13 +1040,11 @@ h1:focus { outline: none; }
     border-bottom: none;
 }
 
-/* Cellule avec congé partiel */
 .trim-cell-hol {
     background: rgba(180, 50, 50, 0.18);
 }
 .dark .trim-cell-hol { background: rgba(120, 30, 30, 0.4); }
 
-/* Lettre "C" pour congé partiel */
 .trim-conge {
     font-size: 0.65rem;
     font-weight: 700;
@@ -1135,19 +1053,16 @@ h1:focus { outline: none; }
     width: 100%;
 }
 
-/* Jour courant */
 .trim-cell-today {
     background: rgba(102, 126, 234, 0.15) !important;
     border-left: 2px solid var(--primary);
 }
 
-/* Jours hors période (remplissage) */
 .trim-cell-out {
     opacity: 0.2;
     pointer-events: none;
 }
 
-/* Bloc de cours dans le trimestre */
 .trim-course {
     font-size: 0.58rem;
     color: white;
@@ -1160,7 +1075,6 @@ h1:focus { outline: none; }
     box-sizing: border-box;
 }
 
-/* ===== BLAZOR ===== */
 #blazor-error-ui { background: lightyellow; bottom: 0; box-shadow: 0 -1px 2px rgba(0,0,0,0.2); display: none; left: 0; padding: 0.6rem 1.25rem 0.7rem; position: fixed; width: 100%; z-index: 1000; }
 #blazor-error-ui .dismiss { cursor: pointer; position: absolute; right: 0.75rem; top: 0.5rem; }
 
@@ -1170,22 +1084,18 @@ h1:focus { outline: none; }
 .loading-progress-text { position: absolute; text-align: center; font-weight: bold; inset: calc(20vh + 3.25rem) 0 auto 0.2rem; }
 .loading-progress-text:after { content: var(--blazor-load-percentage-text, "Loading"); }
 
-/* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
     .calendar-container { padding: 0.5rem; }
     .day-cell { min-height: 60px; padding: 0.25rem; }
     .day-num { font-size: 0.9rem; }
 
-    /* Barre de vue : boutons plus petits sur mobile */
     .view-mode-bar { padding: 3px; gap: 2px; }
     .view-btn { padding: 6px 2px; font-size: 0.72rem; }
 
-    /* Navigation */
     .nav-btn { padding: 0.4rem 0.7rem; font-size: 1rem; }
     .week-title { font-size: 0.9rem; }
     .period-dates-sub { font-size: 0.68rem; }
 
-    /* Trimestre : colonnes plus étroites */
     .trim-col { min-width: 64px; }
     .trim-col-fixed { min-width: 36px; max-width: 36px; }
     .trim-cell { min-height: 48px; }
@@ -1195,7 +1105,6 @@ h1:focus { outline: none; }
     .trim-week-date { font-size: 0.5rem; }
 }
 
-/* ===== ACCESS CODE PAGE ===== */
 .access-container {
     display: flex;
     align-items: center;
@@ -1304,7 +1213,6 @@ h1:focus { outline: none; }
     border-color: #e74c3c;
 }
 
-/* ===== ADMIN PAGE ===== */
 .admin-page { padding: 1.5rem; max-width: 860px; margin: 0 auto; }
 .admin-title { font-size: 1.4rem; font-weight: 700; color: var(--text); margin-bottom: 1.2rem; }
 .admin-section-title { font-size: 1rem; font-weight: 600; color: var(--text); margin: 0 0 0.8rem 0; }
@@ -1423,8 +1331,6 @@ h1:focus { outline: none; }
 }
 .btn-generate-code:hover { filter: brightness(1.15); }
 
-
-/* ===== CONFIRM EMAIL PAGE ===== */
 .confirm-email-page {
     min-height: 100vh;
     display: flex;
@@ -1535,14 +1441,11 @@ h1:focus { outline: none; }
     .time-row-vide { display: none !important; }
     .time-grid { grid-auto-rows: auto !important; }
 
-    /* Notes et cellules en clair, avec un contour visible sur papier */
     .note-block, .note-mini { background: #ffffff !important; color: #000000 !important; border: 1px solid #999999 !important; }
     .mini-course, .note-visee { color: #1b5e20 !important; }
 
-    /* Mention de report : en gras sur papier, la couleur ne suffisant pas a la distinguer */
     .note-reporte, .mini-reporte { color: #000000 !important; font-weight: 700 !important; }
 
-    /* Les puces de cours identifient un cours par leur couleur : on la conserve */
     .course-block, .course-mini { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
     .day-cell, .time-cell, .time-label, .note-block, .trim-cell { break-inside: avoid; page-break-inside: avoid; }
@@ -1607,7 +1510,6 @@ h1:focus { outline: none; }
     color: var(--text-muted); text-transform: uppercase;
 }
 
-
 .lecons-page {
     padding: 1.2rem 1rem 3rem;
     display: flex; justify-content: center;
@@ -1634,7 +1536,6 @@ h1:focus { outline: none; }
     font-size: .88rem; color: var(--text-muted);
 }
 
-
 .lecon-row {
     display: flex; align-items: center; gap: .8rem;
     padding: .7rem .8rem; margin-bottom: .5rem;
@@ -1659,8 +1560,6 @@ h1:focus { outline: none; }
 
 .lecon-row-btns { display: flex; gap: .35rem; flex-shrink: 0; }
 
-/* ---- Boutons ---- */
-
 .btn-lecon, .btn-lecon-new, .btn-lecon-add {
     padding: .34rem .7rem; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--border); background: var(--bg-card); color: var(--text);
@@ -1678,7 +1577,6 @@ h1:focus { outline: none; }
     background: #2E7D32; border-color: #2E7D32; color: #ffffff;
 }
 .btn-lecon-new:hover { opacity: .88; }
-
 
 .lecon-modal { max-width: 760px; width: 94vw; max-height: 88vh; overflow-y: auto; }
 
@@ -1700,7 +1598,6 @@ h1:focus { outline: none; }
     font-size: .88rem; font-family: inherit;
 }
 .lecon-zone { resize: vertical; line-height: 1.45; }
-
 
 .lecon-phases-entete {
     display: flex; align-items: center; justify-content: space-between;

@@ -1,21 +1,3 @@
-@* ─────────────────────────────────────────────────────────────────────────────
-   ReferentielPage.razor — Lecteur de PDF des référentiels pédagogiques.
-
-   Mise en page :
-     • Barre d'en-tête : titre à gauche, sélecteur déroulant (avec flèche Bootstrap)
-       à droite et scrollbar natif sur la liste déroulante.
-     • Visionneuse pleine largeur en dessous, prenant toute la hauteur restante.
-     • Compatible Android : un bouton "Ouvrir" est affiché si l'iframe ne suffit pas
-       (certains navigateurs Android n'embarquent pas les PDF en iframe blob).
-
-   Flux de données :
-     1. OnInitializedAsync charge la liste des fichiers via GET api/referentiel.
-     2. L'utilisateur choisit un fichier dans le select.
-     3. ChargerPdf télécharge les octets via GET api/referentiel/{nom} (JWT inclus).
-     4. creerUrlBlob (JS) crée une URL blob affichée dans l'iframe/object.
-     5. libererUrlBlob (JS) libère la précédente à chaque changement et au Dispose.
-   ───────────────────────────────────────────────────────────────────────────── *@
-
 @page "/referentiel"
 
 @inject AuthService Auth
@@ -25,16 +7,13 @@
 
 @implements IAsyncDisposable
 
-@* ── Conteneur principal : colonne flex qui occupe toute la hauteur de la fenêtre ── *@
 <div class="ref-page">
 
-    @* ── Barre d'en-tête : titre à gauche, sélecteur à droite ───────────────── *@
     <div class="ref-header">
         <span class="ref-titre">📄 Référentiels pédagogiques</span>
 
         @if (!chargementListe && fichiers.Any())
         {
-            @* Sélecteur natif Bootstrap avec flèche intégrée et scrollbar sur la liste *@
             <select class="form-select ref-select"
                     value="@fichierSelectionne"
                     @onchange="OnSelectChange">
@@ -47,12 +26,10 @@
         }
     </div>
 
-    @* ── Zone de contenu : occupe toute la hauteur restante ─────────────────── *@
     <div class="ref-viewer-zone">
 
         @if (chargementListe)
         {
-            @* Chargement de la liste des fichiers *@
             <div class="ref-centre">
                 <div class="spinner-border text-primary me-2" role="status"></div>
                 <span>Chargement…</span>
@@ -60,12 +37,10 @@
         }
         else if (!fichiers.Any())
         {
-            @* Aucun PDF disponible sur le serveur *@
             <div class="alert alert-warning m-3">Aucun référentiel disponible pour le moment.</div>
         }
         else if (chargementPdf)
         {
-            @* Téléchargement du PDF en cours *@
             <div class="ref-centre">
                 <div class="spinner-border text-primary me-2" role="status"></div>
                 <span>Chargement du PDF…</span>
@@ -73,18 +48,11 @@
         }
         else if (!string.IsNullOrEmpty(erreur))
         {
-            @* Erreur de téléchargement *@
             <div class="alert alert-danger m-3">@erreur</div>
         }
         else if (!string.IsNullOrEmpty(urlBlob))
         {
-            @* ── Visionneuse pleine largeur ──────────────────────────────────
-               L'iframe couvre toute la zone disponible (desktop + Android Chrome).
-               Le bouton "Ouvrir dans un nouvel onglet" sert de repli pour les
-               navigateurs Android qui n'embarquent pas les PDF blob en iframe.
-            ── *@
             <div class="ref-toolbar">
-                @* Bouton de repli pour Android et navigateurs sans lecteur PDF intégré *@
                 <a href="@urlBlob" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">
                     ↗ Ouvrir dans un nouvel onglet
                 </a>
@@ -96,7 +64,6 @@
         }
         else
         {
-            @* État initial : aucun PDF sélectionné *@
             <div class="ref-centre text-muted">
                 <span>Sélectionnez un référentiel dans la liste ↑</span>
             </div>
@@ -105,17 +72,14 @@
     </div>
 </div>
 
-@* ── Styles scoped à cette page ─────────────────────────────────────────────── *@
 <style>
-    /* Conteneur principal : colonne flex pleine hauteur sous la top-bar */
     .ref-page {
         display: flex;
         flex-direction: column;
-        height: calc(100dvh - 56px); /* 56px = hauteur de la top-bar */
+        height: calc(100dvh - 56px);
         overflow: hidden;
     }
 
-    /* Barre d'en-tête : titre + sélecteur sur une seule ligne */
     .ref-header {
         display: flex;
         align-items: center;
@@ -133,12 +97,10 @@
         white-space: nowrap;
     }
 
-    /* Sélecteur : largeur adaptative, min 220px, max 55% de la ligne */
     .ref-select {
         width: clamp(220px, 55%, 480px);
     }
 
-    /* Zone de la visionneuse : prend tout l'espace vertical restant */
     .ref-viewer-zone {
         flex: 1;
         display: flex;
@@ -146,13 +108,11 @@
         overflow: hidden;
     }
 
-    /* Barre de la visionneuse : bouton "Ouvrir dans un nouvel onglet" */
     .ref-toolbar {
         padding: 6px 12px;
         flex-shrink: 0;
     }
 
-    /* Iframe : pleine largeur et hauteur de la zone restante */
     .ref-iframe {
         flex: 1;
         width: 100%;
@@ -160,7 +120,6 @@
         display: block;
     }
 
-    /* Centrage vertical/horizontal pour les états de chargement et vide */
     .ref-centre {
         flex: 1;
         display: flex;
@@ -168,7 +127,6 @@
         justify-content: center;
     }
 
-    /* Sur mobile : le sélecteur prend toute la largeur sous le titre */
     @@media (max-width: 576px) {
         .ref-header {
             flex-direction: column;
@@ -181,28 +139,20 @@
 </style>
 
 @code {
-    // Liste des noms de fichiers PDF disponibles sur le serveur
     private List<string> fichiers = new();
 
-    // Nom du fichier actuellement sélectionné dans le select
     private string? fichierSelectionne;
 
-    // URL blob créée par JS à partir des octets du PDF téléchargé
     private string? urlBlob;
 
-    // True pendant le chargement initial de la liste
     private bool chargementListe = true;
 
-    // True pendant le téléchargement du PDF sélectionné
     private bool chargementPdf = false;
 
-    // Message d'erreur si le téléchargement échoue
     private string? erreur;
 
-    // Initialisation : vérifie l'authentification puis charge la liste des PDFs
     protected override async Task OnInitializedAsync()
     {
-        // Redirection si l'utilisateur n'est pas connecté
         if (!await Auth.IsLoggedInAsync())
         {
             Nav.NavigateTo("/login");
@@ -213,7 +163,6 @@
         chargementListe = false;
     }
 
-    // Appelé quand l'utilisateur change la sélection dans le <select>
     private async Task OnSelectChange(ChangeEventArgs e)
     {
         var valeur = e.Value?.ToString();
@@ -221,22 +170,17 @@
         await ChargerPdf(valeur);
     }
 
-    // Télécharge le PDF sélectionné et crée une URL blob pour l'affichage
-    // fichier : nom du fichier PDF à charger
     private async Task ChargerPdf(string fichier)
     {
-        // Évite de recharger le même fichier
         if (fichierSelectionne == fichier) return;
 
         fichierSelectionne = fichier;
         chargementPdf = true;
         erreur = null;
 
-        // Libère l'ancienne URL blob avant d'en créer une nouvelle
         await LiberUrlBlob();
         StateHasChanged();
 
-        // Télécharge les octets du PDF via le client HTTP authentifié (JWT en header)
         var octets = await Api.GetReferentielPdfAsync(fichier);
 
         if (octets == null || octets.Length == 0)
@@ -245,15 +189,12 @@
         }
         else
         {
-            // Crée l'URL blob côté navigateur via JS
             urlBlob = await JS.InvokeAsync<string>("creerUrlBlob", octets, "application/pdf");
         }
 
         chargementPdf = false;
     }
 
-    // Formate le nom du fichier pour l'affichage :
-    // retire l'extension, remplace les tirets par des espaces, majuscule initiale
     private static string FormatNom(string? nomFichier)
     {
         if (string.IsNullOrEmpty(nomFichier)) return "";
@@ -262,7 +203,6 @@
         return char.ToUpper(lisible[0]) + lisible[1..];
     }
 
-    // Libère l'URL blob via JS pour éviter les fuites mémoire du navigateur
     private async Task LiberUrlBlob()
     {
         if (!string.IsNullOrEmpty(urlBlob))
@@ -272,7 +212,6 @@
         }
     }
 
-    // Libère l'URL blob quand le composant est détruit (changement de page)
     public async ValueTask DisposeAsync()
     {
         await LiberUrlBlob();

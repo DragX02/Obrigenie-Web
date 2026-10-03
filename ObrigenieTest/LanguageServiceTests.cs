@@ -4,27 +4,8 @@ using Obrigenie.Services;
 
 namespace ObrigenieTest;
 
-/// <summary>
-/// Tests unitaires pour <see cref="LanguageService"/>.
-///
-/// Couvre :
-///   - Current      : langue par défaut = "FR".
-///   - T()          : retour de la bonne traduction selon la langue active.
-///   - InitAsync    : chargement depuis localStorage, valeur par défaut, idempotence.
-///   - SetAsync     : changement de langue, persistance, validation, événement OnChange.
-///
-/// <see cref="ILocalStorageService"/> est mocké avec Moq ; aucun accès localStorage réel.
-/// </summary>
 public class LanguageServiceTests
 {
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Crée un <see cref="LanguageService"/> dont le localStorage renvoie
-    /// <paramref name="storedLang"/> pour la clé "lang".
-    /// </summary>
     private static (LanguageService svc, Mock<ILocalStorageService> mock)
         CreateService(string? storedLang = null)
     {
@@ -34,13 +15,6 @@ public class LanguageServiceTests
         return (new LanguageService(mock.Object), mock);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Current — valeur par défaut
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Avant tout appel à InitAsync, Current doit valoir "FR".
-    /// </summary>
     [Fact]
     public void Current_BeforeInit_DefaultsFR()
     {
@@ -49,13 +23,6 @@ public class LanguageServiceTests
         Assert.Equal("FR", svc.Current);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // T() — traductions
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Sans InitAsync, T() utilise "FR" par défaut et renvoie la traduction française.
-    /// </summary>
     [Fact]
     public void T_WithoutInit_UsesDefaultFR()
     {
@@ -64,9 +31,6 @@ public class LanguageServiceTests
         Assert.Equal("Agenda", svc.T("nav.calendar"));
     }
 
-    /// <summary>
-    /// T() retourne la traduction correcte pour chaque combinaison langue / clé.
-    /// </summary>
     [Theory]
     [InlineData("FR", "nav.calendar",   "Agenda")]
     [InlineData("EN", "nav.calendar",   "Calendar")]
@@ -103,9 +67,6 @@ public class LanguageServiceTests
         Assert.Equal(expected, svc.T(key));
     }
 
-    /// <summary>
-    /// Quand la clé n'existe pas dans le dictionnaire, T() retourne la clé elle-même.
-    /// </summary>
     [Fact]
     public void T_UnknownKey_ReturnsKey()
     {
@@ -114,9 +75,6 @@ public class LanguageServiceTests
         Assert.Equal("unknown.key", svc.T("unknown.key"));
     }
 
-    /// <summary>
-    /// T() ne renvoie jamais null pour une clé connue.
-    /// </summary>
     [Theory]
     [InlineData("FR")]
     [InlineData("EN")]
@@ -131,13 +89,6 @@ public class LanguageServiceTests
         Assert.NotNull(svc.T("action.logout"));
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // InitAsync
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// InitAsync charge la langue valide stockée dans localStorage.
-    /// </summary>
     [Theory]
     [InlineData("FR", "FR")]
     [InlineData("EN", "EN")]
@@ -151,15 +102,12 @@ public class LanguageServiceTests
         Assert.Equal(expected, svc.Current);
     }
 
-    /// <summary>
-    /// InitAsync utilise "FR" par défaut quand la valeur stockée est absente ou invalide.
-    /// </summary>
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("ES")]
     [InlineData("IT")]
-    [InlineData("fr")]   // sensible à la casse
+    [InlineData("fr")]
     [InlineData("en")]
     public async Task InitAsync_DefaultsToFR_WhenValueIsInvalid(string? stored)
     {
@@ -170,23 +118,17 @@ public class LanguageServiceTests
         Assert.Equal("FR", svc.Current);
     }
 
-    /// <summary>
-    /// Un second appel à InitAsync ne relit pas localStorage (idempotent).
-    /// </summary>
     [Fact]
     public async Task InitAsync_IsIdempotent_LocalStorageReadOnlyOnce()
     {
         var (svc, mock) = CreateService("EN");
 
         await svc.InitAsync();
-        await svc.InitAsync(); // deuxième appel
+        await svc.InitAsync();
 
         mock.Verify(s => s.GetItemAsStringAsync("lang", default), Times.Once);
     }
 
-    /// <summary>
-    /// Après InitAsync avec "EN", un second InitAsync ne remet pas la langue à "FR".
-    /// </summary>
     [Fact]
     public async Task InitAsync_SecondCall_DoesNotResetLanguage()
     {
@@ -198,13 +140,6 @@ public class LanguageServiceTests
         Assert.Equal("EN", svc.Current);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // SetAsync
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// SetAsync met à jour Current avec la langue valide fournie.
-    /// </summary>
     [Theory]
     [InlineData("EN")]
     [InlineData("NL")]
@@ -218,9 +153,6 @@ public class LanguageServiceTests
         Assert.Equal(lang, svc.Current);
     }
 
-    /// <summary>
-    /// SetAsync persiste la langue dans localStorage sous la clé "lang".
-    /// </summary>
     [Theory]
     [InlineData("EN")]
     [InlineData("NL")]
@@ -234,14 +166,11 @@ public class LanguageServiceTests
         mock.Verify(s => s.SetItemAsStringAsync("lang", lang, default), Times.Once);
     }
 
-    /// <summary>
-    /// SetAsync ignore silencieusement les codes de langue inconnus sans modifier Current.
-    /// </summary>
     [Theory]
     [InlineData("ES")]
     [InlineData("IT")]
     [InlineData("")]
-    [InlineData("fr")]  // sensible à la casse : "fr" ≠ "FR"
+    [InlineData("fr")]
     [InlineData("EN-US")]
     public async Task SetAsync_InvalidLanguage_DoesNotChangeState(string invalid)
     {
@@ -249,17 +178,12 @@ public class LanguageServiceTests
 
         await svc.SetAsync(invalid);
 
-        // La langue ne doit pas avoir changé
         Assert.Equal("FR", svc.Current);
-        // localStorage ne doit pas avoir été écrit
         mock.Verify(
             s => s.SetItemAsStringAsync(It.IsAny<string>(), It.IsAny<string>(), default),
             Times.Never);
     }
 
-    /// <summary>
-    /// SetAsync déclenche l'événement OnChange après un changement de langue valide.
-    /// </summary>
     [Fact]
     public async Task SetAsync_ValidLanguage_FiresOnChangeEvent()
     {
@@ -272,9 +196,6 @@ public class LanguageServiceTests
         Assert.True(fired);
     }
 
-    /// <summary>
-    /// SetAsync ne déclenche pas OnChange pour une langue invalide.
-    /// </summary>
     [Fact]
     public async Task SetAsync_InvalidLanguage_DoesNotFireOnChange()
     {
@@ -287,9 +208,6 @@ public class LanguageServiceTests
         Assert.False(fired);
     }
 
-    /// <summary>
-    /// Chaque SetAsync valide déclenche OnChange exactement une fois.
-    /// </summary>
     [Fact]
     public async Task SetAsync_CalledTwice_FiresOnChangeTwice()
     {
@@ -303,9 +221,6 @@ public class LanguageServiceTests
         Assert.Equal(2, count);
     }
 
-    /// <summary>
-    /// Plusieurs abonnés à OnChange sont tous notifiés.
-    /// </summary>
     [Fact]
     public async Task SetAsync_MultipleSubscribers_AllNotified()
     {
@@ -321,9 +236,6 @@ public class LanguageServiceTests
         Assert.Equal(1, counter2);
     }
 
-    /// <summary>
-    /// Après SetAsync("EN"), T() retourne les traductions anglaises.
-    /// </summary>
     [Fact]
     public async Task SetAsync_ThenT_ReturnsUpdatedTranslations()
     {

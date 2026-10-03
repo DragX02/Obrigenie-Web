@@ -1,16 +1,3 @@
-@* ─────────────────────────────────────────────────────────────────────────────
-   CongesPage.razor — Corrections personnelles du calendrier des congés.
-
-   Le calendrier officiel (api/values) est commun à tous et alimenté
-   automatiquement ; certaines dates y sont inexactes. Cette page permet à chaque
-   utilisateur de le rectifier pour lui seul :
-     • corriger les dates ou le nom d'un congé officiel
-     • masquer un congé officiel qui ne le concerne pas
-     • ajouter un congé absent du calendrier officiel
-   Les corrections sont stockées côté serveur (table user_conge) et appliquées à
-   l'affichage du calendrier par CalendarService.AppliquerCorrections.
-   ───────────────────────────────────────────────────────────────────────────── *@
-
 @page "/conges"
 
 @inject ApiService Api
@@ -33,13 +20,11 @@
         }
         else
         {
-            @* Message d'erreur du serveur (dates invalides, nom vide, table absente…) *@
             @if (erreur != null)
             {
                 <p class="modal-error">@erreur</p>
             }
 
-            @* ── Congés officiels, avec leurs corrections éventuelles ────────── *@
             <div class="conges-section-title">Calendrier officiel</div>
 
             @if (congesOfficiels.Count == 0)
@@ -47,17 +32,13 @@
                 <div class="conges-vide">Aucun congé officiel n'a pu être chargé.</div>
             }
 
-            @* Année scolaire du groupe précédent, pour n'écrire l'intitulé qu'au changement *@
             int anneeAffichee = 0;
 
             @foreach (var conge in congesOfficiels)
             {
-                @* Capture pour les fermetures des gestionnaires de clic *@
                 var id = conge.Id;
                 var ligne = Ligne(id);
 
-                @* Sépare visuellement les deux années scolaires proposées : une même
-                   rentrée existe pour chacune, l'intitulé évite de corriger la mauvaise. *@
                 var annee = CalendarService.AnneeScolaire(conge.StartDate);
                 if (annee != anneeAffichee)
                 {
@@ -78,9 +59,6 @@
                     <div class="conge-actions">
                         <button class="btn-conge" @onclick="() => Enregistrer(ligne)">Enregistrer</button>
 
-                        @* Masquer / réafficher : un congé masqué disparaît du calendrier.
-                           Une Rentrée ne peut pas être masquée : elle ancre la numérotation
-                           des semaines scolaires, sa date reste en revanche corrigeable. *@
                         @if (!CalendarService.EstRentree(conge.Name))
                         {
                             <button class="btn-conge" @onclick="() => BasculerMasque(ligne)">
@@ -88,7 +66,6 @@
                             </button>
                         }
 
-                        @* Réinitialiser n'apparaît que si une correction existe côté serveur *@
                         @if (ligne.Id > 0)
                         {
                             <button class="btn-conge btn-conge-reset" @onclick="() => Reinitialiser(ligne)">
@@ -104,7 +81,6 @@
                 </div>
             }
 
-            @* ── Congés ajoutés par l'utilisateur ────────────────────────────── *@
             <div class="conges-section-title">Congés ajoutés</div>
 
             @if (congesAjoutes.Count == 0)
@@ -133,7 +109,6 @@
                 </div>
             }
 
-            @* ── Formulaire d'ajout ──────────────────────────────────────────── *@
             <div class="conges-section-title">Ajouter un congé</div>
 
             <div class="conge-row">
@@ -158,16 +133,12 @@
 </div>
 
 @code {
-    @* Congés du calendrier officiel, tels que renvoyés par l'API (sans corrections appliquées) *@
     private List<Holiday> congesOfficiels = new();
 
-    @* Corrections de l'utilisateur, indexées par identifiant de congé officiel *@
     private Dictionary<int, UserConge> corrections = new();
 
-    @* Congés créés de toutes pièces par l'utilisateur *@
     private List<UserConge> congesAjoutes = new();
 
-    @* Champs du formulaire d'ajout *@
     private string   nouveauNom   = "";
     private DateTime nouveauDebut = DateTime.Today;
     private DateTime nouveauFin   = DateTime.Today;
@@ -177,7 +148,6 @@
 
     protected override async Task OnInitializedAsync() => await Recharger();
 
-    // Recharge le calendrier officiel et les corrections de l'utilisateur.
     private async Task Recharger()
     {
         chargement = true;
@@ -185,13 +155,6 @@
 
         var calendrier = await CalendarSvc.GetCalendarData();
 
-        // Tous les congés issus de la base sont corrigeables, Rentrée comprise : sa date
-        // est justement l'une des plus souvent fausses. Les marqueurs synthétiques
-        // (Id = 0, ajoutés en secours quand l'API n'en fournit pas) n'ont pas de ligne
-        // en base à corriger et sont donc écartés.
-        //
-        // Seules l'année scolaire en cours et la suivante sont proposées : corriger une
-        // année déjà écoulée n'a pas d'intérêt et allongeait la liste pour rien.
         int anneeCourante = CalendarService.AnneeScolaire(DateTime.Today);
 
         congesOfficiels = calendrier.Holidays
@@ -201,8 +164,6 @@
             .OrderBy(h => h.StartDate)
             .ToList();
 
-        // L'erreur éventuelle est affichée : sans elle, une table absente ou des droits
-        // manquants se traduiraient par une page vide sans explication.
         var (toutes, erreurChargement) = await Api.GetCongesAsync();
         erreur = erreurChargement;
 
@@ -214,8 +175,6 @@
         chargement = false;
     }
 
-    // Retourne la ligne éditable d'un congé officiel : sa correction si elle existe,
-    // sinon une correction non encore enregistrée pré-remplie avec les valeurs officielles.
     private UserConge Ligne(int idCalendrier)
     {
         if (corrections.TryGetValue(idCalendrier, out var existante)) return existante;
@@ -229,12 +188,10 @@
             DateFin        = officiel.EndDate,
         };
 
-        // Mémorisée pour que les champs liés gardent la saisie entre deux rendus
         corrections[idCalendrier] = ligne;
         return ligne;
     }
 
-    // Enregistre une correction (création ou mise à jour) et recharge la liste.
     private async Task Enregistrer(UserConge ligne)
     {
         erreur = null;
@@ -245,15 +202,12 @@
         await Recharger();
     }
 
-    // Masque ou réaffiche un congé officiel, puis enregistre immédiatement :
-    // le bouton reflète ainsi toujours l'état réellement stocké.
     private async Task BasculerMasque(UserConge ligne)
     {
         ligne.Masque = !ligne.Masque;
         await Enregistrer(ligne);
     }
 
-    // Supprime la correction : le congé officiel réapparaît avec ses dates d'origine.
     private async Task Reinitialiser(UserConge ligne)
     {
         erreur = null;
@@ -262,7 +216,6 @@
         await Recharger();
     }
 
-    // Supprime un congé ajouté par l'utilisateur.
     private async Task Supprimer(UserConge ligne)
     {
         erreur = null;
@@ -271,7 +224,6 @@
         await Recharger();
     }
 
-    // Ajoute un congé absent du calendrier officiel.
     private async Task Ajouter()
     {
         erreur = null;

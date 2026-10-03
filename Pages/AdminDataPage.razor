@@ -1,9 +1,3 @@
-@* Page d'administration des données pédagogiques.
-   Accessible uniquement aux administrateurs (vérification via isAdmin dans MainLayout).
-   Permet de créer, lister et supprimer les enregistrements des tables de référence :
-   catégories, cours, niveaux, liaisons cours-niveau, domaines, compétences, aptitudes,
-   noms de visées, visées à maîtriser et sous-domaines. *@
-
 @page "/admin-data"
 @inject ApiService Api
 @inject NavigationManager Nav
@@ -24,7 +18,6 @@ else
     <div class="container-fluid py-3">
         <h2 class="mb-3">Gestion des données pédagogiques</h2>
 
-        @* Barre d'onglets + champ de recherche *@
         <div class="d-flex flex-wrap align-items-start gap-2 mb-3">
             <ul class="nav nav-tabs flex-wrap flex-grow-1 mb-0">
                 @foreach (var t in tabs)
@@ -40,7 +33,6 @@ else
                    @bind="searchQuery" @bind:event="oninput" />
         </div>
 
-        @* Message de retour global *@
         @if (!string.IsNullOrEmpty(feedback))
         {
             <div class="alert @(feedbackOk ? "alert-success" : "alert-danger") alert-dismissible">
@@ -49,7 +41,6 @@ else
             </div>
         }
 
-        @* ── CATÉGORIES ───────────────────────────────────────────── *@
         @if (activeTab == "Catégories")
         {
             <div class="row g-3">
@@ -82,7 +73,6 @@ else
             </div>
         }
 
-        @* ── COURS ────────────────────────────────────────────────── *@
         @if (activeTab == "Cours")
         {
             <div class="row g-3">
@@ -126,7 +116,6 @@ else
             </div>
         }
 
-        @* ── NIVEAUX ─────────────────────────────────────────────── *@
         @if (activeTab == "Niveaux")
         {
             <div class="row g-3">
@@ -159,7 +148,6 @@ else
             </div>
         }
 
-        @* ── LIAISONS COURS-NIVEAU ───────────────────────────────── *@
         @if (activeTab == "Liaisons")
         {
             <div class="row g-3">
@@ -212,7 +200,6 @@ else
             </div>
         }
 
-        @* ── DOMAINES ────────────────────────────────────────────── *@
         @if (activeTab == "Domaines")
         {
             <div class="row g-3">
@@ -252,7 +239,6 @@ else
             </div>
         }
 
-        @* ── SOUS-DOMAINES ───────────────────────────────────────── *@
         @if (activeTab == "Sous-domaines")
         {
             <div class="row g-3">
@@ -291,7 +277,6 @@ else
             </div>
         }
 
-        @* ── COMPÉTENCES ─────────────────────────────────────────── *@
         @if (activeTab == "Compétences")
         {
             <div class="row g-3">
@@ -322,7 +307,6 @@ else
             </div>
         }
 
-        @* ── APTITUDES ───────────────────────────────────────────── *@
         @if (activeTab == "Aptitudes")
         {
             <div class="row g-3">
@@ -353,7 +337,6 @@ else
             </div>
         }
 
-        @* ── NOMS DE VISÉES ──────────────────────────────────────── *@
         @if (activeTab == "Noms visées")
         {
             <div class="row g-3">
@@ -384,7 +367,6 @@ else
             </div>
         }
 
-        @* ── VISÉES À MAÎTRISER ──────────────────────────────────── *@
         @if (activeTab == "Visées à maîtriser")
         {
             <div class="row g-3">
@@ -415,7 +397,6 @@ else
             </div>
         }
 
-        @* ── VISÉES (objectifs d'apprentissage) avec sélecteurs en cascade ── *@
         @if (activeTab == "Visées")
         {
             <div class="row g-3">
@@ -423,7 +404,6 @@ else
                     <div class="card">
                         <div class="card-header">Nouvelle visée — sélection en cascade</div>
                         <div class="card-body">
-                            @* Étape 1 : catégorie → filtre les cours *@
                             <label class="form-label fw-bold">1. Catégorie</label>
                             <select class="form-select mb-2" @onchange="OnViseeCatChanged">
                                 <option value="0">-- Catégorie --</option>
@@ -433,7 +413,6 @@ else
                                 }
                             </select>
 
-                            @* Étape 2 : cours (filtré par catégorie) → filtre les liaisons cours-niveau *@
                             <label class="form-label fw-bold">2. Cours</label>
                             <select class="form-select mb-2" @onchange="OnViseeCourChanged" disabled="@(vCatId == 0)">
                                 <option value="0">-- Cours --</option>
@@ -443,7 +422,6 @@ else
                                 }
                             </select>
 
-                            @* Étape 3 : liaison cours-niveau (filtré par cours) → filtre les domaines *@
                             <label class="form-label fw-bold">3. Niveau</label>
                             <select class="form-select mb-2" @onchange="OnViseeCnChanged" disabled="@(vCoursId == 0)">
                                 <option value="0">-- Niveau --</option>
@@ -453,7 +431,6 @@ else
                                 }
                             </select>
 
-                            @* Étape 4 : domaine (filtré par liaison) → filtre les sous-domaines *@
                             <label class="form-label fw-bold">4. Domaine</label>
                             <select class="form-select mb-2" @onchange="OnViseeDomaineChanged" disabled="@(vCnId == 0)">
                                 <option value="0">-- Domaine --</option>
@@ -463,7 +440,6 @@ else
                                 }
                             </select>
 
-                            @* Étape 5 (optionnelle) : sous-domaine *@
                             <label class="form-label fw-bold">5. Sous-domaine <span class="text-muted">(optionnel)</span></label>
                             <select class="form-select mb-2" @bind="vSousDomId" disabled="@(vDomaineId == 0)">
                                 <option value="0">-- Aucun --</option>
@@ -473,7 +449,6 @@ else
                                 }
                             </select>
 
-                            @* Étape 6 : nom de visée (type d'objectif) *@
                             <label class="form-label fw-bold">6. Type de visée</label>
                             <select class="form-select mb-2" @bind="vNomViseeId">
                                 <option value="0">-- Type --</option>
@@ -483,7 +458,6 @@ else
                                 }
                             </select>
 
-                            @* Étape 7 : compétence liée à la visée *@
                             <label class="form-label fw-bold">7. Compétence</label>
                             <select class="form-select mb-2" @bind="vCompId">
                                 <option value="0">-- Compétence --</option>
@@ -495,7 +469,6 @@ else
 
                             <hr class="my-2" />
 
-                            @* Étape 8 (optionnelle) : visée à maîtriser → crée le lien automatiquement *@
                             <label class="form-label fw-bold">8. Visée à maîtriser <span class="text-muted">(optionnel)</span></label>
                             <select class="form-select mb-2" value="@vVmId"
                                     @onchange="e => { vVmId = int.TryParse(e.Value?.ToString(), out var v) ? v : 0; if (vVmId == 0) vAptIds = new(); }">
@@ -506,7 +479,6 @@ else
                                 }
                             </select>
 
-                            @* Étape 9 (optionnelle) : aptitudes → crée une entrée appartenir par aptitude cochée *@
                             <label class="form-label fw-bold">9. Aptitudes <span class="text-muted">(optionnel — plusieurs possibles)</span></label>
                             <div class="mb-3 @(vVmId == 0 ? "opacity-50 pe-none" : "")">
                                 @foreach (var a in aptitudes)
@@ -553,10 +525,8 @@ else
             </div>
         }
 
-        @* ── LIAISONS VISÉE ↔ VISÉE À MAÎTRISER ─────────────────── *@
         @if (activeTab == "Liens V→M")
         {
-            @* Bouton de création — au-dessus des 3 boxes *@
             <div class="d-flex align-items-center gap-3 mb-3">
                 <button class="btn btn-primary" @onclick="CreateLiensViseeMaitrise"
                         disabled="@(lienIdVisee == 0 || lienIdVms.Count == 0)">
@@ -574,7 +544,6 @@ else
 
             <div class="row g-3">
 
-                @* ── Box 1 : Visées ── *@
                 <div class="col-md-4">
                     <div class="card h-100">
                         <div class="card-header fw-bold">Visées</div>
@@ -603,7 +572,6 @@ else
                     </div>
                 </div>
 
-                @* ── Box 2 : Visées à maîtriser (multi-sélection) ── *@
                 <div class="col-md-4">
                     <div class="card h-100">
                         <div class="card-header fw-bold">
@@ -635,7 +603,6 @@ else
                     </div>
                 </div>
 
-                @* ── Box 3 : Liaisons existantes ── *@
                 <div class="col-md-4">
                     <div class="card h-100">
                         <div class="card-header fw-bold">Liaisons existantes</div>
@@ -667,7 +634,6 @@ else
             </div>
         }
 
-        @* ── LIAISONS VISÉE_MAITRISER ↔ APTITUDE ↔ COMPÉTENCE ────── *@
         @if (activeTab == "Aptit.→VM")
         {
             <div class="row g-3">
@@ -731,27 +697,20 @@ else
 }
 
 @code {
-    // Indique si la page est encore en train de charger les données initiales
     private bool isLoading = true;
 
-    // Indique si l'utilisateur connecté est administrateur
     private bool isAdmin = false;
 
-    // Onglet actuellement sélectionné
     private string activeTab = "Catégories";
 
-    // Texte de recherche — filtre les lignes du tableau de l'onglet actif
     private string searchQuery = "";
 
-    // Change l'onglet et efface la recherche en cours
     private void SetTab(string tab) { activeTab = tab; searchQuery = ""; }
 
-    // Retourne true si searchQuery est vide ou si au moins une des valeurs le contient (insensible à la casse)
     private bool MatchSearch(params string?[] values)
         => string.IsNullOrWhiteSpace(searchQuery)
            || values.Any(v => v?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) == true);
 
-    // Liste des noms d'onglets dans l'ordre d'affichage
     private readonly string[] tabs =
     {
         "Catégories", "Cours", "Niveaux", "Liaisons",
@@ -761,13 +720,10 @@ else
         "Visées", "Liens V→M", "Aptit.→VM"
     };
 
-    // Message de retour affiché après une action (succès ou erreur)
     private string? feedback;
 
-    // True si le message de retour représente un succès, false pour une erreur
     private bool feedbackOk;
 
-    // ── Données chargées depuis l'API ─────────────────────────────────────
     private List<CategorieAdminDto>      categories     = new();
     private List<CoursAdminDto>          coursList      = new();
     private List<NiveauAdminDto>         niveaux        = new();
@@ -783,7 +739,6 @@ else
     private List<LienViseeMaitriseAdminDto> liensViseeMaitrise = new();
     private List<AppartenirAdminDto>     appartenirs     = new();
 
-    // ── Sélecteurs en cascade pour la création d'une visée ───────────────
     private int vCatId      = 0;
     private int vCoursId    = 0;
     private int vCnId       = 0;
@@ -791,66 +746,51 @@ else
     private int vSousDomId  = 0;
     private int vNomViseeId = 0;
     private int vCompId     = 0;
-    // Liaisons optionnelles créées en même temps que la visée
-    private int          vVmId   = 0;       // visée à maîtriser (étape 8)
-    private HashSet<int> vAptIds = new();   // aptitudes sélectionnées pour appartenir (étape 9)
+    private int          vVmId   = 0;
+    private HashSet<int> vAptIds = new();
 
-    // ── Champs de saisie — Liaison visée ↔ visée à maîtriser ─────────────
     private int         lienIdVisee   = 0;
-    private HashSet<int> lienIdVms    = new();  // sélection multiple de VM
+    private HashSet<int> lienIdVms    = new();
     private string      lienSearchV   = "";
     private string      lienSearchVm  = "";
     private string      lienSearchLien = "";
 
-    // ── Champs de saisie — Appartenir visée_maitriser ↔ aptitude/compétence
     private int aptVmId   = 0;
     private int aptAptId  = 0;
     private int aptCompId = 0;
 
-    // ── Champs de saisie — Catégorie ─────────────────────────────────────
     private string newCatNom   = "";
     private int    newCatOrdre = 0;
 
-    // ── Champs de saisie — Cours ─────────────────────────────────────────
     private string newCoursNom     = "";
     private string newCoursCode    = "";
     private string newCoursPrefix  = "";
     private string newCoursCouleur = "#3B82F6";
     private int    newCoursIdCat   = 0;
 
-    // ── Champs de saisie — Niveau ────────────────────────────────────────
     private string newNivCode = "";
     private string newNivNom  = "";
 
-    // ── Champs de saisie — Cours-Niveau ──────────────────────────────────
     private int newCnIdCours  = 0;
     private int newCnIdNiveau = 0;
     private int newCnIdProf   = 0;
 
-    // ── Champs de saisie — Domaine ────────────────────────────────────────
     private string newDomNom  = "";
     private int    newDomIdCn = 0;
 
-    // ── Champs de saisie — Sous-domaine ──────────────────────────────────
     private string newSdNom   = "";
     private int    newSdIdDom = 0;
 
-    // ── Champs de saisie — Compétence ────────────────────────────────────
     private string newCompNom = "";
 
-    // ── Champs de saisie — Aptitude ──────────────────────────────────────
     private string newAptNom = "";
 
-    // ── Champs de saisie — Nom visée ─────────────────────────────────────
     private string newNvNom = "";
 
-    // ── Champs de saisie — Visée à maîtriser ─────────────────────────────
     private string newVmNom = "";
 
-    // Charge toutes les listes au démarrage de la page après vérification du rôle admin.
     protected override async Task OnInitializedAsync()
     {
-        // Redirection si le token est absent ou expiré
         if (await Auth.IsTokenExpiredAsync())
         {
             await Auth.RemoveTokenAsync();
@@ -861,7 +801,6 @@ else
         isAdmin = (await Auth.GetRoleAsync()) == "ADMIN";
         if (!isAdmin) { isLoading = false; return; }
 
-        // Chargement en parallèle de tous les jeux de données
         await Task.WhenAll(
             LoadCategories(), LoadCours(), LoadNiveaux(), LoadProfesseurs(),
             LoadCoursNiveaux(), LoadDomaines(), LoadSousDomaines(),
@@ -871,9 +810,6 @@ else
         isLoading = false;
     }
 
-    // Affiche un message de retour pendant 3 secondes puis l'efface automatiquement.
-    // ok : true pour succès (vert), false pour erreur (rouge)
-    // msg : texte du message à afficher
     private async Task ShowFeedback(bool ok, string msg)
     {
         feedbackOk = ok;
@@ -884,7 +820,6 @@ else
         StateHasChanged();
     }
 
-    // ── Chargements ──────────────────────────────────────────────────────
     private async Task LoadCategories()    => categories      = await Api.GetAdminCategoriesAsync();
     private async Task LoadCours()         => coursList       = await Api.GetAdminCoursAsync();
     private async Task LoadNiveaux()       => niveaux         = await Api.GetAdminNiveauxAsync();
@@ -900,48 +835,36 @@ else
     private async Task LoadLiensViseeMaitrise() => liensViseeMaitrise = await Api.GetAdminLiensViseeMaitriseAsync();
     private async Task LoadAppartenirs()      => appartenirs     = await Api.GetAdminAppartenirAsync();
 
-    // ── Événements en cascade — Visées ───────────────────────────────────
-
-    // Catégorie sélectionnée → réinitialise tous les sélecteurs en aval
     private void OnViseeCatChanged(ChangeEventArgs e)
     {
         vCatId     = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
         vCoursId   = 0; vCnId = 0; vDomaineId = 0; vSousDomId = 0;
     }
 
-    // Cours sélectionné → réinitialise les sélecteurs en aval du cours
     private void OnViseeCourChanged(ChangeEventArgs e)
     {
         vCoursId  = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
         vCnId = 0; vDomaineId = 0; vSousDomId = 0;
     }
 
-    // Niveau (liaison cours-niveau) sélectionné → réinitialise domaine et sous-domaine
     private void OnViseeCnChanged(ChangeEventArgs e)
     {
         vCnId      = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
         vDomaineId = 0; vSousDomId = 0;
     }
 
-    // Domaine sélectionné → réinitialise le sous-domaine
     private void OnViseeDomaineChanged(ChangeEventArgs e)
     {
         vDomaineId = int.TryParse(e.Value?.ToString(), out var v) ? v : 0;
         vSousDomId = 0;
     }
 
-    // Coche ou décoche une aptitude dans la sélection multiple (étape 9)
     private void ToggleAptitude(int id, bool isChecked)
     {
         if (isChecked) vAptIds.Add(id);
         else           vAptIds.Remove(id);
     }
 
-    // ── Actions — Visées ─────────────────────────────────────────────────
-
-    // Crée une nouvelle visée via la sélection en cascade et recharge la liste.
-    // Si une visée à maîtriser (étape 8) est sélectionnée, crée aussi le lien automatiquement.
-    // Si une aptitude (étape 9) est sélectionnée en plus, crée aussi l'entrée appartenir.
     private async Task CreateVisee()
     {
         var (ok, err) = await Api.CreateAdminViseeAsync(new
@@ -955,17 +878,14 @@ else
 
         if (!ok) { await ShowFeedback(false, err ?? "Erreur"); return; }
 
-        // Récupère l'id de la visée fraîchement créée (dernier élément après rechargement)
         await LoadVisees();
         var newId = visees.Count > 0 ? visees[^1].IdVisee : 0;
 
-        // Crée le lien visée ↔ visée à maîtriser si sélectionnée
         if (vVmId != 0 && newId != 0)
         {
             await Api.CreateAdminLienViseeMaitriseAsync(new { idVisee = newId, idViseesMaitriser = vVmId });
             await LoadLiensViseeMaitrise();
 
-            // Crée une entrée appartenir par aptitude cochée
             if (vAptIds.Count > 0)
             {
                 foreach (var aptId in vAptIds)
@@ -981,10 +901,8 @@ else
             }
         }
 
-        // Sauvegarde avant reset pour le message de confirmation
         bool avecLiaisons = vVmId != 0;
 
-        // Réinitialise tous les sélecteurs
         vCatId = 0; vCoursId = 0; vCnId = 0;
         vDomaineId = 0; vSousDomId = 0; vNomViseeId = 0; vCompId = 0;
         vVmId = 0; vAptIds = new();
@@ -992,7 +910,6 @@ else
         await ShowFeedback(true, avecLiaisons ? "Visée créée + liaisons automatiques." : "Visée créée.");
     }
 
-    // Supprime une visée par son identifiant et recharge la liste
     private async Task DeleteVisee(int id)
     {
         var (ok, err) = await Api.DeleteAdminViseeAsync(id);
@@ -1000,9 +917,6 @@ else
         await ShowFeedback(ok, ok ? "Visée supprimée." : err ?? "Erreur");
     }
 
-    // ── Actions — Liaisons visée ↔ visée à maîtriser ─────────────────────
-
-    // Crée un lien par VM sélectionnée (indépendants) puis recharge la liste
     private async Task CreateLiensViseeMaitrise()
     {
         int created = 0;
@@ -1018,7 +932,6 @@ else
         await ShowFeedback(lastErr == null, lastErr == null ? $"{created} lien(s) créé(s)." : lastErr ?? "Erreur");
     }
 
-    // Supprime un lien visée ↔ visée à maîtriser et recharge la liste
     private async Task DeleteLienViseeMaitrise(int idVisee, int idVm)
     {
         var (ok, err) = await Api.DeleteAdminLienViseeMaitriseAsync(idVisee, idVm);
@@ -1026,9 +939,6 @@ else
         await ShowFeedback(ok, ok ? "Lien supprimé." : err ?? "Erreur");
     }
 
-    // ── Actions — Appartenir (visée_maitriser ↔ aptitude ↔ compétence) ───
-
-    // Crée une liaison appartenir et recharge la liste
     private async Task CreateAppartenir()
     {
         var (ok, err) = await Api.CreateAdminAppartenirAsync(new
@@ -1041,7 +951,6 @@ else
         await ShowFeedback(ok, ok ? "Liaison créée." : err ?? "Erreur");
     }
 
-    // Supprime une liaison appartenir par son identifiant et recharge la liste
     private async Task DeleteAppartenir(int id)
     {
         var (ok, err) = await Api.DeleteAdminAppartenirAsync(id);
@@ -1049,9 +958,6 @@ else
         await ShowFeedback(ok, ok ? "Liaison supprimée." : err ?? "Erreur");
     }
 
-    // ── Actions — Catégories ─────────────────────────────────────────────
-
-    // Crée une nouvelle catégorie et recharge la liste
     private async Task CreateCategorie()
     {
         var (ok, err) = await Api.CreateAdminCategorieAsync(new { nomCat = newCatNom, ordre = newCatOrdre });
@@ -1059,7 +965,6 @@ else
         await ShowFeedback(ok, ok ? "Catégorie ajoutée." : err ?? "Erreur");
     }
 
-    // Supprime une catégorie par son identifiant et recharge la liste
     private async Task DeleteCategorie(int id)
     {
         var (ok, err) = await Api.DeleteAdminCategorieAsync(id);
@@ -1067,9 +972,6 @@ else
         await ShowFeedback(ok, ok ? "Catégorie supprimée." : err ?? "Erreur");
     }
 
-    // ── Actions — Cours ──────────────────────────────────────────────────
-
-    // Crée un nouveau cours et recharge la liste
     private async Task CreateCours()
     {
         var (ok, err) = await Api.CreateAdminCoursAsync(new
@@ -1082,7 +984,6 @@ else
         await ShowFeedback(ok, ok ? "Cours ajouté." : err ?? "Erreur");
     }
 
-    // Supprime un cours par son identifiant et recharge la liste
     private async Task DeleteCours(int id)
     {
         var (ok, err) = await Api.DeleteAdminCoursAsync(id);
@@ -1090,9 +991,6 @@ else
         await ShowFeedback(ok, ok ? "Cours supprimé." : err ?? "Erreur");
     }
 
-    // ── Actions — Niveaux ────────────────────────────────────────────────
-
-    // Crée un nouveau niveau et recharge la liste
     private async Task CreateNiveau()
     {
         var (ok, err) = await Api.CreateAdminNiveauAsync(new { codeNiveau = newNivCode, nomNiveau = newNivNom });
@@ -1100,7 +998,6 @@ else
         await ShowFeedback(ok, ok ? "Niveau ajouté." : err ?? "Erreur");
     }
 
-    // Supprime un niveau par son identifiant et recharge la liste
     private async Task DeleteNiveau(int id)
     {
         var (ok, err) = await Api.DeleteAdminNiveauAsync(id);
@@ -1108,9 +1005,6 @@ else
         await ShowFeedback(ok, ok ? "Niveau supprimé." : err ?? "Erreur");
     }
 
-    // ── Actions — Cours-Niveau ───────────────────────────────────────────
-
-    // Crée une liaison cours-niveau-professeur et recharge la liste
     private async Task CreateCoursNiveau()
     {
         var (ok, err) = await Api.CreateAdminCoursNiveauAsync(new { idCoursFk = newCnIdCours, idNiveauFk = newCnIdNiveau, idProfFk = newCnIdProf });
@@ -1118,7 +1012,6 @@ else
         await ShowFeedback(ok, ok ? "Liaison ajoutée." : err ?? "Erreur");
     }
 
-    // Supprime une liaison cours-niveau et recharge la liste
     private async Task DeleteCoursNiveau(int id)
     {
         var (ok, err) = await Api.DeleteAdminCoursNiveauAsync(id);
@@ -1126,9 +1019,6 @@ else
         await ShowFeedback(ok, ok ? "Liaison supprimée." : err ?? "Erreur");
     }
 
-    // ── Actions — Domaines ───────────────────────────────────────────────
-
-    // Crée un nouveau domaine et recharge la liste
     private async Task CreateDomaine()
     {
         var (ok, err) = await Api.CreateAdminDomaineAsync(new { nom = newDomNom, idCoursNiveauFk = newDomIdCn });
@@ -1136,7 +1026,6 @@ else
         await ShowFeedback(ok, ok ? "Domaine ajouté." : err ?? "Erreur");
     }
 
-    // Supprime un domaine par son identifiant et recharge la liste
     private async Task DeleteDomaine(int id)
     {
         var (ok, err) = await Api.DeleteAdminDomaineAsync(id);
@@ -1144,9 +1033,6 @@ else
         await ShowFeedback(ok, ok ? "Domaine supprimé." : err ?? "Erreur");
     }
 
-    // ── Actions — Sous-domaines ──────────────────────────────────────────
-
-    // Crée un nouveau sous-domaine et recharge la liste
     private async Task CreateSousDomaine()
     {
         var (ok, err) = await Api.CreateAdminSousDomaineAsync(new { nomComp = newSdNom, idDomFk = newSdIdDom });
@@ -1154,7 +1040,6 @@ else
         await ShowFeedback(ok, ok ? "Sous-domaine ajouté." : err ?? "Erreur");
     }
 
-    // Supprime un sous-domaine par son identifiant et recharge la liste
     private async Task DeleteSousDomaine(int id)
     {
         var (ok, err) = await Api.DeleteAdminSousDomaineAsync(id);
@@ -1162,9 +1047,6 @@ else
         await ShowFeedback(ok, ok ? "Sous-domaine supprimé." : err ?? "Erreur");
     }
 
-    // ── Actions — Compétences ────────────────────────────────────────────
-
-    // Crée une nouvelle compétence et recharge la liste
     private async Task CreateCompetence()
     {
         var (ok, err) = await Api.CreateAdminCompetenceAsync(new { nom = newCompNom });
@@ -1172,7 +1054,6 @@ else
         await ShowFeedback(ok, ok ? "Compétence ajoutée." : err ?? "Erreur");
     }
 
-    // Supprime une compétence par son identifiant et recharge la liste
     private async Task DeleteCompetence(int id)
     {
         var (ok, err) = await Api.DeleteAdminCompetenceAsync(id);
@@ -1180,9 +1061,6 @@ else
         await ShowFeedback(ok, ok ? "Compétence supprimée." : err ?? "Erreur");
     }
 
-    // ── Actions — Aptitudes ──────────────────────────────────────────────
-
-    // Crée une nouvelle aptitude et recharge la liste
     private async Task CreateAptitude()
     {
         var (ok, err) = await Api.CreateAdminAptitudeAsync(new { nom = newAptNom });
@@ -1190,7 +1068,6 @@ else
         await ShowFeedback(ok, ok ? "Aptitude ajoutée." : err ?? "Erreur");
     }
 
-    // Supprime une aptitude par son identifiant et recharge la liste
     private async Task DeleteAptitude(int id)
     {
         var (ok, err) = await Api.DeleteAdminAptitudeAsync(id);
@@ -1198,9 +1075,6 @@ else
         await ShowFeedback(ok, ok ? "Aptitude supprimée." : err ?? "Erreur");
     }
 
-    // ── Actions — Noms visées ────────────────────────────────────────────
-
-    // Crée un nouveau nom de visée et recharge la liste
     private async Task CreateNomVisee()
     {
         var (ok, err) = await Api.CreateAdminNomViseeAsync(new { nom = newNvNom });
@@ -1208,7 +1082,6 @@ else
         await ShowFeedback(ok, ok ? "Nom de visée ajouté." : err ?? "Erreur");
     }
 
-    // Supprime un nom de visée par son identifiant et recharge la liste
     private async Task DeleteNomVisee(int id)
     {
         var (ok, err) = await Api.DeleteAdminNomViseeAsync(id);
@@ -1216,9 +1089,6 @@ else
         await ShowFeedback(ok, ok ? "Nom de visée supprimé." : err ?? "Erreur");
     }
 
-    // ── Actions — Visées à maîtriser ─────────────────────────────────────
-
-    // Crée une nouvelle visée à maîtriser et recharge la liste
     private async Task CreateViseesMaitriser()
     {
         var (ok, err) = await Api.CreateAdminViseesMaitriserAsync(new { nom = newVmNom });
@@ -1226,7 +1096,6 @@ else
         await ShowFeedback(ok, ok ? "Visée à maîtriser ajoutée." : err ?? "Erreur");
     }
 
-    // Supprime une visée à maîtriser par son identifiant et recharge la liste
     private async Task DeleteViseesMaitriser(int id)
     {
         var (ok, err) = await Api.DeleteAdminViseesMaitriserAsync(id);

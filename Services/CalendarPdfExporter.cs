@@ -4,7 +4,6 @@ namespace Obrigenie.Services
 {
     public static class CalendarPdfExporter
     {
-        // Marges de page et couleurs, communes à toutes les vues
         private const float Marge      = 24f;
         private const float HautGrille = 58f;
         private const string GrisTrait = "0.65 0.65 0.65";

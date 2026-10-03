@@ -4,20 +4,20 @@ namespace Obrigenie.Services
     {
         private static readonly (string MotCle, string Couleur)[] ParMotCle =
         {
-            ("rentree",   "#2E7D32"),   // vert : reprise de l'année
-            ("toussaint", "#E65100"),   // orange automne
+            ("rentree",   "#2E7D32"),
+            ("toussaint", "#E65100"),
             ("automne",   "#E65100"),
-            ("noel",      "#C62828"),   // rouge Noël
+            ("noel",      "#C62828"),
             ("hiver",     "#C62828"),
-            ("carnaval",  "#6A1B9A"),   // violet Carnaval
+            ("carnaval",  "#6A1B9A"),
             ("detente",   "#6A1B9A"),
-            ("paques",    "#00897B"),   // vert-bleu printemps
+            ("paques",    "#00897B"),
             ("printemps", "#00897B"),
-            ("ete",       "#0277BD"),   // bleu été
-            ("armistice", "#455A64"),   // gris-bleu commémoration
+            ("ete",       "#0277BD"),
+            ("armistice", "#455A64"),
             ("ferie",     "#455A64"),
-            ("fete",      "#AD1457"),   // rose fête
-            ("pedagogiq", "#5D4037"),   // brun journée pédagogique
+            ("fete",      "#AD1457"),
+            ("pedagogiq", "#5D4037"),
         };
 
         private static readonly string[] Palette =

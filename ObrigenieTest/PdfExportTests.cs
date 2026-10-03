@@ -4,22 +4,8 @@ using Obrigenie.Services;
 
 namespace ObrigenieTest;
 
-/// <summary>
-/// Tests for the calendar PDF export.
-///
-/// Two concerns are covered:
-///   - <see cref="NoteLayout"/>: how notes are merged into blocks in the hour grid.
-///     The same code drives the on-screen grid and the printed page, so a regression
-///     here silently changes both.
-///   - <see cref="PdfWriter"/> / <see cref="CalendarPdfExporter"/>: the produced bytes
-///     must form a structurally valid PDF. The writer builds the cross-reference table
-///     by hand, so every declared offset is checked against the actual object position —
-///     a wrong offset yields a file that viewers refuse to open.
-/// </summary>
 public class PdfExportTests
 {
-    // ── Helpers ─────────────────────────────────────────────────────────────
-
     private static Note Note(int hour, int minute, int endHour, int endMinute, string content = "Test")
         => new()
         {
@@ -36,19 +22,15 @@ public class PdfExportTests
             Notes = notes.ToList(),
         };
 
-    // ── NoteLayout : fusion des blocs ───────────────────────────────────────
-
     [Fact]
     public void RowEnd_EndsOnTheHour_StopsAtThatRow()
     {
-        // 09:00 → 11:00 occupe les lignes 9 et 10, la ligne 11 reste libre
         Assert.Equal(11, NoteLayout.RowEnd(Note(9, 0, 11, 0)));
     }
 
     [Fact]
     public void RowEnd_EndsMidHour_CoversTheStartedRow()
     {
-        // 09:00 → 11:15 déborde sur la ligne 11, qui est donc occupée entièrement
         Assert.Equal(12, NoteLayout.RowEnd(Note(9, 0, 11, 15)));
     }
 
@@ -71,8 +53,6 @@ public class PdfExportTests
     [Fact]
     public void Blocs_OverlappingNotes_ShareTheSameBlock()
     {
-        // Sans fusion, la note de 10:00 tomberait sur une ligne déjà absorbée
-        // par la première et ne serait affichée nulle part.
         var blocs = NoteLayout.Blocs(new[] { Note(9, 0, 11, 0), Note(10, 0, 12, 0) }, 8, 18);
 
         var bloc = Assert.Single(blocs);
@@ -92,7 +72,6 @@ public class PdfExportTests
     [Fact]
     public void Blocs_NoteBeforeGrid_IsClippedToTheFirstRow()
     {
-        // Note héritée de l'ancienne grille commençant à 06:00
         var blocs = NoteLayout.Blocs(new[] { Note(6, 0, 9, 0) }, 8, 18);
 
         var bloc = Assert.Single(blocs);
@@ -127,8 +106,6 @@ public class PdfExportTests
         Assert.Equal("09:05 -> 11:30", NoteLayout.PlageHoraire(Note(9, 5, 11, 30)));
     }
 
-    // ── PdfWriter : structure du fichier ────────────────────────────────────
-
     [Fact]
     public void Jour_ProducesAStructurallyValidPdf()
     {
@@ -153,8 +130,6 @@ public class PdfExportTests
 
         AssertPdfValide(octets);
 
-        // La colonne des heures couvre les créneaux occupés, et chaque note garde sa plage.
-        // Les heures vides ne sont plus imprimées : seules 09:00 et 10:00 subsistent ici.
         var texte = Encoding.Latin1.GetString(octets);
         Assert.Contains("(09:00) Tj", texte);
         Assert.Contains("(10:00) Tj", texte);
@@ -164,8 +139,6 @@ public class PdfExportTests
     [Fact]
     public void Semaine_AvecIdentite_EcritLEnTeteDuDocument()
     {
-        // L'identité saisie avant l'impression doit figurer en tête du document,
-        // avec le nom de l'application et l'année scolaire.
         var octets = CalendarPdfExporter.Semaine("Semaine 24/08 - 28/08",
                                                  new List<Day> { DayWith() }, 8, 18,
                                                  "Jean Dupont - instituteur", "2026-2027");
@@ -181,7 +154,6 @@ public class PdfExportTests
     [Fact]
     public void Semaine_SansIdentite_NEcritPasDeLigneVide()
     {
-        // Sans saisie, l'en-tête se limite au nom de l'application et au titre.
         var texte = Encoding.Latin1.GetString(
             CalendarPdfExporter.Semaine("Semaine", new List<Day> { DayWith() }, 8, 18));
 
@@ -192,12 +164,11 @@ public class PdfExportTests
     [Fact]
     public void Jour_HeuresSansNote_NeSontPasImprimees()
     {
-        // Une journée avec une seule note ne doit pas sortir avec neuf lignes blanches.
         var texte = Encoding.Latin1.GetString(
             CalendarPdfExporter.Jour("lundi", DayWith(Note(9, 0, 11, 0)), 8, 18));
 
         Assert.Contains("(09:00) Tj", texte);
-        Assert.Contains("(10:00) Tj", texte);   // couverte par la note
+        Assert.Contains("(10:00) Tj", texte);
         Assert.DoesNotContain("(08:00) Tj", texte);
         Assert.DoesNotContain("(14:00) Tj", texte);
     }
@@ -205,7 +176,6 @@ public class PdfExportTests
     [Fact]
     public void Jour_SansAucuneNote_ConserveLaGrilleComplete()
     {
-        // Rien de planifié : mieux vaut un horaire vierge qu'une page blanche.
         var texte = Encoding.Latin1.GetString(CalendarPdfExporter.Jour("mardi", DayWith(), 8, 18));
 
         Assert.Contains("(08:00) Tj", texte);
@@ -215,7 +185,6 @@ public class PdfExportTests
     [Fact]
     public void Semaine_HeureVideChezTousLesJours_EstRetiree()
     {
-        // L'heure n'est retirée que si aucun jour de la semaine n'y a quelque chose.
         var jours = new List<Day>
         {
             DayWith(Note(9, 0, 10, 0)),
@@ -235,8 +204,6 @@ public class PdfExportTests
     [Fact]
     public void Semaine_NoteFusionnee_ResteDUnSeulTenant()
     {
-        // Les heures d'une même note sont toutes conservées : le bloc ne peut pas
-        // se retrouver coupé par une ligne supprimée entre son début et sa fin.
         var jours = new List<Day> { DayWith(Note(9, 0, 12, 0)) };
         var octets = CalendarPdfExporter.Semaine("Semaine", jours, 8, 18);
 
@@ -251,8 +218,6 @@ public class PdfExportTests
     [Fact]
     public void EnTete_ContientLeLogoEnImageJpeg()
     {
-        // Le logo est embarqué en JPEG et recopié tel quel dans le PDF : sa présence
-        // ajoute un objet image au document, dont la table xref doit rester juste.
         var octets = CalendarPdfExporter.Jour("lundi", DayWith(Note(9, 0, 10, 0)), 8, 18);
 
         AssertPdfValide(octets);
@@ -267,8 +232,6 @@ public class PdfExportTests
     [Fact]
     public void Logo_EstUnJpegValide()
     {
-        // Un JPEG commence par le marqueur SOI (FF D8) et se termine par EOI (FF D9) :
-        // le PDF ne décode pas l'image, un fichier tronqué passerait donc inaperçu.
         var jpeg = LogoObrigenie.Jpeg;
 
         Assert.True(jpeg.Length > 500);
@@ -306,8 +269,6 @@ public class PdfExportTests
     [Fact]
     public void Jour_EmojiAndArrows_AreStrippedFromTheContentStream()
     {
-        // Le PDF écrit ses chaînes en WinAnsi : les émojis n'y ont pas de place et
-        // laisseraient un fichier corrompu s'ils étaient copiés tels quels.
         var note = Note(9, 0, 10, 0, "📝 réunion → salle B");
         var texte = Encoding.Latin1.GetString(CalendarPdfExporter.Jour("Test", DayWith(note), 8, 18));
 
@@ -318,8 +279,6 @@ public class PdfExportTests
     [Fact]
     public void Grille_LongContent_DoesNotOverflowIntoAnExtraPage()
     {
-        // Le texte est rogné à la hauteur de la cellule : une note très longue ne doit
-        // pas faire grossir le document indéfiniment.
         var note = Note(9, 0, 10, 0, string.Join(" ", Enumerable.Repeat("mot", 500)));
         var octets = CalendarPdfExporter.Grille("Semaine", new List<Day> { DayWith(note) }, 5);
 
@@ -327,12 +286,6 @@ public class PdfExportTests
         Assert.Equal(1, CompterPages(Encoding.Latin1.GetString(octets)));
     }
 
-    // ── Vérifications communes ──────────────────────────────────────────────
-
-    /// <summary>
-    /// Vérifie l'en-tête, la présence de la table xref et surtout que chaque offset
-    /// annoncé pointe bien sur le début de l'objet correspondant.
-    /// </summary>
     private static void AssertPdfValide(byte[] octets)
     {
         Assert.NotNull(octets);
@@ -346,8 +299,6 @@ public class PdfExportTests
         Assert.Contains("/Type /Pages", texte);
         Assert.Contains("/BaseFont /Helvetica", texte);
 
-        // La table xref : "xref\n0 N\n" suivi d'une entrée par objet.
-        // On cherche "\nxref\n" et non "xref\n", sinon le "startxref" du trailer matche aussi.
         int posXref = texte.LastIndexOf("\nxref\n", StringComparison.Ordinal);
         Assert.True(posXref > 0, "Table xref absente.");
 
@@ -356,14 +307,12 @@ public class PdfExportTests
 
         for (int id = 1; id <= nbObjets; id++)
         {
-            // Entrées : ligne 0 = "xref", ligne 1 = en-tête, ligne 2 = objet libre 0
             long offset = long.Parse(lignes[2 + id][..10]);
             Assert.True(offset > 0 && offset < octets.Length, $"Offset hors fichier pour l'objet {id}.");
             Assert.StartsWith($"{id} 0 obj", texte[(int)offset..]);
         }
     }
 
-    /// <summary>Nombre de pages déclarées dans l'arbre de pages du document.</summary>
     private static int CompterPages(string texte)
     {
         int pos = texte.IndexOf("/Count ", StringComparison.Ordinal);

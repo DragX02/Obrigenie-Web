@@ -10,7 +10,6 @@
 <div class="account-page">
     <div class="account-card">
 
-        @* En-tête *@
         <div class="account-header">
             <div class="account-avatar-large">@userInitial</div>
             <div>
@@ -19,7 +18,6 @@
             </div>
         </div>
 
-        @* Section langue *@
         <div class="account-section">
             <div class="account-section-title">@Lang.T("account.lang")</div>
 
@@ -71,7 +69,6 @@
             }
         </div>
 
-        @* Bouton retour *@
         <button class="btn-account-back" @onclick="GoBack">
             ← @Lang.T("account.back")
         </button>
@@ -100,7 +97,6 @@
     {
         await Lang.SetAsync(lang);
         saved = true;
-        // Masque la confirmation après 2 s
         _ = Task.Delay(2000).ContinueWith(_ => InvokeAsync(() => { saved = false; StateHasChanged(); }));
     }
 

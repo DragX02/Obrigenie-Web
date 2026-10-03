@@ -1,27 +1,3 @@
-@* ─────────────────────────────────────────────────────────────────────────────
-   CascadeSelector.razor — Composant réutilisable de sélection en cascade.
-
-   Reprend le flux réordonné de la page /test (TestPage.razor) sous forme de
-   composant compact, embarquable (ex : panneau latéral de la modale de note) :
-     1. Année            → Niveau (tous niveaux ayant des visées)
-     2. Cours            → tous les cours enseignés à ce niveau (toutes catégories)
-     3. Champ            → table domaine, pour la combinaison cours + niveau
-     4. Domaine          → table sous_domaine, optionnel, masqué si le champ n'en a pas
-                           (sauf en mode élargi, pour y ajouter le premier)
-     5. Compétences, savoirs, S-F → champ competence de la visée
-     6. Visées           → tous les NomVisée du cours et de l'année, sans doublon —
-                           sélection multiple avec recherche (MultiSelectSearch)
-     7. Visées à maîtriser → toutes celles du cours et de l'année, sans doublon —
-                           sélection multiple avec recherche également
-
-   Tout ce qui est retenu aux étapes 6 et 7 est remonté au parent et finit dans le
-   texte affiché sur la note ; la clé étrangère de la note ne retient que la
-   première visée cochée (la table note n'en référence qu'une).
-
-   À chaque changement, OnSelectionChanged est invoqué avec l'état courant afin
-   que le parent puisse associer la sélection à une note.
-   ───────────────────────────────────────────────────────────────────────────── *@
-
 @inject ApiService Api
 
 <div class="cascade-selector">
@@ -31,7 +7,6 @@
         <div class="cascade-error">@loadError</div>
     }
 
-    @* Étape 1 : année (niveau) *@
     <div class="cascade-field">
         <label>1. Année</label>
         <SearchableSelect Value="@selectedNiveau"
@@ -40,7 +15,6 @@
                           Options="OptionsNiveaux" EmptyValue="" />
     </div>
 
-    @* Étape 2 : cours (tous les cours du niveau, toutes catégories confondues) *@
     @if (!string.IsNullOrEmpty(selectedNiveau))
     {
         <div class="cascade-field">
@@ -52,7 +26,6 @@
         </div>
     }
 
-    @* Sous-sélection langue (LM uniquement) *@
     @if (selectedCours == "LM")
     {
         <div class="cascade-field cascade-field-lm">
@@ -64,8 +37,6 @@
         </div>
     }
 
-    @* À partir du champ, tout se complète : taper un nom absent des listes propose de
-       l'ajouter, et le bouton ouvre en plus les tables entières aux étapes 5 à 8. *@
     @if (!string.IsNullOrEmpty(selectedCours))
     {
         <div class="cascade-completion">
@@ -83,7 +54,6 @@
         </div>
     }
 
-    @* Étape 3 : champ (table domaine du référentiel) *@
     @if (!string.IsNullOrEmpty(selectedCours))
     {
         <div class="cascade-field">
@@ -96,9 +66,6 @@
         </div>
     }
 
-    @* Étape 4 : domaine (table sous_domaine du référentiel), optionnel.
-       Masquée tant que le champ choisi n'a aucun domaine à proposer ; le mode élargi
-       la rouvre, c'est là qu'on ajoute le premier domaine d'un champ. *@
     @if (selectedIdDomaine > 0 && (listeSousDomaines.Count > 0 || elargir))
     {
         <div class="cascade-field">
@@ -111,7 +78,6 @@
         </div>
     }
 
-    @* Étape 5 : compétences, savoirs, savoir-faire (champ competence de la visée) *@
     @if (selectedIdDomaine > 0)
     {
         <div class="cascade-field">
@@ -119,7 +85,6 @@
         </div>
     }
 
-    @* Étape 6 : visées (nom_visee) — sélection multiple avec recherche *@
     @if (selectedIdCompetence > 0)
     {
         <div class="cascade-field">
@@ -132,8 +97,6 @@
         </div>
     }
 
-    @* Étape 7 : compétence des visées à maîtriser. Comme à l'étape 5, ce choix ne filtre
-       rien : c'est lui qui intitule le bloc des visées à maîtriser dans la note. *@
     @if (selectedIdNomVisees.Count > 0)
     {
         <div class="cascade-field">
@@ -141,7 +104,6 @@
         </div>
     }
 
-    @* Étape 8 : visées à maîtriser des visées retenues — sélection multiple avec recherche *@
     @if (selectedIdNomVisees.Count > 0)
     {
         <div class="cascade-field">
@@ -156,8 +118,6 @@
 </div>
 
 @code {
-    // Invoqué à chaque changement de sélection : permet au parent (modale de note)
-    // de connaître la visée choisie pour, plus tard, l'associer à la note.
     [Parameter] public EventCallback<CascadeSelection> OnSelectionChanged { get; set; }
 
     private string? loadError;
@@ -167,13 +127,10 @@
         try { listeNiveaux = await Api.GetNiveauxTousAsync(); }
         catch (Exception ex) { loadError = ex.Message; }
 
-        // La table des compétences est chargée d'emblée : l'étape 5 y ajoute
-        // Compétences / Savoirs / Savoir-faire même quand le champ ne les propose pas.
         try { toutesCompetences = await Api.GetCompetencesRefAsync(); }
         catch (Exception ex) { loadError = ex.Message; }
     }
 
-    // ── Mode élargi : listes complètes des tables du référentiel ───────────
     private bool elargir;
 
     private List<CompetenceRefDto>        toutesCompetences = new();
@@ -193,7 +150,6 @@
         catch (Exception ex) { loadError = ex.Message; }
     }
 
-    // ── Sélections courantes ───────────────────────────────────────────────
     private string selectedNiveau       = "";
     private string selectedCours        = "";
     private string selectedLangue       = "";
@@ -201,17 +157,12 @@
     private int    selectedIdSousD      = 0;
     private int    selectedIdCompetence = 0;
 
-    // Compétence des visées à maîtriser (étape 7) : sert uniquement d'intitulé au bloc
-    // correspondant dans la note, comme la compétence de l'étape 5 pour les visées.
     private int    selectedIdCompetenceVm = 0;
 
-    // Étapes 6 et 7 : sélection multiple par cases à cocher.
-    // selectedIdVisees est dérivé de selectedIdNomVisees (couple compétence + nom_visee).
     private readonly HashSet<int> selectedIdNomVisees = new();
     private readonly HashSet<int> selectedIdVisees    = new();
     private readonly HashSet<int> selectedIdVms       = new();
 
-    // ── Listes chargées ────────────────────────────────────────────────────
     private List<NiveauDto>             listeNiveaux         = new();
     private List<CoursDto>              listeCours           = new();
     private List<DomaineDto>            domainesFiltres      = new();
@@ -219,12 +170,9 @@
     private List<ViseeRefDto>           listeVisees          = new();
     private List<ViseesMaitriserRefDto> listeViseesMaitriser = new();
 
-    // Tout le référentiel du cours et de l'année choisis, tous champs confondus :
-    // c'est lui qui alimente les étapes 6 et 8, dédoublonné.
     private List<ViseeRefDto>           viseesDuCours = new();
     private List<ViseesMaitriserRefDto> vmDuCours     = new();
 
-    // ── Options des listes déroulantes cherchables ─────────────────────────
     private static SearchableSelect.SelectOption Opt(string value, string label) => new(value, label);
 
     private IEnumerable<SearchableSelect.SelectOption> OptionsNiveaux =>
@@ -246,12 +194,6 @@
     private IEnumerable<SearchableSelect.SelectOption> OptionsSousDomaines =>
         listeSousDomaines.Select(s => Opt(s.IdSousDomaine.ToString(), s.NomComp));
 
-    // En mode élargi, les listes de visées viennent des tables complètes plutôt que
-    // du seul référentiel du champ choisi. Les entrées déjà rattachées restent en
-    // tête pour rester repérables.
-    // Les étapes 5 et 7 ne proposent que ces intitulés : ils nomment le bloc de la
-    // note, ils ne filtrent rien. Ils sont résolus en compétences réelles du
-    // référentiel ; celui qui n'existe pas encore est créé à la sélection.
     private static readonly string[] CompetencesProposees =
         { "Compétences", "Savoirs", "Savoir-faire" };
 
@@ -264,8 +206,6 @@
     private IEnumerable<SearchableSelect.SelectOption> OptionsCompetencesVm =>
         CompetencesVmProposees.Select(OptionCompetenceFigee);
 
-    // Option d'une entrée toujours proposée : son identifiant si la table la connaît,
-    // sinon une valeur « nouveau:… » qui déclenche sa création à la sélection.
     private SearchableSelect.SelectOption OptionCompetenceFigee(string nom)
     {
         var connue = toutesCompetences.FirstOrDefault(
@@ -284,8 +224,6 @@
             : Fusionner(ListeNomVisees.Select(nv => Opt(nv.Id.ToString(), nv.Nom)),
                         Enumerable.Empty<SearchableSelect.SelectOption>());
 
-    // Étape 8 : les visées à maîtriser des visées cochées d'abord, puis toutes celles
-    // du cours et de l'année, sans doublon.
     private IEnumerable<SearchableSelect.SelectOption> OptionsVmDuCours =>
         Fusionner(listeViseesMaitriser.Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser)),
                   vmDuCours.OrderBy(vm => vm.NomViseesMaitriser)
@@ -298,8 +236,6 @@
                                 .Select(vm => Opt(vm.IdViseesMaitriser.ToString(), vm.NomViseesMaitriser)))
             : OptionsVmDuCours;
 
-    // Concatène deux listes d'options en écartant les doublons, de valeur comme
-    // d'intitulé : la même entrée ne doit jamais figurer deux fois dans une liste.
     private static IEnumerable<SearchableSelect.SelectOption> Fusionner(
         IEnumerable<SearchableSelect.SelectOption> tete,
         IEnumerable<SearchableSelect.SelectOption> reste)
@@ -315,24 +251,16 @@
         }
     }
 
-    // ── Sélections vues comme des chaînes, pour MultiSelectSearch ──────────
     private IReadOnlyCollection<string> ValeursNomVisees =>
         selectedIdNomVisees.Select(i => i.ToString()).ToList();
 
     private IReadOnlyCollection<string> ValeursVms =>
         selectedIdVms.Select(i => i.ToString()).ToList();
 
-    // ── Listes dérivées ────────────────────────────────────────────────────
-
-    // Étape 6 : tous les attendus du cours et de l'année, tous champs et toutes
-    // compétences confondus. La compétence de l'étape 5 ne filtre plus la liste,
-    // elle ne fait qu'intituler le bloc dans la note.
     private IEnumerable<(int Id, string Nom)> ListeNomVisees =>
         viseesDuCours.GroupBy(v => v.IdNomVisee)
                      .Select(g => (Id: g.Key, Nom: g.First().NomVisee))
                      .OrderBy(x => x.Nom);
-
-    // ── Gestionnaires ──────────────────────────────────────────────────────
 
     private async Task OnNiveauChanged(string? value)
     {
@@ -391,7 +319,6 @@
 
     private async Task OnCompetenceChanged(string? value)
     {
-        // Entrée toujours proposée mais absente de la table : on la crée à la volée.
         if (value != null && value.StartsWith(PrefixeNouveau, StringComparison.Ordinal))
         {
             await AjouterCompetence(value[PrefixeNouveau.Length..]);
@@ -403,7 +330,6 @@
         await Notify();
     }
 
-    // Étape 7 : compétence qui intitulera le bloc des visées à maîtriser.
     private async Task OnCompetenceVmChanged(string? value)
     {
         if (value != null && value.StartsWith(PrefixeNouveau, StringComparison.Ordinal))
@@ -416,14 +342,6 @@
         await Notify();
     }
 
-    // ── Ajout d'entrées absentes du référentiel ───────────────────────────
-    // Chaque utilisateur peut compléter les tables depuis la cascade : ce qui n'existe
-    // nulle part est créé, puis immédiatement sélectionné. Les appels sont rejouables
-    // côté serveur, un nom déjà présent rend simplement son identifiant.
-
-    // Année et cours sont des données fixes : la complétion commence au champ.
-
-    // Étape 3 : nouveau champ pour le cours et l'année choisis.
     private async Task AjouterDomaine(string nom)
     {
         if (string.IsNullOrEmpty(selectedCours) || string.IsNullOrEmpty(selectedNiveau)) return;
@@ -435,7 +353,6 @@
         await OnDomaineChanged(id.ToString());
     }
 
-    // Étape 4 : nouveau domaine sous le champ choisi.
     private async Task AjouterSousDomaine(string nom)
     {
         if (selectedIdDomaine == 0) return;
@@ -479,8 +396,6 @@
         var (ok, id, err) = await Api.CreateRefNomViseeAsync(nom);
         if (!ok || id == 0) { loadError = err ?? "Ajout de la visée refusé."; return; }
 
-        // La nouvelle entrée n'appartient à aucun champ : elle doit figurer dans la
-        // liste pour être sélectionnable, donc le mode élargi s'active de lui-même.
         elargir = true;
         try { tousNomVisees = await Api.GetNomViseesRefAsync(); }
         catch (Exception ex) { loadError = ex.Message; }
@@ -500,14 +415,11 @@
         await ToggleVm(id.ToString());
     }
 
-    // Étape 6 : ajoute / retire une visée. Les visées à maîtriser proposées sont
-    // celles de l'ensemble des visées retenues.
     private async Task ToggleNomVisee(string valeur)
     {
         if (!int.TryParse(valeur, out var idNomVisee)) return;
         if (!selectedIdNomVisees.Remove(idNomVisee)) selectedIdNomVisees.Add(idNomVisee);
 
-        // Résoudre les IdVisée correspondants (couple compétence + nom_visee).
         selectedIdVisees.Clear();
         foreach (var id in selectedIdNomVisees)
         {
@@ -530,15 +442,12 @@
         await Notify();
     }
 
-    // Étape 7 : ajoute / retire une visée à maîtriser.
     private async Task ToggleVm(string valeur)
     {
         if (!int.TryParse(valeur, out var idVm)) return;
         if (!selectedIdVms.Remove(idVm)) selectedIdVms.Add(idVm);
         await Notify();
     }
-
-    // ── Helpers ────────────────────────────────────────────────────────────
 
     private void ResetFrom(int level)
     {
@@ -550,7 +459,6 @@
         ViderVisees();
     }
 
-    // Vide les étapes 6 et 7 (visées cochées et visées à maîtriser proposées).
     private void ViderVisees()
     {
         selectedIdCompetenceVm = 0;
@@ -560,10 +468,6 @@
         listeViseesMaitriser.Clear();
     }
 
-    // Charge tous les cours enseignés au niveau choisi, toutes catégories confondues.
-    // Le serveur rend la liste déjà fusionnée et dédoublonnée (un cours peut être
-    // rattaché à plusieurs catégories) : ce travail se faisait ici, au prix d'un appel
-    // par catégorie du niveau.
     private async Task ChargerCours()
     {
         listeCours.Clear();
@@ -580,9 +484,6 @@
         catch (Exception ex) { loadError = ex.Message; }
     }
 
-    // Tout le référentiel du cours et de l'année : les visées de chacun de ses champs,
-    // puis les visées à maîtriser de ces visées. C'est ce que proposent les étapes 6 et 8,
-    // quel que soit le champ choisi ensuite.
     private async Task ChargerViseesDuCours()
     {
         viseesDuCours.Clear();
@@ -615,17 +516,11 @@
         catch (Exception ex) { loadError = ex.Message; }
     }
 
-    // Visées à maîtriser de toutes les visées cochées. Le serveur les fusionne et les
-    // dédoublonne en une requête ; la boucle qui interrogeait ici une visée à la fois
-    // coûtait un aller-retour par case cochée.
     private async Task ChargerViseesMaitriser()
     {
         try { listeViseesMaitriser = await Api.GetViseesMaitriserParViseesAsync(selectedIdVisees); }
         catch (Exception ex) { loadError = ex.Message; return; }
 
-        // Les cases cochées qui ne sont plus proposées sont abandonnées.
-        // En mode élargi, une visée à maîtriser peut venir de la table complète sans être
-        // encore reliée : on ne l'abandonne pas, le lien sera créé à l'enregistrement.
         if (elargir) return;
 
         var proposees = listeViseesMaitriser.Select(vm => vm.IdViseesMaitriser).ToHashSet();
@@ -634,34 +529,16 @@
         selectedIdVms.RemoveWhere(id => !proposees.Contains(id));
     }
 
-    // ── Écriture en base des liens manquants ──────────────────────────────
-
-    /// <summary>
-    /// Vrai quand la sélection contient des entrées qui n'existent pas encore dans le
-    /// référentiel du champ : visée à créer, ou lien visée ↔ visée à maîtriser à créer.
-    /// </summary>
     public bool ReferentielAComplete =>
         selectedIdCompetence > 0 &&
         (selectedIdNomVisees.Any(id => ViseeExistante(id) == 0) ||
          (selectedIdVisees.Count > 0 &&
           selectedIdVms.Any(idVm => !listeViseesMaitriser.Any(vm => vm.IdViseesMaitriser == idVm))));
 
-    // Identifiant de la visée reliant le champ courant à ce nom_visee, 0 si elle n'existe pas.
     private int ViseeExistante(int idNomVisee) =>
         listeVisees.FirstOrDefault(v => v.IdCompetence == selectedIdCompetence
                                      && v.IdNomVisee   == idNomVisee)?.IdVisee ?? 0;
 
-    /// <summary>
-    /// Crée en base ce qui manque pour que la sélection soit complète : une visée par
-    /// nom_visee retenu qui n'en a pas encore pour ce champ, puis les liens vers les
-    /// visées à maîtriser retenues. Recharge ensuite les listes et remonte l'état.
-    /// Retourne null si tout s'est bien passé, sinon le message d'erreur.
-    ///
-    /// Le serveur mène la séquence entière dans une transaction. Elle se faisait ici :
-    /// une requête par visée à créer, une relecture pour récupérer les identifiants
-    /// attribués, puis une requête par lien — et un onglet fermé au milieu laissait des
-    /// visées créées sans aucun lien, que rien ne venait rattraper.
-    /// </summary>
     public async Task<string?> SynchroniserReferentielAsync()
     {
         if (!ReferentielAComplete) return null;
@@ -672,12 +549,8 @@
 
         if (!ok) return err ?? "Enregistrement du référentiel refusé.";
 
-        // Relecture : les listes affichées doivent contenir les visées qui viennent
-        // d'être créées, sans quoi elles resteraient marquées comme manquantes.
         await RechargerViseesDuChamp();
 
-        // Les identifiants rendus par le serveur font foi : ils couvrent aussi les
-        // visées créées à l'instant, dans l'ordre des intitulés envoyés.
         selectedIdVisees.Clear();
         foreach (var idVisee in idVisees) selectedIdVisees.Add(idVisee);
 
@@ -686,7 +559,6 @@
         return null;
     }
 
-    // Recharge les visées du champ courant.
     private async Task RechargerViseesDuChamp()
     {
         try
@@ -697,20 +569,16 @@
         catch (Exception ex) { loadError = ex.Message; }
     }
 
-    // Libellé d'une compétence : depuis les visées du champ, sinon depuis la table
-    // complète (entrée choisie hors du référentiel du champ, ou créée à la volée).
     private string? NomCompetenceDe(int idCompetence) =>
         idCompetence == 0 ? null
         : listeVisees.FirstOrDefault(v => v.IdCompetence == idCompetence)?.NomCompetence
           ?? toutesCompetences.FirstOrDefault(c => c.IdCompetence == idCompetence)?.NomCompetence;
 
-    // Libellés des options dont l'identifiant est retenu, dans l'ordre d'affichage.
     private static List<string> LibellesRetenus(
         IEnumerable<SearchableSelect.SelectOption> options, HashSet<int> retenus) =>
         options.Where(o => int.TryParse(o.Value, out var id) && retenus.Contains(id))
                .Select(o => o.Label).ToList();
 
-    // Remonte l'état courant au parent (avec les libellés résolus).
     private async Task Notify()
     {
         if (!OnSelectionChanged.HasDelegate) return;
@@ -729,9 +597,6 @@
             NomCompetence   = NomCompetenceDe(selectedIdCompetence),
             IdCompetenceVm  = selectedIdCompetenceVm,
             NomCompetenceVm = NomCompetenceDe(selectedIdCompetenceVm),
-            // Étapes 6 et 7 : tout ce qui est retenu, dans l'ordre d'affichage des listes.
-            // Les libellés viennent des options affichées (référentiel du champ ou table
-            // complète), les identifiants de visée des seules visées déjà reliées.
             IdVisees        = selectedIdVisees.ToList(),
             NomVisees       = LibellesRetenus(OptionsNomVisees, selectedIdNomVisees),
             IdsViseesMaitriser  = selectedIdVms.ToList(),
@@ -739,7 +604,6 @@
         });
     }
 
-    // État complet de la sélection remonté au parent.
     public class CascadeSelection
     {
         public string? CodeNiveau { get; set; }
@@ -751,45 +615,22 @@
         public string? NomDomaine { get; set; }
         public int     IdSousDomaine { get; set; }
         public string? NomSousDomaine { get; set; }
-        // Compétence de l'étape 5 : intitule le bloc des visées dans la note.
         public int     IdCompetence { get; set; }
         public string? NomCompetence { get; set; }
 
-        // Compétence de l'étape 7 : intitule le bloc des visées à maîtriser.
         public int     IdCompetenceVm { get; set; }
         public string? NomCompetenceVm { get; set; }
 
-        // Étape 6 : visées cochées (plusieurs possibles), listes parallèles.
         public List<int>    IdVisees  { get; set; } = new();
         public List<string> NomVisees { get; set; } = new();
 
-        // Étape 7 : visées à maîtriser cochées (plusieurs possibles).
         public List<int>    IdsViseesMaitriser  { get; set; } = new();
         public List<string> NomsViseesMaitriser { get; set; } = new();
 
-        // Première visée cochée : c'est elle qui alimente la clé étrangère de la note
-        // (la table note ne référence qu'une visée ; le détail complet vit dans le texte).
         public int IdVisee => IdVisees.Count > 0 ? IdVisees[0] : 0;
 
-        // Vrai dès qu'une visée est retenue, sous forme d'identifiant ou de simple
-        // intitulé (une entrée choisie hors du référentiel du champ n'a pas encore d'id).
         public bool ADesVisees => IdVisee > 0 || NomVisees.Count > 0;
 
-        /// <summary>
-        /// La sélection en texte, une ligne par niveau renseigné :
-        ///
-        ///     Année : 1ère primaire
-        ///     Cours : Français
-        ///     Champ : Orienter sa prise de parole, son écoute, sa lecture, son écrit
-        ///     Savoir-faire : Assigner un but à sa lecture ou son écoute
-        ///     Compétences : Déterminer un but d'écoute selon l'intention précisée
-        ///                   Utiliser les termes du support de lecture comme indices
-        ///
-        /// C'est cette forme qui est figée sur la note ou la préparation de leçon au
-        /// moment de l'enregistrement, puis affichée telle quelle à l'écran, à
-        /// l'impression et dans le PDF. Elle vit ici, sur la sélection elle-même, pour
-        /// que les deux écrans qui l'emploient ne puissent pas en donner deux versions.
-        /// </summary>
         public string EnTexte()
         {
             var lignes = new List<string>();
@@ -799,17 +640,13 @@
                 if (!string.IsNullOrWhiteSpace(valeur)) lignes.Add($"{label} : {valeur}");
             }
 
-            // Intitulé d'un bloc : la compétence choisie, à défaut le libellé générique.
             static string Libelle(string? competence, string defaut) =>
                 string.IsNullOrWhiteSpace(competence) ? defaut : competence;
 
-            // Bloc à valeurs multiples : le libellé n'est écrit qu'une fois, les valeurs
-            // suivantes sont alignées dessous, sous la première (indentation conservée
-            // à l'affichage comme à l'impression).
             void AjouterBloc(string label, IReadOnlyList<string> valeurs)
             {
                 if (valeurs.Count == 0) return;
-                var marge = new string(' ', label.Length + 3);   // largeur de « label : »
+                var marge = new string(' ', label.Length + 3);
                 lignes.Add($"{label} : {valeurs[0]}");
                 for (var i = 1; i < valeurs.Count; i++) lignes.Add(marge + valeurs[i]);
             }
@@ -820,9 +657,6 @@
             Ajouter("Champ", NomDomaine);
             Ajouter("Domaine", NomSousDomaine);
 
-            // Les compétences choisies ne s'écrivent pas sur une ligne à elles : ce sont
-            // elles qui intitulent les blocs qu'elles qualifient (« Savoirs : … » plutôt
-            // que « Visée : … »). Sans choix, on retombe sur le libellé générique.
             AjouterBloc(Libelle(NomCompetence, "Visée"), NomVisees);
             AjouterBloc(Libelle(NomCompetenceVm, "Visée à maîtriser"), NomsViseesMaitriser);
 

@@ -9,7 +9,6 @@ namespace Obrigenie.Services
     {
         private readonly HttpClient _httpClient;
 
-       
         private readonly AuthService _auth;
 
         public ApiService(HttpClient httpClient, AuthService auth)
@@ -24,7 +23,6 @@ namespace Obrigenie.Services
             {
                 var response = await _httpClient.GetAsync("api/auth/exchange");
 
-                // Retourne l'AuthResponse désérialisé en cas de succès ; null pour tout statut non-succès
                 if (response.IsSuccessStatusCode)
                     return await response.Content.ReadFromJsonAsync<AuthResponse>();
 
@@ -32,7 +30,6 @@ namespace Obrigenie.Services
             }
             catch
             {
-                // Les erreurs réseau ou de sérialisation retournent null ; l'appelant gère la redirection
                 return null;
             }
         }
@@ -42,12 +39,9 @@ namespace Obrigenie.Services
             {
                 var response = await _httpClient.PostAsJsonAsync("api/auth/login", loginDto);
 
-                // Désérialise et retourne le payload du jeton sur HTTP 200
                 if (response.IsSuccessStatusCode)
                     return (await response.Content.ReadFromJsonAsync<AuthResponse>(), null);
 
-                // 429 : la politique de limitation de débit du serveur a rejeté la requête
-                // (5 requêtes / 15 min par IP, partagées entre connexion et inscription)
                 if ((int)response.StatusCode == 429)
                     return (null, "Trop de tentatives. Veuillez réessayer dans quelques minutes.");
 
@@ -349,11 +343,6 @@ namespace Obrigenie.Services
             }
         }
 
-        // Crée une préparation (Id == 0) ou met à jour une existante.
-        // Le serveur réécrit le déroulement en bloc et renumérote les phases.
-        // Endpoint : POST api/lecons
-        // Retourne (true, la préparation enregistrée, null) en cas de succès ;
-        // (false, null, message) sinon, pour que l'interface affiche le refus inline.
         public async Task<(bool Ok, Lecon? Lecon, string? Err)> SaveLeconAsync(Lecon lecon)
         {
             try
@@ -390,7 +379,6 @@ namespace Obrigenie.Services
         {
             try
             {
-                // Envoie le code comme objet JSON avec une seule propriété "code"
                 var response = await _httpClient.PostAsJsonAsync("api/access/validate", new { code });
                 return response.IsSuccessStatusCode;
             }
@@ -605,74 +593,59 @@ namespace Obrigenie.Services
         public Task<(bool Ok, string? Err)>       CreateAdminCategorieAsync(object dto)        => AdminPostAsync("api/admin-data/categories", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminCategorieAsync(int id)            => AdminDeleteAsync($"api/admin-data/categories/{id}");
 
-        // Cours
         public Task<List<CoursAdminDto>>          GetAdminCoursAsync()                        => AdminGetListAsync<CoursAdminDto>("api/admin-data/cours");
         public Task<(bool Ok, string? Err)>       CreateAdminCoursAsync(object dto)            => AdminPostAsync("api/admin-data/cours", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminCoursAsync(int id)               => AdminDeleteAsync($"api/admin-data/cours/{id}");
 
-        // Niveaux
         public Task<List<NiveauAdminDto>>         GetAdminNiveauxAsync()                      => AdminGetListAsync<NiveauAdminDto>("api/admin-data/niveaux");
         public Task<(bool Ok, string? Err)>       CreateAdminNiveauAsync(object dto)           => AdminPostAsync("api/admin-data/niveaux", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminNiveauAsync(int id)              => AdminDeleteAsync($"api/admin-data/niveaux/{id}");
 
-        // Professeurs (lecture seule)
         public Task<List<ProfesseurAdminDto>>     GetAdminProfesseursAsync()                  => AdminGetListAsync<ProfesseurAdminDto>("api/admin-data/professeurs");
 
-        // Liaisons Cours-Niveau
         public Task<List<CoursNiveauAdminDto>>    GetAdminCoursNiveauxAsync()                 => AdminGetListAsync<CoursNiveauAdminDto>("api/admin-data/cours-niveaux");
         public Task<(bool Ok, string? Err)>       CreateAdminCoursNiveauAsync(object dto)      => AdminPostAsync("api/admin-data/cours-niveaux", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminCoursNiveauAsync(int id)         => AdminDeleteAsync($"api/admin-data/cours-niveaux/{id}");
 
-        // Domaines
         public Task<List<DomaineAdminDto>>        GetAdminDomainesAsync()                     => AdminGetListAsync<DomaineAdminDto>("api/admin-data/domaines");
         public Task<(bool Ok, string? Err)>       CreateAdminDomaineAsync(object dto)          => AdminPostAsync("api/admin-data/domaines", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminDomaineAsync(int id)             => AdminDeleteAsync($"api/admin-data/domaines/{id}");
 
-        // Compétences
         public Task<List<CompetenceAdminDto>>     GetAdminCompetencesAsync()                  => AdminGetListAsync<CompetenceAdminDto>("api/admin-data/competences");
         public Task<(bool Ok, string? Err)>       CreateAdminCompetenceAsync(object dto)       => AdminPostAsync("api/admin-data/competences", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminCompetenceAsync(int id)          => AdminDeleteAsync($"api/admin-data/competences/{id}");
 
-        // Aptitudes
         public Task<List<AptitudeAdminDto>>       GetAdminAptitudesAsync()                    => AdminGetListAsync<AptitudeAdminDto>("api/admin-data/aptitudes");
         public Task<(bool Ok, string? Err)>       CreateAdminAptitudeAsync(object dto)         => AdminPostAsync("api/admin-data/aptitudes", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminAptitudeAsync(int id)            => AdminDeleteAsync($"api/admin-data/aptitudes/{id}");
 
-        // Noms de visées
         public Task<List<NomViseeAdminDto>>       GetAdminNomViseesAsync()                    => AdminGetListAsync<NomViseeAdminDto>("api/admin-data/nom-visees");
         public Task<(bool Ok, string? Err)>       CreateAdminNomViseeAsync(object dto)         => AdminPostAsync("api/admin-data/nom-visees", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminNomViseeAsync(int id)            => AdminDeleteAsync($"api/admin-data/nom-visees/{id}");
 
-        // Visées à maîtriser
         public Task<List<ViseesMaitriserAdminDto>> GetAdminViseesMaitriserAsync()              => AdminGetListAsync<ViseesMaitriserAdminDto>("api/admin-data/visees-maitriser");
         public Task<(bool Ok, string? Err)>        CreateAdminViseesMaitriserAsync(object dto) => AdminPostAsync("api/admin-data/visees-maitriser", dto);
         public Task<(bool Ok, string? Err)>        DeleteAdminViseesMaitriserAsync(int id)     => AdminDeleteAsync($"api/admin-data/visees-maitriser/{id}");
 
-        // Sous-domaines
         public Task<List<SousDomaineAdminDto>>    GetAdminSousDomainesAsync()                 => AdminGetListAsync<SousDomaineAdminDto>("api/admin-data/sous-domaines");
         public Task<(bool Ok, string? Err)>       CreateAdminSousDomaineAsync(object dto)      => AdminPostAsync("api/admin-data/sous-domaines", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminSousDomaineAsync(int id)         => AdminDeleteAsync($"api/admin-data/sous-domaines/{id}");
 
-        // Visées
         public Task<List<ViseeAdminDto>>          GetAdminViseesAsync()                       => AdminGetListAsync<ViseeAdminDto>("api/admin-data/visees");
         public Task<(bool Ok, string? Err)>       CreateAdminViseeAsync(object dto)            => AdminPostAsync("api/admin-data/visees", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminViseeAsync(int id)               => AdminDeleteAsync($"api/admin-data/visees/{id}");
 
-        // Liaisons visée ↔ visée à maîtriser
         public Task<List<LienViseeMaitriseAdminDto>> GetAdminLiensViseeMaitriseAsync()         => AdminGetListAsync<LienViseeMaitriseAdminDto>("api/admin-data/lien-visee-maitrise");
         public Task<(bool Ok, string? Err)>          CreateAdminLienViseeMaitriseAsync(object dto) => AdminPostAsync("api/admin-data/lien-visee-maitrise", dto);
         public Task<(bool Ok, string? Err)>          DeleteAdminLienViseeMaitriseAsync(int idVisee, int idVm) => AdminDeleteAsync($"api/admin-data/lien-visee-maitrise/{idVisee}/{idVm}");
 
-        // Liaisons visée_maitriser ↔ aptitude ↔ compétence
         public Task<List<AppartenirAdminDto>>     GetAdminAppartenirAsync()                   => AdminGetListAsync<AppartenirAdminDto>("api/admin-data/appartenir-visee-aptitude");
         public Task<(bool Ok, string? Err)>       CreateAdminAppartenirAsync(object dto)       => AdminPostAsync("api/admin-data/appartenir-visee-aptitude", dto);
         public Task<(bool Ok, string? Err)>       DeleteAdminAppartenirAsync(int id)          => AdminDeleteAsync($"api/admin-data/appartenir-visee-aptitude/{id}");
 
-   
         private async Task<HttpRequestMessage> BuildAuthRequest(HttpMethod method, string url)
         {
             var request = new HttpRequestMessage(method, url);
-            // Lit le jeton JWT stocké et l'attache comme en-tête Authorization Bearer
             var token = await _auth.GetTokenAsync();
             if (!string.IsNullOrEmpty(token))
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -863,12 +836,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<CategorieDto>>() ?? new();
         }
 
-        // Récupère tous les cours (matières) appartenant à une catégorie spécifique.
-        // Utilisé pour peupler la deuxième liste déroulante après qu'une catégorie a été sélectionnée.
-        // Endpoint : GET api/ref/cours/{idCat}
-        // Lève HttpRequestException si le serveur retourne un code de statut non-succès.
-        // idCat : la clé primaire de la catégorie sélectionnée.
-        // Retourne une liste de CoursDto.
         public async Task<List<CoursDto>> GetCoursAsync(int idCat)
         {
             var request = await BuildAuthRequest(HttpMethod.Get, $"api/ref/cours/{idCat}");
@@ -878,10 +845,6 @@ namespace Obrigenie.Services
             return await response.Content.ReadFromJsonAsync<List<CoursDto>>() ?? new();
         }
 
-        // Récupère TOUS les niveaux disponibles (ayant des visées), indépendamment du cours.
-        // Alimente la première liste déroulante de la cascade réordonnée (Année en premier).
-        // Endpoint : GET api/ref/niveaux
-        // Retourne une liste de NiveauDto triée par code de niveau.
         public async Task<List<NiveauDto>> GetNiveauxTousAsync()
         {
             var request = await BuildAuthRequest(HttpMethod.Get, "api/ref/niveaux");
