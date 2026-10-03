@@ -62,7 +62,7 @@ namespace Obrigenie.Services
         private const float InterligneSemaine = TailleSemaine + 2f;
         private const float RetraitCadre      = 2f;
         private const float MargeCadre        = 4f;
-        private const float EcartCadres       = 3f;
+        private const float EcartCadres       = 0f;
         private const string OrangeCadre      = "0.85 0.55 0.1";
 
         private readonly record struct LigneCadre(string Texte, bool Gras, string Couleur);
@@ -94,14 +94,34 @@ namespace Obrigenie.Services
 
                 foreach (var cadre in CadresDuJour(jours[d], heureDebut, heureFin, largeurTexte))
                 {
-                    float h = Math.Min(hDispo - 2 * RetraitCadre, HauteurCadre(cadre.Lignes));
-                    if (y > RetraitCadre && y + h > hDispo - RetraitCadre)
+                    var reste = new List<LigneCadre>(cadre.Lignes);
+                    bool suite = false;
+
+                    while (reste.Count > 0)
                     {
-                        page++;
-                        y = RetraitCadre;
+                        var entete = suite
+                            ? new List<LigneCadre> { new($"{cadre.Lignes[0].Texte} (suite)", true, cadre.Lignes[0].Couleur) }
+                            : new List<LigneCadre>();
+
+                        float libre = hDispo - RetraitCadre - y;
+                        int capacite = (int)Math.Floor((libre - 2 * MargeCadre + 0.01f) / InterligneSemaine) - entete.Count;
+
+                        if (capacite < Math.Min(2, reste.Count) && y > RetraitCadre)
+                        {
+                            page++;
+                            y = RetraitCadre;
+                            continue;
+                        }
+
+                        int n = Math.Clamp(capacite, 1, reste.Count);
+                        var morceau = entete.Concat(reste.Take(n)).ToList();
+                        reste.RemoveRange(0, n);
+
+                        float h = HauteurCadre(morceau);
+                        placements.Add(new Placement(page, d, y, h, cadre with { Lignes = morceau }));
+                        y += h + EcartCadres;
+                        suite = true;
                     }
-                    placements.Add(new Placement(page, d, y, h, cadre));
-                    y += h + EcartCadres;
                 }
             }
 
@@ -189,10 +209,10 @@ namespace Obrigenie.Services
                 if (ReportNote.Cible(note.Content) is DateTime cible)
                     lignes.Add(new LigneCadre(PdfWriter.Nettoyer($"-> Reporte au {cible:dd/MM/yyyy}"), false, OrangeNote));
 
-                foreach (var l in PdfWriter.Decouper(PdfWriter.Nettoyer(note.ViseeContexte), t, largeur))
+                foreach (var l in PdfWriter.Decouper(ReduireRetrait(PdfWriter.Nettoyer(note.ViseeContexte)), t, largeur))
                     lignes.Add(new LigneCadre(l, false, VertCours));
 
-                foreach (var l in PdfWriter.Decouper(PdfWriter.Nettoyer(ReportNote.Texte(note.Content)), t, largeur))
+                foreach (var l in PdfWriter.Decouper(ReduireRetrait(PdfWriter.Nettoyer(ReportNote.Texte(note.Content))), t, largeur))
                     lignes.Add(new LigneCadre(l, false, "0 0 0"));
 
                 cadres.Add(new CadreSemaine(new TimeSpan(note.Hour, note.Minute, 0), true, lignes));
@@ -200,6 +220,13 @@ namespace Obrigenie.Services
 
             return cadres.OrderBy(c => c.Debut).ThenBy(c => c.EstNote).ToList();
         }
+
+        private static string ReduireRetrait(string texte)
+            => string.Join("\n", texte.Split('\n').Select(l =>
+            {
+                var contenu = l.TrimStart();
+                return contenu.Length < l.Length ? "  " + contenu : contenu;
+            }));
 
         private static float HauteurCadre(IEnumerable<LigneCadre> lignes)
             => 2 * MargeCadre + lignes.Count() * InterligneSemaine;

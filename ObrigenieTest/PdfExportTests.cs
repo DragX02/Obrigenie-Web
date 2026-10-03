@@ -182,6 +182,31 @@ public class PdfExportTests
     }
 
     [Fact]
+    public void Semaine_CadreTropLong_EstCoupeEtContinueSurLaPageSuivante()
+    {
+        var courte = Note(8, 0, 9, 0, string.Join("\n", Enumerable.Range(1, 30).Select(i => $"Ligne {i}")));
+        var longue = Note(10, 0, 11, 0, string.Join("\n", Enumerable.Range(1, 40).Select(i => $"Point {i}")));
+
+        var texte = Encoding.Latin1.GetString(
+            CalendarPdfExporter.Semaine("Semaine", new List<Day> { DayWith(courte, longue) }, 8, 18));
+
+        Assert.Contains("(10:00 -> 11:00 \\(suite\\)) Tj", texte);
+        var yPoint1 = YDuTexte(texte, "Point 1");
+        Assert.True(yPoint1 < 400, "le début de la note longue doit remplir le bas de la première page");
+    }
+
+    [Fact]
+    public void Semaine_RetraitDuContenu_EstReduitADeuxEspaces()
+    {
+        var note = Note(9, 0, 10, 0, "Titre\n            Sous-point indenté");
+
+        var texte = Encoding.Latin1.GetString(
+            CalendarPdfExporter.Semaine("Semaine", new List<Day> { DayWith(note) }, 8, 18));
+
+        Assert.Contains("(  Sous-point indenté) Tj", texte);
+    }
+
+    [Fact]
     public void Semaine_AvecIdentite_EcritLEnTeteDuDocument()
     {
         var octets = CalendarPdfExporter.Semaine("Semaine 24/08 - 28/08",
