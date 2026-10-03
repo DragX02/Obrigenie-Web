@@ -123,7 +123,7 @@ public class PdfExportTests
     }
 
     [Fact]
-    public void Semaine_DrawsTheHourColumnAndTheNoteRanges()
+    public void Semaine_DrawsTheNoteRanges()
     {
         var jours = new List<Day> { DayWith(Note(9, 0, 11, 0)), DayWith(), DayWith(), DayWith(), DayWith() };
         var octets = CalendarPdfExporter.Semaine("Semaine 17/08 - 21/08", jours, 8, 18);
@@ -131,13 +131,11 @@ public class PdfExportTests
         AssertPdfValide(octets);
 
         var texte = Encoding.Latin1.GetString(octets);
-        Assert.Contains("(09:00) Tj", texte);
-        Assert.Contains("(10:00) Tj", texte);
         Assert.Contains("(09:00 -> 11:00) Tj", texte);
     }
 
     [Fact]
-    public void Semaine_ToutLeTexteDeLaGrille_EstEnTaille10()
+    public void Semaine_ToutLeTexteDeLaGrille_EstEnTaille8()
     {
         var note = Note(9, 0, 10, 0, "Contenu de la note");
         note.Titre = "Dictée";
@@ -145,10 +143,30 @@ public class PdfExportTests
 
         var texte = Encoding.Latin1.GetString(CalendarPdfExporter.Semaine("Semaine", jours, 8, 18));
 
-        Assert.Matches(@"/F2 10 Tf [^\n]*\(09:00 -> 10:00\) Tj", texte);
-        Assert.Matches(@"/F1 10 Tf [^\n]*\(Contenu de la note\) Tj", texte);
-        Assert.Matches(@"/F1 10 Tf [^\n]*\(09:00\) Tj", texte);
-        Assert.Matches(@"/F2 10 Tf [^\n]*\(Lundi 17\) Tj", texte);
+        Assert.Matches(@"/F2 8 Tf [^\n]*\(09:00 -> 10:00\) Tj", texte);
+        Assert.Matches(@"/F1 8 Tf [^\n]*\(Contenu de la note\) Tj", texte);
+        Assert.Matches(@"/F2 8 Tf [^\n]*\(Lundi 17\) Tj", texte);
+    }
+
+    [Fact]
+    public void Semaine_NotesDUnJour_SontEmpileesSansCadreVide()
+    {
+        var jours = new List<Day> { DayWith(Note(14, 0, 15, 0), Note(8, 0, 9, 0)) };
+
+        var texte = Encoding.Latin1.GetString(CalendarPdfExporter.Semaine("Semaine", jours, 8, 18));
+
+        var y08 = YDuTexte(texte, "08:00 -> 09:00");
+        var y14 = YDuTexte(texte, "14:00 -> 15:00");
+        Assert.True(y08 > y14, "la note de 8h doit être au-dessus de celle de 14h");
+        Assert.True(y08 - y14 < 40, "la note de 14h doit suivre directement celle de 8h");
+        Assert.DoesNotContain("(10:00) Tj", texte);
+    }
+
+    private static float YDuTexte(string pdf, string texte)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(pdf, $@"1 0 0 1 [\d.]+ ([\d.]+) Tm \({System.Text.RegularExpressions.Regex.Escape(texte)}\) Tj");
+        Assert.True(m.Success, $"texte introuvable : {texte}");
+        return float.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     [Fact]
@@ -210,26 +228,19 @@ public class PdfExportTests
     }
 
     [Fact]
-    public void Semaine_HeureVideChezTousLesJours_EstRetiree()
+    public void Semaine_NoteHorsPlage_EstIgnoree()
     {
-        var jours = new List<Day>
-        {
-            DayWith(Note(9, 0, 10, 0)),
-            DayWith(Note(14, 0, 15, 0)),
-            DayWith(),
-        };
+        var jours = new List<Day> { DayWith(Note(6, 0, 7, 0), Note(9, 0, 10, 0)) };
 
         var texte = Encoding.Latin1.GetString(
             CalendarPdfExporter.Semaine("Semaine", jours, 8, 18));
 
-        Assert.Contains("(09:00) Tj", texte);
-        Assert.Contains("(14:00) Tj", texte);
-        Assert.DoesNotContain("(11:00) Tj", texte);
-        Assert.DoesNotContain("(17:00) Tj", texte);
+        Assert.Contains("(09:00 -> 10:00) Tj", texte);
+        Assert.DoesNotContain("(06:00 -> 07:00) Tj", texte);
     }
 
     [Fact]
-    public void Semaine_NoteFusionnee_ResteDUnSeulTenant()
+    public void Semaine_NoteSurPlusieursHeures_ApparaitUneSeuleFois()
     {
         var jours = new List<Day> { DayWith(Note(9, 0, 12, 0)) };
         var octets = CalendarPdfExporter.Semaine("Semaine", jours, 8, 18);
@@ -237,9 +248,7 @@ public class PdfExportTests
         AssertPdfValide(octets);
 
         var texte = Encoding.Latin1.GetString(octets);
-        Assert.Contains("(09:00) Tj", texte);
-        Assert.Contains("(10:00) Tj", texte);
-        Assert.Contains("(11:00) Tj", texte);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(texte, @"\(09:00 -> 12:00\) Tj"));
     }
 
     [Fact]

@@ -58,13 +58,18 @@ namespace Obrigenie.Services
             return pdf.Build();
         }
 
-        private const float TailleSemaine     = 10f;
+        private const float TailleSemaine     = 8f;
         private const float InterligneSemaine = TailleSemaine + 2f;
         private const float RetraitCadre      = 2f;
-        private const float MargeCadre        = 5f;
+        private const float MargeCadre        = 4f;
+        private const float EcartCadres       = 3f;
         private const string OrangeCadre      = "0.85 0.55 0.1";
 
-        private readonly record struct LigneCadre(string Texte, bool Gras, string Couleur, float Espace = 0f);
+        private readonly record struct LigneCadre(string Texte, bool Gras, string Couleur);
+
+        private sealed record CadreSemaine(TimeSpan Debut, bool EstNote, List<LigneCadre> Lignes);
+
+        private readonly record struct Placement(int Page, int Jour, float Y, float Hauteur, CadreSemaine Cadre);
 
         public static byte[] Semaine(string titre, IReadOnlyList<Day> jours, int heureDebut, int heureFin,
                                      string? identite = null, string? anneeScolaire = null)
@@ -75,39 +80,34 @@ namespace Obrigenie.Services
             if (jours.Count == 0) return pdf.Build();
 
             const float t = TailleSemaine;
-            float largeurLabel = 46f;
-            float hEntete      = 22f;
-
-            float xJours       = Marge + largeurLabel;
-            float lCol         = (pdf.PageWidth - Marge - xJours) / jours.Count;
+            float hEntete      = 18f;
+            float lCol         = (pdf.PageWidth - 2 * Marge) / jours.Count;
             float largeurTexte = lCol - 2 * (RetraitCadre + MargeCadre);
-            float hDispo       = pdf.PageHeight - HautGrille - Marge - hEntete;
+            float yHaut        = HautGrille + hEntete;
+            float hDispo       = pdf.PageHeight - Marge - yHaut;
 
-            var heures = HeuresOccupees(jours, heureDebut, heureFin);
-
-            var cadres = jours
-                .Select(j => heures.Select(h => LignesCadre(j, h, heureDebut, heureFin, largeurTexte)).ToList())
-                .ToList();
-
-            float hMin = HauteurCadre(new[] { new LigneCadre("", false, "") });
-            var hauteurs = heures
-                .Select((_, i) => Math.Min(hDispo, Math.Max(hMin, cadres.Max(c => HauteurCadre(c[i])))))
-                .ToList();
-
-            var pages = new List<List<int>> { new() };
-            float cumul = 0;
-            for (int i = 0; i < heures.Count; i++)
+            var placements = new List<Placement>();
+            for (int d = 0; d < jours.Count; d++)
             {
-                if (pages[^1].Count > 0 && cumul + hauteurs[i] > hDispo)
+                int page = 0;
+                float y = RetraitCadre;
+
+                foreach (var cadre in CadresDuJour(jours[d], heureDebut, heureFin, largeurTexte))
                 {
-                    pages.Add(new List<int>());
-                    cumul = 0;
+                    float h = Math.Min(hDispo - 2 * RetraitCadre, HauteurCadre(cadre.Lignes));
+                    if (y > RetraitCadre && y + h > hDispo - RetraitCadre)
+                    {
+                        page++;
+                        y = RetraitCadre;
+                    }
+                    placements.Add(new Placement(page, d, y, h, cadre));
+                    y += h + EcartCadres;
                 }
-                pages[^1].Add(i);
-                cumul += hauteurs[i];
             }
 
-            for (int p = 0; p < pages.Count; p++)
+            int nbPages = placements.Count == 0 ? 1 : placements.Max(p => p.Page) + 1;
+
+            for (int p = 0; p < nbPages; p++)
             {
                 if (p > 0)
                 {
@@ -115,18 +115,14 @@ namespace Obrigenie.Services
                     Titre(pdf, titre, identite, anneeScolaire);
                 }
 
-                var lignes = pages[p];
-                float bonus   = (hDispo - lignes.Sum(i => hauteurs[i])) / lignes.Count;
                 float hauteur = hEntete + hDispo;
-
                 pdf.Rect(Marge, HautGrille, pdf.PageWidth - 2 * Marge, hauteur, 0.8f, GrisTrait);
-                pdf.Line(xJours, HautGrille, xJours, HautGrille + hauteur, 0.8f, GrisTrait);
-                pdf.Line(Marge, HautGrille + hEntete, pdf.PageWidth - Marge, HautGrille + hEntete, 0.8f, GrisTrait);
+                pdf.Line(Marge, yHaut, pdf.PageWidth - Marge, yHaut, 0.8f, GrisTrait);
 
                 for (int d = 0; d < jours.Count; d++)
                 {
                     var jour = jours[d];
-                    float x = xJours + d * lCol;
+                    float x = Marge + d * lCol;
 
                     if (d > 0) pdf.Line(x, HautGrille, x, HautGrille + hauteur, 0.5f, GrisTrait);
 
@@ -142,67 +138,50 @@ namespace Obrigenie.Services
                     }
                 }
 
-                float y = HautGrille + hEntete;
-                for (int k = 0; k < lignes.Count; k++)
+                foreach (var pl in placements.Where(pl => pl.Page == p))
                 {
-                    int i = lignes[k];
-                    float h = hauteurs[i] + bonus;
+                    float xc = Marge + pl.Jour * lCol + RetraitCadre;
+                    float yc = yHaut + pl.Y;
+                    float lc = lCol - 2 * RetraitCadre;
 
-                    if (k > 0) pdf.Line(Marge, y, xJours, y, 0.4f, GrisTrait);
-                    pdf.Text(Marge + 4, y + RetraitCadre + MargeCadre, t, $"{heures[i]:D2}:00", false, GrisTexte);
+                    if (!pl.Cadre.EstNote) pdf.FillRect(xc, yc, lc, pl.Hauteur, "0.93 0.93 0.93");
+                    pdf.Rect(xc, yc, lc, pl.Hauteur, pl.Cadre.EstNote ? 0.8f : 0.4f,
+                             pl.Cadre.EstNote ? OrangeCadre : GrisTrait);
 
-                    for (int d = 0; d < jours.Count; d++)
+                    float yTexte = yc + MargeCadre;
+                    float yMax   = yc + pl.Hauteur - MargeCadre;
+                    foreach (var ligne in pl.Cadre.Lignes)
                     {
-                        var contenu = cadres[d][i];
-                        bool aNote  = contenu.Any(l => l.Couleur == OrangeNote);
-
-                        float xc = xJours + d * lCol + RetraitCadre;
-                        float yc = y + RetraitCadre;
-                        float lc = lCol - 2 * RetraitCadre;
-                        float hc = h - 2 * RetraitCadre;
-
-                        if (jours[d].Courses.Any(c => CoursCouvre(c, heures[i], heureDebut, heureFin)))
-                            pdf.FillRect(xc, yc, lc, hc, "0.93 0.93 0.93");
-                        pdf.Rect(xc, yc, lc, hc, aNote ? 0.8f : 0.4f, aNote ? OrangeCadre : GrisTrait);
-
-                        float yTexte = yc + MargeCadre;
-                        float yMax   = yc + hc - MargeCadre;
-                        foreach (var ligne in contenu)
-                        {
-                            yTexte += ligne.Espace;
-                            if (yTexte + InterligneSemaine > yMax + 2f) break;
-                            pdf.Text(xc + MargeCadre, yTexte, t, ligne.Texte, ligne.Gras, ligne.Couleur);
-                            yTexte += InterligneSemaine;
-                        }
+                        if (yTexte + InterligneSemaine > yMax + 2f) break;
+                        pdf.Text(xc + MargeCadre, yTexte, t, ligne.Texte, ligne.Gras, ligne.Couleur);
+                        yTexte += InterligneSemaine;
                     }
-
-                    y += h;
                 }
             }
 
             return pdf.Build();
         }
 
-        private static List<LigneCadre> LignesCadre(Day jour, int heure, int heureDebut, int heureFin, float largeur)
+        private static List<CadreSemaine> CadresDuJour(Day jour, int heureDebut, int heureFin, float largeur)
         {
             const float t = TailleSemaine;
-            var lignes = new List<LigneCadre>();
+            var cadres = new List<CadreSemaine>();
 
             foreach (var cours in jour.Courses)
             {
-                if (Math.Max(cours.StartTime.Hours, heureDebut) != heure
-                    || !CoursCouvre(cours, heure, heureDebut, heureFin)) continue;
+                int fin = cours.EndTime.Minutes > 0 ? cours.EndTime.Hours + 1 : cours.EndTime.Hours;
+                if (cours.StartTime.Hours >= heureFin || fin <= heureDebut) continue;
 
                 var libelle = PdfWriter.Nettoyer($"{cours.StartTime:hh\\:mm}-{cours.EndTime:hh\\:mm} {cours.Name}");
-                lignes.Add(new LigneCadre(PdfWriter.Tronquer(libelle, t, largeur), true, VertCours));
+                cadres.Add(new CadreSemaine(cours.StartTime, false,
+                    new List<LigneCadre> { new(PdfWriter.Tronquer(libelle, t, largeur), true, VertCours) }));
             }
 
-            foreach (var note in jour.Notes.OrderBy(n => n.Hour).ThenBy(n => n.Minute))
+            foreach (var note in jour.Notes)
             {
-                if (Math.Max(note.Hour, heureDebut) != heure
-                    || note.Hour >= heureFin || NoteLayout.RowEnd(note) <= heureDebut) continue;
+                if (note.Hour >= heureFin || NoteLayout.RowEnd(note) <= heureDebut) continue;
 
-                lignes.Add(new LigneCadre(NoteLayout.PlageHoraire(note), true, OrangeNote, lignes.Count > 0 ? 4f : 0f));
+                var lignes = new List<LigneCadre> { new(NoteLayout.PlageHoraire(note), true, OrangeNote) };
 
                 foreach (var l in PdfWriter.Decouper(PdfWriter.Nettoyer(note.Titre), t, largeur))
                     lignes.Add(new LigneCadre(l, true, "0 0 0"));
@@ -215,20 +194,15 @@ namespace Obrigenie.Services
 
                 foreach (var l in PdfWriter.Decouper(PdfWriter.Nettoyer(ReportNote.Texte(note.Content)), t, largeur))
                     lignes.Add(new LigneCadre(l, false, "0 0 0"));
+
+                cadres.Add(new CadreSemaine(new TimeSpan(note.Hour, note.Minute, 0), true, lignes));
             }
 
-            return lignes;
+            return cadres.OrderBy(c => c.Debut).ThenBy(c => c.EstNote).ToList();
         }
 
         private static float HauteurCadre(IEnumerable<LigneCadre> lignes)
-            => 2 * (RetraitCadre + MargeCadre) + lignes.Sum(l => l.Espace + InterligneSemaine);
-
-        private static bool CoursCouvre(Course cours, int heure, int heureDebut, int heureFin)
-        {
-            int debut = Math.Max(cours.StartTime.Hours, heureDebut);
-            int fin   = Math.Min(cours.EndTime.Minutes > 0 ? cours.EndTime.Hours + 1 : cours.EndTime.Hours, heureFin);
-            return heure >= debut && heure < fin;
-        }
+            => 2 * MargeCadre + lignes.Count() * InterligneSemaine;
 
         public static byte[] Grille(string titre, IReadOnlyList<Day> jours, int colonnes,
                                     string? identite = null, string? anneeScolaire = null)
